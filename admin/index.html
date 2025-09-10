@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MM Shop - Админ Панель</title>
+    <link rel="stylesheet" href="styles.css?v=3.0">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+</head>
+<body>
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal" style="display: block;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-lock"></i> Вход в админ панель</h3>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" required class="form-input" placeholder="admin@mm.com">
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="login-password" required class="form-input" placeholder="admin123">
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Войти</button>
+                    <button type="button" class="btn btn-secondary" onclick="testConnection()" style="margin-top: 10px; width: 100%;">Проверить подключение</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="admin-container" id="admin-content" style="display: none;">
+        <!-- Мобильная кнопка навигации -->
+        <button class="mobile-nav-toggle" id="mobile-nav-toggle" style="display: none;">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Мобильный тапбар удален -->
+        
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-shopping-bag"></i> MM Shop</h2>
+                <p>Админ Панель</p>
+            </div>
+            
+            <ul class="nav-menu">
+                <li class="nav-item active" data-tab="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Дашборд</span>
+                </li>
+                <li class="nav-item" data-tab="products">
+                    <i class="fas fa-box"></i>
+                    <span>Товары</span>
+                </li>
+                <li class="nav-item" data-tab="categories">
+                    <i class="fas fa-tags"></i>
+                    <span>Категории</span>
+                </li>
+                <li class="nav-item" data-tab="users">
+                    <i class="fas fa-users"></i>
+                    <span>Пользователи</span>
+                </li>
+                <li class="nav-item" data-tab="roles">
+                    <i class="fas fa-user-shield"></i>
+                    <span>Роли</span>
+                </li>
+                <li class="nav-item" data-tab="orders">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Заказы</span>
+                </li>
+                <li class="nav-item" data-tab="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Настройки</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="breadcrumb">
+                    <span id="current-page">Дашборд</span>
+                </div>
+                <div class="user-menu" onclick="toggleUserDropdown()">
+                    <span id="header-user-name">Администратор</span>
+                    <i class="fas fa-user-circle"></i>
+                    <div class="user-dropdown" style="
+                    color: white;
+                " id="user-dropdown">
+                        <div class="dropdown-item">
+                            <i class="fas fa-user"></i>
+                            <span id="header-user-email">admin@mm.com</span>
+                        </div>
+                        <div class="dropdown-item">
+                            <i class="fas fa-user-shield"></i>
+                            <span id="header-user-role">Администратор</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Выйти</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="total-products">0</h3>
+                            <p>Товаров</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="total-users">0</h3>
+                            <p>Пользователей</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="total-orders">0</h3>
+                            <p>Заказов</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="total-revenue">₽0</h3>
+                            <p>Доход</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-section">
+                    <h3>Последние заказы</h3>
+                    <div id="recent-orders" class="table-container">
+                        <p>Загрузка...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Tab -->
+            <div id="products" class="tab-content">
+                <div class="content-header">
+                    <h2>Управление товарами</h2>
+                    <button class="btn btn-primary" onclick="openProductModal()">
+                        <i class="fas fa-plus"></i> Добавить товар
+                    </button>
+                </div>
+                
+                <div class="filters">
+                    <input type="text" id="product-search" placeholder="Поиск товаров..." class="search-input">
+                    <select id="category-filter" class="filter-select">
+                        <option value="">Все категории</option>
+                    </select>
+                </div>
+                
+                <div id="products-table" class="table-container">
+                    <p>Загрузка товаров...</p>
+                </div>
+            </div>
+
+            <!-- Categories Tab -->
+            <div id="categories" class="tab-content">
+                <div class="content-header">
+                    <h2>Управление категориями</h2>
+                    <button class="btn btn-primary" onclick="openCategoryModal()">
+                        <i class="fas fa-plus"></i> Добавить категорию
+                    </button>
+                </div>
+                
+                <div id="categories-table" class="table-container">
+                    <p>Загрузка категорий...</p>
+                </div>
+            </div>
+
+            <!-- Orders Tab -->
+            <div id="orders" class="tab-content">
+                <div class="content-header">
+                    <h2>Управление заказами</h2>
+                </div>
+                
+                <div id="orders-table" class="table-container">
+                    <p>Загрузка заказов...</p>
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="users" class="tab-content">
+                <div class="content-header">
+                    <h2><i class="fas fa-users"></i> Управление пользователями</h2>
+                    <button class="btn btn-primary" onclick="openUserModal()">
+                        <i class="fas fa-plus"></i> Добавить пользователя
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    <h3><i class="fas fa-users"></i> Список пользователей</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-user"></i> Имя</th>
+                                    <th><i class="fas fa-envelope"></i> Email</th>
+                                    <th><i class="fas fa-phone"></i> Телефон</th>
+                                    <th><i class="fas fa-user-shield"></i> Роль</th>
+                                    <th><i class="fas fa-toggle-on"></i> Статус</th>
+                                    <th><i class="fas fa-calendar"></i> Дата регистрации</th>
+                                    <th><i class="fas fa-cogs"></i> Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr>
+                                    <td colspan="7" class="text-center loading">
+                                        <i class="fas fa-spinner fa-spin"></i> Загрузка пользователей...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Имя</th>
+                                <th>Email</th>
+                                <th>Роль</th>
+                                <th>Статус</th>
+                                <th>Дата регистрации</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <!-- Данные будут загружены динамически -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Roles Tab -->
+            <div id="roles" class="tab-content">
+                <div class="content-header">
+                    <h2><i class="fas fa-user-shield"></i> Управление ролями</h2>
+                    <button class="btn btn-primary" onclick="openRoleModal()">
+                        <i class="fas fa-plus"></i> Добавить роль
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    <h3><i class="fas fa-user-shield"></i> Список ролей</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-tag"></i> Название</th>
+                                    <th><i class="fas fa-eye"></i> Отображаемое имя</th>
+                                    <th><i class="fas fa-info-circle"></i> Описание</th>
+                                    <th><i class="fas fa-key"></i> Разрешения</th>
+                                    <th><i class="fas fa-toggle-on"></i> Статус</th>
+                                    <th><i class="fas fa-users"></i> Пользователей</th>
+                                    <th><i class="fas fa-cogs"></i> Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="roles-table-body">
+                                <tr>
+                                    <td colspan="7" class="text-center loading">
+                                        <i class="fas fa-spinner fa-spin"></i> Загрузка ролей...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content">
+                <div class="content-header">
+                    <h2>Настройки системы</h2>
+                </div>
+                
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label>API URL</label>
+                        <input type="text" id="api-url" value="http://localhost:8080" class="form-input">
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSettings()">Сохранить настройки</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Product Modal -->
+    <div id="product-modal" class="modal">
+        <div class="modal-content" style="max-width: 1200px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 id="product-modal-title">Добавить товар</h3>
+                <span class="close" onclick="closeProductModal()">&times;</span>
+            </div>
+            <form id="product-form">
+                <!-- Основная информация о товаре -->
+                <div class="form-section">
+                    <h4>Основная информация</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Название товара</label>
+                            <input type="text" id="product-name" required class="form-input" placeholder="Введите название товара">
+                        </div>
+                        <div class="form-group">
+                            <label>Бренд</label>
+                            <input type="text" id="product-brand" class="form-input" placeholder="Введите бренд">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Категория</label>
+                            <select id="product-category" required class="form-input">
+                                <option value="">Выберите категорию</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Пол</label>
+                            <select id="product-gender" class="form-input">
+                                <option value="unisex">Унисекс</option>
+                                <option value="male">Мужской</option>
+                                <option value="female">Женский</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Описание</label>
+                        <textarea id="product-description" rows="3" class="form-input" placeholder="Опишите товар"></textarea>
+                    </div>
+                </div>
+
+                <!-- Вариации товара -->
+                <div class="form-section">
+                    <div class="variations-container">
+                        <div class="variations-header">
+                            <h4>Вариации товара (размеры, цвета, цены, фото)</h4>
+                            <button type="button" class="btn btn-primary" onclick="addVariation()">
+                                <i class="fas fa-plus"></i> Добавить вариацию
+                            </button>
+                        </div>
+                        <div class="variations-list" id="variations-list">
+                            <!-- Вариации будут добавляться здесь -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Сохранить товар</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeProductModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Modal -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="user-modal-title">Добавить пользователя</h3>
+                <span class="close" onclick="closeUserModal()">&times;</span>
+            </div>
+            <form id="user-form">
+                <div class="form-group">
+                    <label>Имя</label>
+                    <input type="text" id="modal-user-name" required class="form-input" placeholder="Введите имя пользователя">
+                </div>
+                
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="modal-user-email" required class="form-input" placeholder="user@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="modal-user-password" required class="form-input" placeholder="Минимум 8 символов">
+                </div>
+                
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input type="tel" id="modal-user-phone" class="form-input" placeholder="+7-999-000-00-00">
+                </div>
+                
+                <div class="form-group">
+                    <label>Роль</label>
+                    <select id="modal-user-role" class="form-input">
+                        <option value="">Выберите роль</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="user-active" checked>
+                        Активный пользователь
+                    </label>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Создать пользователя</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Role Modal -->
+    <div id="role-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="role-modal-title">Добавить роль</h3>
+                <span class="close" onclick="closeRoleModal()">&times;</span>
+            </div>
+            <form id="role-form">
+                <div class="form-group">
+                    <label>Название роли</label>
+                    <input type="text" id="role-name" required class="form-input" placeholder="admin, user, moderator">
+                </div>
+                
+                <div class="form-group">
+                    <label>Отображаемое имя</label>
+                    <input type="text" id="role-display-name" required class="form-input" placeholder="Администратор, Пользователь">
+                </div>
+                
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea id="role-description" rows="3" class="form-input" placeholder="Описание роли"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Права доступа (JSON)</label>
+                    <textarea id="role-permissions" rows="4" class="form-input" placeholder='{"dashboard": true, "users": true, "products": true}'></textarea>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Создать роль</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeRoleModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div id="category-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="category-modal-title">Добавить категорию</h3>
+                <span class="close" onclick="closeCategoryModal()">&times;</span>
+            </div>
+            <form id="category-form">
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" id="category-name" required class="form-input">
+                </div>
+                
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea id="category-description" rows="3" class="form-input"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Родительская категория</label>
+                    <select id="category-parent" class="form-input">
+                        <option value="">Нет родительской категории</option>
+                    </select>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCategoryModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Проверяем загрузку стилей
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('💄 Стили CSS v3.0 загружены!');
+        });
+        
+        // Проверяем загрузку всей страницы
+        window.addEventListener('load', function() {
+            console.log('✅ Все ресурсы админки загружены полностью!');
+            console.log('🕒 Время полной загрузки:', performance.now(), 'мс');
+        });
+    </script>
+    <script src="config.js?v=1.0"></script>
+    <script src="script.js?v=3.3-1702567890"></script>
+    <script src="fix-user-display.js?v=1.0"></script>
+</body>
+</html> 
