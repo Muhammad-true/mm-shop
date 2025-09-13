@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
@@ -607,5 +608,152 @@ func (pc *ProductController) GetProductAdmin(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"product": product.ToResponse(),
+	})
+}
+
+// GetProductsWithVariations возвращает продукты с вариациями через JOIN запрос
+func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
+	var productsWithVariations []models.ProductWithVariation
+
+	// Строим SQL запрос с JOIN
+	query := `
+		SELECT
+			p.id AS product_id,
+			p.name,
+			p.description,
+			p.brand,
+			pv.sizes,
+			pv.colors,
+			pv.price,
+			pv.original_price,
+			pv.image_urls,
+			pv.stock_quantity,
+			pv.sku
+		FROM
+			public.products as p 
+		INNER JOIN public.product_variations pv ON p.id = pv.product_id
+		WHERE p.is_available = true AND pv.is_available = true
+	`
+
+	// Получаем текущего пользователя из контекста для фильтрации
+	currentUser, exists := c.Get("user")
+	if exists {
+		user := currentUser.(models.User)
+		query += " AND p.owner_id = $1"
+
+		// Выполняем запрос с параметром пользователя
+		if err := database.DB.Raw(query, user.ID).Scan(&productsWithVariations).Error; err != nil {
+			log.Printf("❌ Ошибка выполнения JOIN запроса: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to fetch products with variations",
+			})
+			return
+		}
+	} else {
+		// Выполняем запрос без фильтрации по пользователю
+		if err := database.DB.Raw(query).Scan(&productsWithVariations).Error; err != nil {
+			log.Printf("❌ Ошибка выполнения JOIN запроса: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to fetch products with variations",
+			})
+			return
+		}
+	}
+
+	log.Printf("📦 Получено %d записей продуктов с вариациями", len(productsWithVariations))
+
+	// Применяем дополнительные фильтры
+	filteredProducts := productsWithVariations
+
+	// Фильтрация по бренду
+	if brand := c.Query("brand"); brand != "" {
+		var temp []models.ProductWithVariation
+		for _, product := range filteredProducts {
+			if product.Brand == brand {
+				temp = append(temp, product)
+			}
+		}
+		filteredProducts = temp
+	}
+
+	// Фильтрация по цене
+	if minPrice := c.Query("min_price"); minPrice != "" {
+		if min, err := strconv.ParseFloat(minPrice, 64); err == nil {
+			var temp []models.ProductWithVariation
+			for _, product := range filteredProducts {
+				if product.Price >= min {
+					temp = append(temp, product)
+				}
+			}
+			filteredProducts = temp
+		}
+	}
+
+	if maxPrice := c.Query("max_price"); maxPrice != "" {
+		if max, err := strconv.ParseFloat(maxPrice, 64); err == nil {
+			var temp []models.ProductWithVariation
+			for _, product := range filteredProducts {
+				if product.Price <= max {
+					temp = append(temp, product)
+				}
+			}
+			filteredProducts = temp
+		}
+	}
+
+	// Поиск по названию или описанию
+	if search := c.Query("search"); search != "" {
+		var temp []models.ProductWithVariation
+		searchLower := strings.ToLower(search)
+		for _, product := range filteredProducts {
+			if strings.Contains(strings.ToLower(product.Name), searchLower) ||
+				strings.Contains(strings.ToLower(product.Description), searchLower) {
+				temp = append(temp, product)
+			}
+		}
+		filteredProducts = temp
+	}
+
+	// Пагинация
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	total := len(filteredProducts)
+	offset := (page - 1) * limit
+
+	// Применяем пагинацию
+	start := offset
+	end := offset + limit
+	if start > total {
+		start = total
+	}
+	if end > total {
+		end = total
+	}
+
+	var paginatedProducts []models.ProductWithVariation
+	if start < total {
+		paginatedProducts = filteredProducts[start:end]
+	}
+
+	log.Printf("📦 Возвращаем %d записей (страница %d из %d)", len(paginatedProducts), page, (total+limit-1)/limit)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    paginatedProducts,
+		"pagination": gin.H{
+			"page":       page,
+			"limit":      limit,
+			"total":      total,
+			"totalPages": (total + limit - 1) / limit,
+		},
+		"message": "Products with variations retrieved successfully",
 	})
 }

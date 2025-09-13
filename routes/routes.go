@@ -61,8 +61,9 @@ func SetupRoutes() *gin.Engine {
 		{
 			products.GET("/", productController.GetProducts)
 			products.GET("/:id", productController.GetProduct)
-			products.GET("/featured", productController.GetProducts) // TODO: Добавить логику для рекомендуемых
-			products.GET("/search", productController.GetProducts)   // Используем тот же метод с параметром search
+			products.GET("/featured", productController.GetProducts)                      // TODO: Добавить логику для рекомендуемых
+			products.GET("/search", productController.GetProducts)                        // Используем тот же метод с параметром search
+			products.GET("/with-variations", productController.GetProductsWithVariations) // Новый endpoint с JOIN запросом
 		}
 
 		// Категории (публичный доступ)

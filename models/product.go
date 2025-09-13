@@ -167,3 +167,18 @@ func (p *Product) ToResponseWithFavorite(isFavorite bool) ProductResponse {
 	response.IsFavorite = isFavorite
 	return response
 }
+
+// ProductWithVariation представляет результат JOIN запроса между продуктами и вариациями
+type ProductWithVariation struct {
+	ProductID     uuid.UUID `json:"productId"`     // p.id
+	Name          string    `json:"name"`          // p.name
+	Description   string    `json:"description"`   // p.description
+	Brand         string    `json:"brand"`         // p.brand
+	Sizes         []string  `json:"sizes"`         // pv.sizes
+	Colors        []string  `json:"colors"`        // pv.colors
+	Price         float64   `json:"price"`         // pv.price
+	OriginalPrice *float64  `json:"originalPrice"` // pv.original_price
+	ImageURLs     []string  `json:"imageUrls"`     // pv.image_urls
+	StockQuantity int64     `json:"stockQuantity"` // pv.stock_quantity
+	SKU           string    `json:"sku"`           // pv.sku
+}
