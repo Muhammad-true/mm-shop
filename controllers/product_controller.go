@@ -622,11 +622,11 @@ func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
 			p.name,
 			p.description,
 			p.brand,
-			pv.sizes,
-			pv.colors,
+			COALESCE(pv.sizes, '[]'::json) AS sizes,
+			COALESCE(pv.colors, '[]'::json) AS colors,
 			pv.price,
 			pv.original_price,
-			pv.image_urls,
+			COALESCE(pv.image_urls, '[]'::json) AS image_urls,
 			pv.stock_quantity,
 			pv.sku
 		FROM
