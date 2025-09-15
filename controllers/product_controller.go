@@ -619,17 +619,17 @@ func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
 	query := `
 		WITH sizes_arr AS (
 			SELECT pv.id AS variation_id,
-			       COALESCE(ARRAY(SELECT json_array_elements_text(pv.sizes::json)), ARRAY[]::text[]) AS sizes
+			       COALESCE(ARRAY(SELECT json_array_elements_text(NULLIF(pv.sizes,'')::json)), ARRAY[]::text[]) AS sizes
 			FROM public.product_variations pv
 		),
 		colors_arr AS (
 			SELECT pv.id AS variation_id,
-			       COALESCE(ARRAY(SELECT json_array_elements_text(pv.colors::json)), ARRAY[]::text[]) AS colors
+			       COALESCE(ARRAY(SELECT json_array_elements_text(NULLIF(pv.colors,'')::json)), ARRAY[]::text[]) AS colors
 			FROM public.product_variations pv
 		),
 		images_arr AS (
 			SELECT pv.id AS variation_id,
-			       COALESCE(ARRAY(SELECT json_array_elements_text(pv.image_urls::json)), ARRAY[]::text[]) AS image_urls
+			       COALESCE(ARRAY(SELECT json_array_elements_text(NULLIF(pv.image_urls,'')::json)), ARRAY[]::text[]) AS image_urls
 			FROM public.product_variations pv
 		)
 		SELECT
@@ -649,7 +649,7 @@ func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
 		LEFT JOIN sizes_arr sz ON sz.variation_id = pv.id
 		LEFT JOIN colors_arr cl ON cl.variation_id = pv.id
 		LEFT JOIN images_arr im ON im.variation_id = pv.id
-		WHERE p.is_available = true AND pv.is_available = true
+		WHERE 1=1
 	`
 
 	// Получаем текущего пользователя из контекста для фильтрации
