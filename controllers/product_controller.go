@@ -615,23 +615,40 @@ func (pc *ProductController) GetProductAdmin(c *gin.Context) {
 func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
 	var productsWithVariations []models.ProductWithVariation
 
-	// Строим SQL запрос с JOIN
+	// Строим SQL запрос с JOIN и конвертацией JSON-текста в массивы строк
 	query := `
+		WITH sizes_arr AS (
+			SELECT pv.id AS variation_id,
+			       COALESCE(ARRAY(SELECT json_array_elements_text(pv.sizes::json)), ARRAY[]::text[]) AS sizes
+			FROM public.product_variations pv
+		),
+		colors_arr AS (
+			SELECT pv.id AS variation_id,
+			       COALESCE(ARRAY(SELECT json_array_elements_text(pv.colors::json)), ARRAY[]::text[]) AS colors
+			FROM public.product_variations pv
+		),
+		images_arr AS (
+			SELECT pv.id AS variation_id,
+			       COALESCE(ARRAY(SELECT json_array_elements_text(pv.image_urls::json)), ARRAY[]::text[]) AS image_urls
+			FROM public.product_variations pv
+		)
 		SELECT
 			p.id AS product_id,
 			p.name,
 			p.description,
 			p.brand,
-			COALESCE(pv.sizes::text, '[]') AS sizes,
-			COALESCE(pv.colors::text, '[]') AS colors,
+			sz.sizes,
+			cl.colors,
 			pv.price,
 			pv.original_price,
-			COALESCE(pv.image_urls::text, '[]') AS image_urls,
+			im.image_urls,
 			pv.stock_quantity,
 			pv.sku
-		FROM
-			public.products as p 
+		FROM public.products AS p
 		INNER JOIN public.product_variations pv ON p.id = pv.product_id
+		LEFT JOIN sizes_arr sz ON sz.variation_id = pv.id
+		LEFT JOIN colors_arr cl ON cl.variation_id = pv.id
+		LEFT JOIN images_arr im ON im.variation_id = pv.id
 		WHERE p.is_available = true AND pv.is_available = true
 	`
 
