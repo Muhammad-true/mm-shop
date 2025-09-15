@@ -653,28 +653,23 @@ func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
 	`
 
 	// Получаем текущего пользователя из контекста для фильтрации
-	currentUser, exists := c.Get("user")
-	if exists {
+	params := []interface{}{}
+	if currentUser, exists := c.Get("user"); exists {
 		user := currentUser.(models.User)
-		query += " AND p.owner_id = $1"
+		if user.Role != nil && user.Role.Name == "shop_owner" {
+			// Владельцу магазина показываем только его товары
+			query += " AND p.owner_id = ?"
+			params = append(params, user.ID)
+		}
+	}
 
-		// Выполняем запрос с параметром пользователя
-		if err := database.DB.Raw(query, user.ID).Scan(&productsWithVariations).Error; err != nil {
-			log.Printf("❌ Ошибка выполнения JOIN запроса: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to fetch products with variations",
-			})
-			return
-		}
-	} else {
-		// Выполняем запрос без фильтрации по пользователю
-		if err := database.DB.Raw(query).Scan(&productsWithVariations).Error; err != nil {
-			log.Printf("❌ Ошибка выполнения JOIN запроса: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to fetch products with variations",
-			})
-			return
-		}
+	// Выполняем запрос с параметрами (если есть)
+	if err := database.DB.Raw(query, params...).Scan(&productsWithVariations).Error; err != nil {
+		log.Printf("❌ Ошибка выполнения JOIN запроса: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to fetch products with variations",
+		})
+		return
 	}
 
 	log.Printf("📦 Получено %d записей продуктов с вариациями", len(productsWithVariations))
