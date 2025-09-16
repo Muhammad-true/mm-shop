@@ -32,6 +32,7 @@ func SetupRoutes() *gin.Engine {
 	roleController := &controllers.RoleController{}
 	uploadController := &controllers.UploadController{}
 	imageController := &controllers.ImageController{}
+	debugController := &controllers.DebugController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -199,6 +200,8 @@ func SetupRoutes() *gin.Engine {
 			adminProducts.GET("/", productController.GetAllProducts)
 			adminProducts.GET("/:id", productController.GetProductAdmin)
 		}
+		// Диагностика БД для админов
+		admin.GET("/debug/db", debugController.DBInfo)
 	}
 
 	// Маршруты для владельцев магазинов (админы + владельцы магазинов)
