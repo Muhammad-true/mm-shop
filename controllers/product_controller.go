@@ -633,7 +633,7 @@ func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
 			FROM public.product_variations pv
 		)
 		SELECT
-			p.id AS product_id,
+			pv.id AS product_id,
 			p.name,
 			p.description,
 			p.brand,
@@ -743,6 +743,8 @@ func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
 	var paginatedProducts []models.ProductWithVariation
 	if start < total {
 		paginatedProducts = filteredProducts[start:end]
+	} else {
+		paginatedProducts = []models.ProductWithVariation{}
 	}
 
 	log.Printf("📦 Возвращаем %d записей (страница %d из %d)", len(paginatedProducts), page, (total+limit-1)/limit)
