@@ -650,21 +650,11 @@ func (pc *ProductController) GetProductsWithVariations(c *gin.Context) {
 		LEFT JOIN colors_arr cl ON cl.variation_id = pv.id
 		LEFT JOIN images_arr im ON im.variation_id = pv.id
 		WHERE 1=1
+		ORDER BY p.created_at DESC
 	`
 
-	// Получаем текущего пользователя из контекста для фильтрации
-	params := []interface{}{}
-	if currentUser, exists := c.Get("user"); exists {
-		user := currentUser.(models.User)
-		if user.Role != nil && user.Role.Name == "shop_owner" {
-			// Владельцу магазина показываем только его товары
-			query += " AND p.owner_id = ?"
-			params = append(params, user.ID)
-		}
-	}
-
-	// Выполняем запрос с параметрами (если есть)
-	if err := database.DB.Raw(query, params...).Scan(&productsWithVariations).Error; err != nil {
+	// Всегда возвращаем все товары без фильтра по владельцу (независимо от токена)
+	if err := database.DB.Raw(query).Scan(&productsWithVariations).Error; err != nil {
 		log.Printf("❌ Ошибка выполнения JOIN запроса: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to fetch products with variations",
