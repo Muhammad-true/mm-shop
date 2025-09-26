@@ -118,14 +118,14 @@ func SetupRoutes() *gin.Engine {
 			favorites.GET("/:productId/check", favoriteController.CheckFavorite)
 		}
 
-		// TODO: Заказы (не реализованы)
-		// orders := protected.Group("orders")
-		// {
-		// 	orders.GET("/", orderController.GetOrders)
-		// 	orders.POST("/", orderController.CreateOrder)
-		// 	orders.GET("/:id", orderController.GetOrder)
-		// 	orders.GET("/:id/tracking", orderController.GetOrderTracking)
-		// }
+		// Заказы пользователя
+		orders := protected.Group("orders")
+		{
+			orders.POST("/", orderController.CreateOrder)
+			orders.GET("/", orderController.GetMyOrders)
+			orders.GET("/:id", orderController.GetMyOrder)
+			orders.POST("/:id/cancel", orderController.CancelMyOrder)
+		}
 
 		// Уведомления
 		notifications := protected.Group("notifications")

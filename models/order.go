@@ -11,11 +11,13 @@ import (
 type OrderStatus string
 
 const (
-	OrderStatusPending   OrderStatus = "pending"
-	OrderStatusConfirmed OrderStatus = "confirmed"
-	OrderStatusShipped   OrderStatus = "shipped"
-	OrderStatusDelivered OrderStatus = "delivered"
-	OrderStatusCancelled OrderStatus = "cancelled"
+	OrderStatusPending    OrderStatus = "pending"
+	OrderStatusConfirmed  OrderStatus = "confirmed"
+	OrderStatusPreparing  OrderStatus = "preparing"
+	OrderStatusInDelivery OrderStatus = "inDelivery"
+	OrderStatusDelivered  OrderStatus = "delivered"
+	OrderStatusCompleted  OrderStatus = "completed"
+	OrderStatusCancelled  OrderStatus = "cancelled"
 )
 
 // Order представляет заказ пользователя
@@ -24,8 +26,19 @@ type Order struct {
 	UserID        uuid.UUID   `json:"user_id" gorm:"type:uuid;not null"`
 	Status        OrderStatus `json:"status" gorm:"default:pending"`
 	TotalAmount   float64     `json:"total_amount" gorm:"not null"`
-	ShippingAddr  string      `json:"shipping_address"`
-	PaymentMethod string      `json:"payment_method"`
+	ItemsSubtotal float64     `json:"items_subtotal" gorm:"not null"`
+	DeliveryFee   float64     `json:"delivery_fee" gorm:"not null;default:0"`
+	Currency      string      `json:"currency" gorm:"not null;default:TJS"`
+	ShippingAddr  string      `json:"shipping_address" gorm:"not null"`
+	PaymentMethod string      `json:"payment_method" gorm:"not null"`
+	PaymentStatus string      `json:"payment_status" gorm:"not null;default:pending"`
+	TransactionID string      `json:"transaction_id"`
+	RecipientName string      `json:"recipient_name" gorm:"not null"`
+	Phone         string      `json:"phone" gorm:"not null"`
+	DesiredAt     *time.Time  `json:"desired_at"`
+	ConfirmedAt   *time.Time  `json:"confirmed_at"`
+	DeliveredAt   *time.Time  `json:"delivered_at"`
+	CancelledAt   *time.Time  `json:"cancelled_at"`
 	Notes         string      `json:"notes"`
 	CreatedAt     time.Time   `json:"created_at"`
 	UpdatedAt     time.Time   `json:"updated_at"`
@@ -52,6 +65,10 @@ type OrderItem struct {
 	Price     float64   `json:"price" gorm:"not null"` // Цена на момент заказа
 	Size      string    `json:"size"`
 	Color     string    `json:"color"`
+	SKU       string    `json:"sku"`
+	Name      string    `json:"name" gorm:"not null"`
+	ImageURL  string    `json:"image_url"`
+	Total     float64   `json:"total" gorm:"not null"`
 	CreatedAt time.Time `json:"created_at"`
 
 	// Связи

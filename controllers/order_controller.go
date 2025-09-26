@@ -3,14 +3,297 @@ package controllers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type OrderController struct{}
+
+// CreateOrder - создать заказ (для авторизованного пользователя)
+func (oc *OrderController) CreateOrder(c *gin.Context) {
+	// Достаём текущего пользователя
+	userIDValue, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
+			models.ErrAuthRequired,
+			"Пользователь не найден",
+		))
+		return
+	}
+
+	type createItem struct {
+		ProductID string  `json:"product_id" binding:"required,uuid"`
+		Quantity  int     `json:"quantity" binding:"required,gt=0"`
+		Price     float64 `json:"price" binding:"required,gt=0"`
+		Size      string  `json:"size"`
+		Color     string  `json:"color"`
+		SKU       string  `json:"sku"`
+		Name      string  `json:"name"`
+		ImageURL  string  `json:"image_url"`
+	}
+
+	var req struct {
+		RecipientName string       `json:"recipient_name" binding:"required"`
+		Phone         string       `json:"phone" binding:"required"`
+		ShippingAddr  string       `json:"shipping_addr" binding:"required"`
+		DesiredAt     *time.Time   `json:"desired_at"`
+		PaymentMethod string       `json:"payment_method" binding:"required,oneof=cash card"`
+		ItemsSubtotal float64      `json:"items_subtotal"`
+		DeliveryFee   float64      `json:"delivery_fee"`
+		TotalAmount   float64      `json:"total_amount"`
+		Currency      string       `json:"currency"`
+		Notes         string       `json:"notes"`
+		Items         []createItem `json:"items" binding:"required,min=1"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Неверные данные запроса",
+		))
+		return
+	}
+
+	// Пересчёт на сервере
+	var subtotal float64
+	for _, it := range req.Items {
+		subtotal += it.Price * float64(it.Quantity)
+	}
+	delivery := 10.0
+	if subtotal >= 200.0 {
+		delivery = 0.0
+	}
+	total := subtotal + delivery
+	currency := req.Currency
+	if currency == "" {
+		currency = "TJS"
+	}
+
+	currentUserID := userIDValue.(uuid.UUID)
+
+	var createdOrder models.Order
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		order := models.Order{
+			UserID:        currentUserID,
+			Status:        models.OrderStatusPending,
+			ItemsSubtotal: subtotal,
+			DeliveryFee:   delivery,
+			TotalAmount:   total,
+			Currency:      currency,
+			ShippingAddr:  req.ShippingAddr,
+			PaymentMethod: req.PaymentMethod,
+			PaymentStatus: "pending",
+			RecipientName: req.RecipientName,
+			Phone:         req.Phone,
+			DesiredAt:     req.DesiredAt,
+			Notes:         req.Notes,
+		}
+		if err := tx.Create(&order).Error; err != nil {
+			return err
+		}
+
+		// Создаём позиции заказа
+		for _, it := range req.Items {
+			pid, err := uuid.Parse(it.ProductID)
+			if err != nil {
+				return err
+			}
+			item := models.OrderItem{
+				OrderID:   order.ID,
+				ProductID: pid,
+				Quantity:  it.Quantity,
+				Price:     it.Price,
+				Size:      it.Size,
+				Color:     it.Color,
+				SKU:       it.SKU,
+				Name:      it.Name,
+				ImageURL:  it.ImageURL,
+				Total:     it.Price * float64(it.Quantity),
+			}
+			if err := tx.Create(&item).Error; err != nil {
+				return err
+			}
+		}
+
+		createdOrder = order
+		return nil
+	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при создании заказа",
+		))
+		return
+	}
+
+	// Возвращаем заказ с позициями
+	if err := database.DB.Preload("OrderItems").Preload("OrderItems.Product").First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при получении созданного заказа",
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.StandardResponse{
+		Success: true,
+		Data:    createdOrder.ToResponse(),
+		Message: "Заказ создан успешно",
+	})
+}
+
+// GetMyOrders - список заказов текущего пользователя
+func (oc *OrderController) GetMyOrders(c *gin.Context) {
+	userIDValue, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
+			models.ErrAuthRequired,
+			"Пользователь не найден",
+		))
+		return
+	}
+	currentUserID := userIDValue.(uuid.UUID)
+
+	status := c.Query("status")
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset := (page - 1) * limit
+
+	query := database.DB.Model(&models.Order{}).Where("user_id = ?", currentUserID)
+	if status != "" {
+		if status == "active" {
+			query = query.Where("status NOT IN ?", []models.OrderStatus{models.OrderStatusCompleted, models.OrderStatusCancelled})
+		} else if status == "completed" {
+			query = query.Where("status IN ?", []models.OrderStatus{models.OrderStatusCompleted, models.OrderStatusCancelled})
+		} else {
+			query = query.Where("status = ?", status)
+		}
+	}
+
+	var total int64
+	query.Count(&total)
+
+	var orders []models.Order
+	if err := query.Preload("OrderItems").Preload("OrderItems.Product").Order("created_at DESC").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при получении заказов",
+		))
+		return
+	}
+
+	var orderResponses []models.OrderResponse
+	for _, order := range orders {
+		orderResponses = append(orderResponses, order.ToResponse())
+	}
+
+	c.JSON(http.StatusOK, models.StandardResponse{
+		Success: true,
+		Data: gin.H{
+			"orders": orderResponses,
+			"pagination": models.PaginationInfo{
+				Page:       page,
+				Limit:      limit,
+				Total:      int(total),
+				TotalPages: int((total + int64(limit) - 1) / int64(limit)),
+			},
+		},
+		Message: "Заказы получены успешно",
+	})
+}
+
+// GetMyOrder - детали заказа текущего пользователя
+func (oc *OrderController) GetMyOrder(c *gin.Context) {
+	userIDValue, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
+			models.ErrAuthRequired,
+			"Пользователь не найден",
+		))
+		return
+	}
+	currentUserID := userIDValue.(uuid.UUID)
+
+	orderID := c.Param("id")
+	var order models.Order
+	err := database.DB.Preload("OrderItems").Preload("OrderItems.Product").First(&order, "id = ? AND user_id = ?", orderID, currentUserID).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponseWithCode(
+				models.ErrNotFound,
+				"Заказ не найден",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при получении заказа",
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.StandardResponse{
+		Success: true,
+		Data:    order.ToResponse(),
+		Message: "Заказ получен успешно",
+	})
+}
+
+// CancelMyOrder - отменить заказ текущего пользователя
+func (oc *OrderController) CancelMyOrder(c *gin.Context) {
+	userIDValue, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
+			models.ErrAuthRequired,
+			"Пользователь не найден",
+		))
+		return
+	}
+	currentUserID := userIDValue.(uuid.UUID)
+
+	orderID := c.Param("id")
+	var order models.Order
+	if err := database.DB.First(&order, "id = ? AND user_id = ?", orderID, currentUserID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponseWithCode(
+				models.ErrNotFound,
+				"Заказ не найден",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при получении заказа",
+		))
+		return
+	}
+
+	// Обновляем статус
+	now := time.Now()
+	order.Status = models.OrderStatusCancelled
+	order.CancelledAt = &now
+
+	if err := database.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при отмене заказа",
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.StandardResponse{
+		Success: true,
+		Data:    order.ToResponse(),
+		Message: "Заказ отменен",
+	})
+}
 
 // GetOrders - получить все заказы (только для админов)
 func (oc *OrderController) GetOrders(c *gin.Context) {
