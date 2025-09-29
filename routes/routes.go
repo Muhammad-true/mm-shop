@@ -127,6 +127,13 @@ func SetupRoutes() *gin.Engine {
 			orders.POST("/:id/cancel", orderController.CancelMyOrder)
 		}
 
+		// Гостевые заказы (публичные, без авторизации)
+		guestOrders := public.Group("guest-orders")
+		{
+			guestOrders.POST("/", orderController.CreateGuestOrder)
+			guestOrders.GET("/", orderController.GetGuestOrder)
+		}
+
 		// Уведомления
 		notifications := protected.Group("notifications")
 		{

@@ -295,6 +295,200 @@ func (oc *OrderController) CancelMyOrder(c *gin.Context) {
 	})
 }
 
+// CreateGuestOrder - создать заказ для гостя (без авторизации)
+func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
+	type createItem struct {
+		ProductID string  `json:"product_id" binding:"required,uuid"`
+		Quantity  int     `json:"quantity" binding:"required,gt=0"`
+		Price     float64 `json:"price" binding:"required,gt=0"`
+		Size      string  `json:"size"`
+		Color     string  `json:"color"`
+		SKU       string  `json:"sku"`
+		Name      string  `json:"name"`
+		ImageURL  string  `json:"image_url"`
+	}
+
+	var req struct {
+		GuestName     string       `json:"guest_name" binding:"required"`
+		GuestEmail    string       `json:"guest_email" binding:"required,email"`
+		GuestPhone    string       `json:"guest_phone" binding:"required"`
+		ShippingAddr  string       `json:"shipping_addr" binding:"required"`
+		DesiredAt     *time.Time   `json:"desired_at"`
+		PaymentMethod string       `json:"payment_method" binding:"required,oneof=cash card"`
+		ItemsSubtotal float64      `json:"items_subtotal"`
+		DeliveryFee   float64      `json:"delivery_fee"`
+		TotalAmount   float64      `json:"total_amount"`
+		Currency      string       `json:"currency"`
+		Notes         string       `json:"notes"`
+		Items         []createItem `json:"items" binding:"required,min=1"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Неверные данные запроса",
+		))
+		return
+	}
+
+	// Пересчёт на сервере
+	var subtotal float64
+	for _, it := range req.Items {
+		subtotal += it.Price * float64(it.Quantity)
+	}
+	delivery := 10.0
+	if subtotal >= 200.0 {
+		delivery = 0.0
+	}
+	total := subtotal + delivery
+	currency := req.Currency
+	if currency == "" {
+		currency = "TJS"
+	}
+
+	// Создаем или находим гостевого пользователя
+	var user models.User
+	err := database.DB.Where("email = ? AND is_guest = true", req.GuestEmail).First(&user).Error
+	if err == gorm.ErrRecordNotFound {
+		// Создаем нового гостевого пользователя
+		user = models.User{
+			Name:     req.GuestName,
+			Email:    req.GuestEmail,
+			Phone:    req.GuestPhone,
+			Password: "guest_password_" + uuid.New().String(), // Временный пароль
+			IsGuest:  true,
+			IsActive: true,
+		}
+		if err := database.DB.Create(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+				models.ErrInternalError,
+				"Ошибка при создании гостевого пользователя",
+			))
+			return
+		}
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при поиске пользователя",
+		))
+		return
+	}
+
+	var createdOrder models.Order
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		order := models.Order{
+			UserID:        user.ID,
+			Status:        models.OrderStatusPending,
+			ItemsSubtotal: subtotal,
+			DeliveryFee:   delivery,
+			TotalAmount:   total,
+			Currency:      currency,
+			ShippingAddr:  req.ShippingAddr,
+			PaymentMethod: req.PaymentMethod,
+			PaymentStatus: "pending",
+			RecipientName: req.GuestName,
+			Phone:         req.GuestPhone,
+			DesiredAt:     req.DesiredAt,
+			Notes:         req.Notes,
+		}
+		if err := tx.Create(&order).Error; err != nil {
+			return err
+		}
+
+		// Создаём позиции заказа
+		for _, it := range req.Items {
+			pid, err := uuid.Parse(it.ProductID)
+			if err != nil {
+				return err
+			}
+			item := models.OrderItem{
+				OrderID:   order.ID,
+				ProductID: pid,
+				Quantity:  it.Quantity,
+				Price:     it.Price,
+				Size:      it.Size,
+				Color:     it.Color,
+				SKU:       it.SKU,
+				Name:      it.Name,
+				ImageURL:  it.ImageURL,
+				Total:     it.Price * float64(it.Quantity),
+			}
+			if err := tx.Create(&item).Error; err != nil {
+				return err
+			}
+		}
+
+		createdOrder = order
+		return nil
+	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при создании заказа",
+		))
+		return
+	}
+
+	// Возвращаем заказ с позициями
+	if err := database.DB.Preload("OrderItems").Preload("OrderItems.Product").First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при получении созданного заказа",
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.StandardResponse{
+		Success: true,
+		Data:    createdOrder.ToResponse(),
+		Message: "Гостевой заказ создан успешно",
+	})
+}
+
+// GetGuestOrder - получить заказ гостя по email/телефону
+func (oc *OrderController) GetGuestOrder(c *gin.Context) {
+	email := c.Query("email")
+	phone := c.Query("phone")
+
+	if email == "" && phone == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Необходимо указать email или телефон",
+		))
+		return
+	}
+
+	var orders []models.Order
+	query := database.DB.Preload("OrderItems").Preload("OrderItems.Product").Joins("JOIN users ON orders.user_id = users.id").Where("users.is_guest = true")
+
+	if email != "" {
+		query = query.Where("users.email = ?", email)
+	}
+	if phone != "" {
+		query = query.Where("users.phone = ?", phone)
+	}
+
+	if err := query.Order("orders.created_at DESC").Find(&orders).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при получении заказов",
+		))
+		return
+	}
+
+	var orderResponses []models.OrderResponse
+	for _, order := range orders {
+		orderResponses = append(orderResponses, order.ToResponse())
+	}
+
+	c.JSON(http.StatusOK, models.StandardResponse{
+		Success: true,
+		Data:    orderResponses,
+		Message: "Заказы гостя получены успешно",
+	})
+}
+
 // GetOrders - получить все заказы (только для админов)
 func (oc *OrderController) GetOrders(c *gin.Context) {
 	var orders []models.Order

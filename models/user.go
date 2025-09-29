@@ -21,6 +21,7 @@ type User struct {
 	IsEmailVerified bool       `json:"isEmailVerified" gorm:"default:false"`
 	IsPhoneVerified bool       `json:"isPhoneVerified" gorm:"default:false"`
 	IsActive        bool       `json:"isActive" gorm:"default:true"`
+	IsGuest         bool       `json:"isGuest" gorm:"default:false"` // Флаг гостевого пользователя
 	RoleID          *uuid.UUID `json:"roleId" gorm:"type:uuid"`
 	CreatedAt       time.Time  `json:"createdAt"`
 	UpdatedAt       time.Time  `json:"updatedAt"`
@@ -92,6 +93,7 @@ type UserResponse struct {
 	IsEmailVerified bool              `json:"isEmailVerified"`
 	IsPhoneVerified bool              `json:"isPhoneVerified"`
 	IsActive        bool              `json:"isActive"`
+	IsGuest         bool              `json:"isGuest"`
 	Role            *RoleResponse     `json:"role,omitempty"`
 	Addresses       []AddressResponse `json:"addresses,omitempty"`
 	CreatedAt       time.Time         `json:"createdAt"`
@@ -122,6 +124,7 @@ func (u *User) ToResponse() UserResponse {
 		IsEmailVerified: u.IsEmailVerified,
 		IsPhoneVerified: u.IsPhoneVerified,
 		IsActive:        u.IsActive,
+		IsGuest:         u.IsGuest,
 		Role:            roleResponse,
 		Addresses:       addresses,
 		CreatedAt:       u.CreatedAt,
