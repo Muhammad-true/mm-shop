@@ -29,6 +29,7 @@ type Order struct {
 	ItemsSubtotal float64     `json:"items_subtotal" gorm:"not null"`
 	DeliveryFee   float64     `json:"delivery_fee" gorm:"not null;default:0"`
 	Currency      string      `json:"currency" gorm:"not null;default:TJS"`
+    AddressID     *uuid.UUID  `json:"address_id" gorm:"type:uuid"`
 	ShippingAddr  string      `json:"shipping_address" gorm:"not null"`
 	PaymentMethod string      `json:"payment_method" gorm:"not null"`
 	PaymentStatus string      `json:"payment_status" gorm:"not null;default:pending"`

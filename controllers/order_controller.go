@@ -77,14 +77,29 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 	currentUserID := userIDValue.(uuid.UUID)
 
 	var createdOrder models.Order
-	err := database.DB.Transaction(func(tx *gorm.DB) error {
-		order := models.Order{
+    err := database.DB.Transaction(func(tx *gorm.DB) error {
+        // Создаём адрес (гостевой, простой, из одной строки shipping_addr)
+        addr := models.Address{
+            UserID:   currentUserID,
+            Street:   req.ShippingAddr,
+            City:     "",
+            State:    "",
+            ZipCode:  "",
+            Country:  "",
+            Label:    "Другое",
+            IsDefault: false,
+        }
+        if err := tx.Create(&addr).Error; err != nil {
+            return err
+        }
+        order := models.Order{
 			UserID:        currentUserID,
 			Status:        models.OrderStatusPending,
 			ItemsSubtotal: subtotal,
 			DeliveryFee:   delivery,
 			TotalAmount:   total,
 			Currency:      currency,
+            AddressID:     &addr.ID,
 			ShippingAddr:  req.ShippingAddr,
 			PaymentMethod: req.PaymentMethod,
 			PaymentStatus: "pending",
@@ -375,14 +390,29 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 	}
 
 	var createdOrder models.Order
-	err = database.DB.Transaction(func(tx *gorm.DB) error {
-		order := models.Order{
+    err = database.DB.Transaction(func(tx *gorm.DB) error {
+        // Создаём адрес для гостя из строки shipping_addr
+        addr := models.Address{
+            UserID:   user.ID,
+            Street:   req.ShippingAddr,
+            City:     "",
+            State:    "",
+            ZipCode:  "",
+            Country:  "",
+            Label:    "Другое",
+            IsDefault: false,
+        }
+        if err := tx.Create(&addr).Error; err != nil {
+            return err
+        }
+        order := models.Order{
 			UserID:        user.ID,
 			Status:        models.OrderStatusPending,
 			ItemsSubtotal: subtotal,
 			DeliveryFee:   delivery,
 			TotalAmount:   total,
 			Currency:      currency,
+            AddressID:     &addr.ID,
 			ShippingAddr:  req.ShippingAddr,
 			PaymentMethod: req.PaymentMethod,
 			PaymentStatus: "pending",
