@@ -32,6 +32,7 @@ type Order struct {
     AddressID     *uuid.UUID  `json:"address_id" gorm:"type:uuid"`
 	ShippingAddr  string      `json:"shipping_address" gorm:"not null"`
 	PaymentMethod string      `json:"payment_method" gorm:"not null"`
+    ShippingMethod string     `json:"shipping_method" gorm:"not null;default:courier"`
 	PaymentStatus string      `json:"payment_status" gorm:"not null;default:pending"`
 	TransactionID string      `json:"transaction_id"`
 	RecipientName string      `json:"recipient_name" gorm:"not null"`
