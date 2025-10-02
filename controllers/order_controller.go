@@ -1,16 +1,16 @@
 package controllers
 
 import (
-    "net/http"
-    "strconv"
-    "time"
-    "strings"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
-    "github.com/gin-gonic/gin"
-    "github.com/google/uuid"
-    "github.com/mm-api/mm-api/database"
-    "github.com/mm-api/mm-api/models"
-    "gorm.io/gorm"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/mm-api/mm-api/database"
+	"github.com/mm-api/mm-api/models"
+	"gorm.io/gorm"
 )
 
 type OrderController struct{}
@@ -38,21 +38,21 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 		ImageURL  string  `json:"image_url"`
 	}
 
-    var req struct {
-		RecipientName string       `json:"recipient_name" binding:"required"`
-		Phone         string       `json:"phone" binding:"required"`
-		ShippingAddr  string       `json:"shipping_addr" binding:"required"`
-        DesiredAt     *time.Time   `json:"desired_at"`
-        DesiredDate   string       `json:"desired_date"` // YYYY-MM-DD
-        DesiredTime   string       `json:"desired_time"` // HH:mm
-		PaymentMethod string       `json:"payment_method" binding:"required,oneof=cash card"`
-        ShippingMethod string      `json:"shipping_method"`
-		ItemsSubtotal float64      `json:"items_subtotal"`
-		DeliveryFee   float64      `json:"delivery_fee"`
-		TotalAmount   float64      `json:"total_amount"`
-		Currency      string       `json:"currency"`
-		Notes         string       `json:"notes"`
-		Items         []createItem `json:"items" binding:"required,min=1"`
+	var req struct {
+		RecipientName  string       `json:"recipient_name" binding:"required"`
+		Phone          string       `json:"phone" binding:"required"`
+		ShippingAddr   string       `json:"shipping_addr" binding:"required"`
+		DesiredAt      *time.Time   `json:"desired_at"`
+		DesiredDate    string       `json:"desired_date"` // YYYY-MM-DD
+		DesiredTime    string       `json:"desired_time"` // HH:mm
+		PaymentMethod  string       `json:"payment_method" binding:"required,oneof=cash card"`
+		ShippingMethod string       `json:"shipping_method"`
+		ItemsSubtotal  float64      `json:"items_subtotal"`
+		DeliveryFee    float64      `json:"delivery_fee"`
+		TotalAmount    float64      `json:"total_amount"`
+		Currency       string       `json:"currency"`
+		Notes          string       `json:"notes"`
+		Items          []createItem `json:"items" binding:"required,min=1"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -63,15 +63,15 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 		return
 	}
 
-    // Если пришли desired_date + desired_time — склеиваем в desired_at (UTC)
-    if req.DesiredAt == nil && req.DesiredDate != "" && req.DesiredTime != "" {
-        if t, err := time.Parse("2006-01-02 15:04", req.DesiredDate+" "+req.DesiredTime); err == nil {
-            tt := t.UTC()
-            req.DesiredAt = &tt
-        }
-    }
+	// Если пришли desired_date + desired_time — склеиваем в desired_at (UTC)
+	if req.DesiredAt == nil && req.DesiredDate != "" && req.DesiredTime != "" {
+		if t, err := time.Parse("2006-01-02 15:04", req.DesiredDate+" "+req.DesiredTime); err == nil {
+			tt := t.UTC()
+			req.DesiredAt = &tt
+		}
+	}
 
-    // Пересчёт на сервере
+	// Пересчёт на сервере
 	var subtotal float64
 	for _, it := range req.Items {
 		subtotal += it.Price * float64(it.Quantity)
@@ -86,44 +86,44 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 		currency = "TJS"
 	}
 
-    currentUserID := userIDValue.(uuid.UUID)
-    shippingMethod := req.ShippingMethod
-    if strings.TrimSpace(shippingMethod) == "" {
-        shippingMethod = "courier"
-    }
+	currentUserID := userIDValue.(uuid.UUID)
+	shippingMethod := req.ShippingMethod
+	if strings.TrimSpace(shippingMethod) == "" {
+		shippingMethod = "courier"
+	}
 
 	var createdOrder models.Order
-    err := database.DB.Transaction(func(tx *gorm.DB) error {
-        // Создаём адрес (гостевой, простой, из одной строки shipping_addr)
-        addr := models.Address{
-            UserID:   currentUserID,
-            Street:   req.ShippingAddr,
-            City:     "",
-            State:    "",
-            ZipCode:  "",
-            Country:  "",
-            Label:    "Другое",
-            IsDefault: false,
-        }
-        if err := tx.Create(&addr).Error; err != nil {
-            return err
-        }
-        order := models.Order{
-			UserID:        currentUserID,
-			Status:        models.OrderStatusPending,
-			ItemsSubtotal: subtotal,
-			DeliveryFee:   delivery,
-			TotalAmount:   total,
-			Currency:      currency,
-            AddressID:     &addr.ID,
-			ShippingAddr:  req.ShippingAddr,
-			PaymentMethod: req.PaymentMethod,
-            ShippingMethod: shippingMethod,
-			PaymentStatus: "pending",
-			RecipientName: req.RecipientName,
-			Phone:         req.Phone,
-			DesiredAt:     req.DesiredAt,
-			Notes:         req.Notes,
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Создаём адрес (гостевой, простой, из одной строки shipping_addr)
+		addr := models.Address{
+			UserID:    currentUserID,
+			Street:    req.ShippingAddr,
+			City:      "",
+			State:     "",
+			ZipCode:   "",
+			Country:   "",
+			Label:     "Другое",
+			IsDefault: false,
+		}
+		if err := tx.Create(&addr).Error; err != nil {
+			return err
+		}
+		order := models.Order{
+			UserID:         currentUserID,
+			Status:         models.OrderStatusPending,
+			ItemsSubtotal:  subtotal,
+			DeliveryFee:    delivery,
+			TotalAmount:    total,
+			Currency:       currency,
+			AddressID:      &addr.ID,
+			ShippingAddr:   req.ShippingAddr,
+			PaymentMethod:  req.PaymentMethod,
+			ShippingMethod: shippingMethod,
+			PaymentStatus:  "pending",
+			RecipientName:  req.RecipientName,
+			Phone:          req.Phone,
+			DesiredAt:      req.DesiredAt,
+			Notes:          req.Notes,
 		}
 		if err := tx.Create(&order).Error; err != nil {
 			return err
@@ -340,22 +340,22 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 		ImageURL  string  `json:"image_url"`
 	}
 
-    var req struct {
-		GuestName     string       `json:"guest_name" binding:"required"`
-		GuestEmail    string       `json:"guest_email" binding:"required,email"`
-		GuestPhone    string       `json:"guest_phone" binding:"required"`
-		ShippingAddr  string       `json:"shipping_addr" binding:"required"`
-        DesiredAt     *time.Time   `json:"desired_at"`
-        DesiredDate   string       `json:"desired_date"`
-        DesiredTime   string       `json:"desired_time"`
-		PaymentMethod string       `json:"payment_method" binding:"required,oneof=cash card"`
-        ShippingMethod string      `json:"shipping_method"`
-		ItemsSubtotal float64      `json:"items_subtotal"`
-		DeliveryFee   float64      `json:"delivery_fee"`
-		TotalAmount   float64      `json:"total_amount"`
-		Currency      string       `json:"currency"`
-		Notes         string       `json:"notes"`
-		Items         []createItem `json:"items" binding:"required,min=1"`
+	var req struct {
+		GuestName      string       `json:"guest_name" binding:"required"`
+		GuestEmail     string       `json:"guest_email" binding:"required,email"`
+		GuestPhone     string       `json:"guest_phone" binding:"required"`
+		ShippingAddr   string       `json:"shipping_addr" binding:"required"`
+		DesiredAt      *time.Time   `json:"desired_at"`
+		DesiredDate    string       `json:"desired_date"`
+		DesiredTime    string       `json:"desired_time"`
+		PaymentMethod  string       `json:"payment_method" binding:"required,oneof=cash card"`
+		ShippingMethod string       `json:"shipping_method"`
+		ItemsSubtotal  float64      `json:"items_subtotal"`
+		DeliveryFee    float64      `json:"delivery_fee"`
+		TotalAmount    float64      `json:"total_amount"`
+		Currency       string       `json:"currency"`
+		Notes          string       `json:"notes"`
+		Items          []createItem `json:"items" binding:"required,min=1"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -366,14 +366,14 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 		return
 	}
 
-    if req.DesiredAt == nil && req.DesiredDate != "" && req.DesiredTime != "" {
-        if t, err := time.Parse("2006-01-02 15:04", req.DesiredDate+" "+req.DesiredTime); err == nil {
-            tt := t.UTC()
-            req.DesiredAt = &tt
-        }
-    }
+	if req.DesiredAt == nil && req.DesiredDate != "" && req.DesiredTime != "" {
+		if t, err := time.Parse("2006-01-02 15:04", req.DesiredDate+" "+req.DesiredTime); err == nil {
+			tt := t.UTC()
+			req.DesiredAt = &tt
+		}
+	}
 
-    // Пересчёт на сервере
+	// Пересчёт на сервере
 	var subtotal float64
 	for _, it := range req.Items {
 		subtotal += it.Price * float64(it.Quantity)
@@ -417,42 +417,42 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 	}
 
 	var createdOrder models.Order
-    err = database.DB.Transaction(func(tx *gorm.DB) error {
-        // Создаём адрес для гостя из строки shipping_addr
-        addr := models.Address{
-            UserID:   user.ID,
-            Street:   req.ShippingAddr,
-            City:     "",
-            State:    "",
-            ZipCode:  "",
-            Country:  "",
-            Label:    "Другое",
-            IsDefault: false,
-        }
-        if err := tx.Create(&addr).Error; err != nil {
-            return err
-        }
-        shippingMethod := req.ShippingMethod
-        if strings.TrimSpace(shippingMethod) == "" {
-            shippingMethod = "courier"
-        }
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		// Создаём адрес для гостя из строки shipping_addr
+		addr := models.Address{
+			UserID:    user.ID,
+			Street:    req.ShippingAddr,
+			City:      "",
+			State:     "",
+			ZipCode:   "",
+			Country:   "",
+			Label:     "Другое",
+			IsDefault: false,
+		}
+		if err := tx.Create(&addr).Error; err != nil {
+			return err
+		}
+		shippingMethod := req.ShippingMethod
+		if strings.TrimSpace(shippingMethod) == "" {
+			shippingMethod = "courier"
+		}
 
-        order := models.Order{
-			UserID:        user.ID,
-			Status:        models.OrderStatusPending,
-			ItemsSubtotal: subtotal,
-			DeliveryFee:   delivery,
-			TotalAmount:   total,
-			Currency:      currency,
-            AddressID:     &addr.ID,
-			ShippingAddr:  req.ShippingAddr,
-			PaymentMethod: req.PaymentMethod,
-            ShippingMethod: shippingMethod,
-			PaymentStatus: "pending",
-			RecipientName: req.GuestName,
-			Phone:         req.GuestPhone,
-			DesiredAt:     req.DesiredAt,
-			Notes:         req.Notes,
+		order := models.Order{
+			UserID:         user.ID,
+			Status:         models.OrderStatusPending,
+			ItemsSubtotal:  subtotal,
+			DeliveryFee:    delivery,
+			TotalAmount:    total,
+			Currency:       currency,
+			AddressID:      &addr.ID,
+			ShippingAddr:   req.ShippingAddr,
+			PaymentMethod:  req.PaymentMethod,
+			ShippingMethod: shippingMethod,
+			PaymentStatus:  "pending",
+			RecipientName:  req.GuestName,
+			Phone:          req.GuestPhone,
+			DesiredAt:      req.DesiredAt,
+			Notes:          req.Notes,
 		}
 		if err := tx.Create(&order).Error; err != nil {
 			return err

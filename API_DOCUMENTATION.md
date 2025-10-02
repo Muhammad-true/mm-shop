@@ -339,6 +339,42 @@ DELETE /api/v1/admin/users/:id
 GET /api/v1/cart
 ```
 
+**Ответ:**
+```json
+{
+  "cart": {
+    "items": [
+      {
+        "id": "uuid",
+        "quantity": 2,
+        "subtotal": 3000.0,
+        "product": {
+          "id": "uuid",
+          "name": "Название товара",
+          "description": "Описание",
+          "brand": "Бренд",
+          "variations": [...]
+        },
+        "variation": {
+          "id": "uuid",
+          "sizes": ["S", "M", "L"],
+          "colors": ["Красный"],
+          "price": 1500.0,
+          "originalPrice": 2000.0,
+          "imageUrls": ["url1", "url2"],
+          "stockQuantity": 10,
+          "isAvailable": true,
+          "sku": "SKU123"
+        },
+        "created_at": "2024-01-15T10:30:00Z"
+      }
+    ],
+    "total_items": 2,
+    "total_price": 3000.0
+  }
+}
+```
+
 ### 2. Добавить в корзину
 ```bash
 POST /api/v1/cart/items
@@ -347,16 +383,31 @@ POST /api/v1/cart/items
 **Тело запроса:**
 ```json
 {
-  "productId": "uuid",
-  "variationId": "uuid",
+  "product_id": "uuid",
+  "variation_id": "uuid",
   "quantity": 2
 }
 ```
+
+**Описание полей:**
+- `product_id` - ID продукта (обязательно)
+- `variation_id` - ID конкретной вариации продукта (обязательно)
+- `quantity` - количество товара (обязательно, больше 0)
 
 ### 3. Обновить товар в корзине
 ```bash
 PUT /api/v1/cart/items/:id
 ```
+
+**Тело запроса:**
+```json
+{
+  "quantity": 3
+}
+```
+
+**Описание полей:**
+- `quantity` - новое количество товара (обязательно, больше 0)
 
 ### 4. Удалить из корзины
 ```bash
@@ -701,8 +752,8 @@ curl -X POST "http://159.89.99.252:8080/api/v1/cart/items" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "productId": "PRODUCT_ID",
-    "variationId": "VARIATION_ID",
+    "product_id": "PRODUCT_ID",
+    "variation_id": "VARIATION_ID",
     "quantity": 2
   }'
 ```

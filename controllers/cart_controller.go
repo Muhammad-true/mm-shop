@@ -3,11 +3,11 @@ package controllers
 import (
 	"net/http"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/middleware"
 	"github.com/mm-api/mm-api/models"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +25,7 @@ func (cc *CartController) GetCart(c *gin.Context) {
 	}
 
 	var cartItems []models.CartItem
-	if err := database.DB.Preload("Product").Where("user_id = ?", user.ID).Find(&cartItems).Error; err != nil {
+	if err := database.DB.Preload("Product").Preload("Variation").Where("user_id = ?", user.ID).Find(&cartItems).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to fetch cart items",
 		})
@@ -75,10 +75,25 @@ func (cc *CartController) AddToCart(c *gin.Context) {
 
 	// Проверяем, существует ли продукт
 	var product models.Product
-	if err := database.DB.First(&product, "id = ? AND in_stock = ?", req.ProductID, true).Error; err != nil {
+	if err := database.DB.First(&product, "id = ? AND is_available = ?", req.ProductID, true).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
-				"error": "Product not found or out of stock",
+				"error": "Product not found or not available",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Database error",
+			})
+		}
+		return
+	}
+
+	// Проверяем, существует ли вариация и принадлежит ли она продукту
+	var variation models.ProductVariation
+	if err := database.DB.First(&variation, "id = ? AND product_id = ? AND is_available = ?", req.VariationID, req.ProductID, true).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Product variation not found or not available",
 			})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -89,50 +104,24 @@ func (cc *CartController) AddToCart(c *gin.Context) {
 	}
 
 	// Проверяем наличие товара в нужном количестве
-	// Ищем подходящую вариацию по размеру и цвету
-	var availableStock int
-	for _, variation := range product.Variations {
-		sizeMatch := false
-		colorMatch := false
-
-		for _, size := range variation.Sizes {
-			if size == req.Size {
-				sizeMatch = true
-				break
-			}
-		}
-
-		for _, color := range variation.Colors {
-			if color == req.Color {
-				colorMatch = true
-				break
-			}
-		}
-
-		if sizeMatch && colorMatch {
-			availableStock = variation.StockQuantity
-			break
-		}
-	}
-
-	if availableStock < req.Quantity {
+	if variation.StockQuantity < req.Quantity {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Insufficient stock",
 		})
 		return
 	}
 
-	// Проверяем, есть ли уже такой товар в корзине
+	// Проверяем, есть ли уже такая вариация в корзине
 	var existingItem models.CartItem
-	err := database.DB.Where("user_id = ? AND product_id = ? AND size = ? AND color = ?",
-		user.ID, req.ProductID, req.Size, req.Color).First(&existingItem).Error
+	err := database.DB.Where("user_id = ? AND product_id = ? AND variation_id = ?",
+		user.ID, req.ProductID, req.VariationID).First(&existingItem).Error
 
 	if err == nil {
-		// Товар уже есть в корзине, увеличиваем количество
+		// Вариация уже есть в корзине, увеличиваем количество
 		existingItem.Quantity += req.Quantity
 
 		// Проверяем, не превышает ли общее количество доступный запас
-		if availableStock < existingItem.Quantity {
+		if variation.StockQuantity < existingItem.Quantity {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error": "Insufficient stock for total quantity",
 			})
@@ -146,8 +135,8 @@ func (cc *CartController) AddToCart(c *gin.Context) {
 			return
 		}
 
-		// Загружаем продукт для ответа
-		database.DB.Preload("Product").First(&existingItem, existingItem.ID)
+		// Загружаем связанные данные для ответа
+		database.DB.Preload("Product").Preload("Variation").First(&existingItem, existingItem.ID)
 
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Cart item updated successfully",
@@ -158,11 +147,10 @@ func (cc *CartController) AddToCart(c *gin.Context) {
 
 	// Создаем новый элемент корзины
 	cartItem := models.CartItem{
-		UserID:    user.ID,
-		ProductID: req.ProductID,
-		Quantity:  req.Quantity,
-		Size:      req.Size,
-		Color:     req.Color,
+		UserID:      user.ID,
+		ProductID:   req.ProductID,
+		VariationID: req.VariationID,
+		Quantity:    req.Quantity,
 	}
 
 	if err := database.DB.Create(&cartItem).Error; err != nil {
@@ -172,8 +160,8 @@ func (cc *CartController) AddToCart(c *gin.Context) {
 		return
 	}
 
-	// Загружаем продукт для ответа
-	database.DB.Preload("Product").First(&cartItem, cartItem.ID)
+	// Загружаем связанные данные для ответа
+	database.DB.Preload("Product").Preload("Variation").First(&cartItem, cartItem.ID)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Item added to cart successfully",
@@ -210,7 +198,7 @@ func (cc *CartController) UpdateCartItem(c *gin.Context) {
 	}
 
 	var cartItem models.CartItem
-	if err := database.DB.Preload("Product").Where("id = ? AND user_id = ?", itemID, user.ID).First(&cartItem).Error; err != nil {
+	if err := database.DB.Preload("Product").Preload("Variation").Where("id = ? AND user_id = ?", itemID, user.ID).First(&cartItem).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Cart item not found",
@@ -223,43 +211,16 @@ func (cc *CartController) UpdateCartItem(c *gin.Context) {
 		return
 	}
 
-	// Проверяем доступность товара через вариации
-	var availableStock int
-	for _, variation := range cartItem.Product.Variations {
-		sizeMatch := false
-		colorMatch := false
-
-		for _, size := range variation.Sizes {
-			if size == req.Size {
-				sizeMatch = true
-				break
-			}
-		}
-
-		for _, color := range variation.Colors {
-			if color == req.Color {
-				colorMatch = true
-				break
-			}
-		}
-
-		if sizeMatch && colorMatch {
-			availableStock = variation.StockQuantity
-			break
-		}
-	}
-
-	if availableStock < req.Quantity {
+	// Проверяем доступность товара через вариацию
+	if cartItem.Variation.StockQuantity < req.Quantity {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Insufficient stock",
 		})
 		return
 	}
 
-	// Обновляем элемент корзины
+	// Обновляем только количество (размер и цвет теперь в вариации)
 	cartItem.Quantity = req.Quantity
-	cartItem.Size = req.Size
-	cartItem.Color = req.Color
 
 	if err := database.DB.Save(&cartItem).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
