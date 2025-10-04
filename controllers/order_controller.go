@@ -342,7 +342,6 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 
 	var req struct {
 		GuestName      string       `json:"guest_name" binding:"required"`
-		GuestEmail     string       `json:"guest_email" binding:"required,email"`
 		GuestPhone     string       `json:"guest_phone" binding:"required"`
 		ShippingAddr   string       `json:"shipping_addr" binding:"required"`
 		DesiredAt      *time.Time   `json:"desired_at"`
@@ -388,23 +387,23 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 		currency = "TJS"
 	}
 
-	// Создаем или находим гостевого пользователя
+		// Создаем или находим пользователя по номеру телефона
 	var user models.User
-	err := database.DB.Where("email = ? AND is_guest = true", req.GuestEmail).First(&user).Error
+	err := database.DB.Where("phone = ?", req.GuestPhone).First(&user).Error
 	if err == gorm.ErrRecordNotFound {
-		// Создаем нового гостевого пользователя
+		// Создаем нового пользователя автоматически
 		user = models.User{
 			Name:     req.GuestName,
-			Email:    req.GuestEmail,
+			Email:    "guest_" + uuid.New().String() + "@temp.local", // Временный email
 			Phone:    req.GuestPhone,
-			Password: "guest_password_" + uuid.New().String(), // Временный пароль
+			Password: "auto_password_" + uuid.New().String(), // Автоматический пароль
 			IsGuest:  true,
 			IsActive: true,
 		}
 		if err := database.DB.Create(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 				models.ErrInternalError,
-				"Ошибка при создании гостевого пользователя",
+				"Ошибка при создании пользователя",
 			))
 			return
 		}
@@ -414,6 +413,18 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 			"Ошибка при поиске пользователя",
 		))
 		return
+	} else {
+		// Пользователь уже существует - обновляем имя если нужно
+		if user.Name != req.GuestName {
+			user.Name = req.GuestName
+			if err := database.DB.Save(&user).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+					models.ErrInternalError,
+					"Ошибка при обновлении пользователя",
+				))
+				return
+			}
+		}
 	}
 
 	var createdOrder models.Order

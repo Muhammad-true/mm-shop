@@ -179,11 +179,10 @@ func (ac *AuthController) Login(c *gin.Context) {
 	))
 }
 
-// CreateGuestToken создает токен для гостевого пользователя
+// CreateGuestToken создает токен для гостевого пользователя или входит в существующий аккаунт
 func (ac *AuthController) CreateGuestToken(c *gin.Context) {
 	var req struct {
 		Name  string `json:"name" binding:"required"`
-		Email string `json:"email" binding:"required,email"`
 		Phone string `json:"phone" binding:"required"`
 	}
 
@@ -197,8 +196,8 @@ func (ac *AuthController) CreateGuestToken(c *gin.Context) {
 	}
 
 	// Получаем роль "user" для гостей
-	var guestRole models.Role
-	if err := database.DB.Where("name = ?", "user").First(&guestRole).Error; err != nil {
+	var userRole models.Role
+	if err := database.DB.Where("name = ?", "user").First(&userRole).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
 			"Failed to find user role",
@@ -206,24 +205,24 @@ func (ac *AuthController) CreateGuestToken(c *gin.Context) {
 		return
 	}
 
-	// Создаем или находим гостевого пользователя
+	// Ищем пользователя по номеру телефона
 	var user models.User
-	err := database.DB.Where("email = ? AND is_guest = true", req.Email).First(&user).Error
+	err := database.DB.Where("phone = ?", req.Phone).First(&user).Error
 	if err == gorm.ErrRecordNotFound {
-		// Создаем нового гостевого пользователя
+		// Создаем нового пользователя автоматически
 		user = models.User{
 			Name:     req.Name,
-			Email:    req.Email,
+			Email:    "guest_" + uuid.New().String() + "@temp.local", // Временный email
 			Phone:    req.Phone,
-			Password: "guest_password_" + uuid.New().String(), // Временный пароль
+			Password: "auto_password_" + uuid.New().String(), // Автоматический пароль
 			IsGuest:  true,
 			IsActive: true,
-			RoleID:   &guestRole.ID,
+			RoleID:   &userRole.ID,
 		}
 		if err := database.DB.Create(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 				models.ErrInternalError,
-				"Failed to create guest user",
+				"Failed to create user",
 			))
 			return
 		}
@@ -234,15 +233,16 @@ func (ac *AuthController) CreateGuestToken(c *gin.Context) {
 		))
 		return
 	} else {
-		// Обновляем данные существующего гостя
-		user.Name = req.Name
-		user.Phone = req.Phone
-		if err := database.DB.Save(&user).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
-				models.ErrInternalError,
-				"Failed to update guest user",
-			))
-			return
+		// Пользователь уже существует - обновляем имя если нужно
+		if user.Name != req.Name {
+			user.Name = req.Name
+			if err := database.DB.Save(&user).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+					models.ErrInternalError,
+					"Failed to update user",
+				))
+				return
+			}
 		}
 	}
 
@@ -265,9 +265,15 @@ func (ac *AuthController) CreateGuestToken(c *gin.Context) {
 		RefreshToken: token, // TODO: Реализовать отдельные refresh токены
 	}
 
+	// Определяем сообщение в зависимости от того, новый это пользователь или существующий
+	message := "User logged in successfully"
+	if err == gorm.ErrRecordNotFound {
+		message = "User created and logged in successfully"
+	}
+
 	c.JSON(http.StatusOK, models.SuccessResponse(
 		authResponse,
-		"Guest token created successfully",
+		message,
 	))
 }
 

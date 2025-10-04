@@ -28,16 +28,15 @@ POST /api/v1/auth/login
 }
 ```
 
-#### 2. Создание токена для гостей:
+#### 2. Быстрый вход по номеру телефона:
 ```bash
 POST /api/v1/auth/guest-token
 ```
 
-**Данные для создания гостевого токена:**
+**Данные для быстрого входа:**
 ```json
 {
-  "name": "Имя гостя",
-  "email": "guest@example.com",
+  "name": "Имя пользователя",
   "phone": "+992901234567"
 }
 ```
@@ -61,11 +60,13 @@ POST /api/v1/auth/guest-token
 }
 ```
 
-**Особенности гостевого токена:**
-- Создает временного пользователя с `isGuest: true`
-- Если гость с таким email уже существует - обновляет его данные
+**Особенности быстрого входа:**
+- Если пользователь с таким номером телефона не существует - создается автоматически
+- Если пользователь уже существует - входит в свой аккаунт
+- Email генерируется автоматически (временный)
+- Пароль генерируется автоматически
 - Токен действует 24 часа
-- Гость может использовать все функции авторизованного пользователя
+- Пользователь может использовать все функции системы
 
 ---
 
@@ -645,7 +646,6 @@ POST /api/v1/guest-orders
 ```json
 {
   "guest_name": "Имя гостя",
-  "guest_email": "guest@example.com",
   "guest_phone": "+992901234567",
   "shipping_addr": "Полный адрес доставки",
   "payment_method": "cash",
@@ -671,7 +671,6 @@ POST /api/v1/guest-orders
 
 **Дополнительные поля для гостей:**
 - `guest_name` - имя гостя (обязательно)
-- `guest_email` - email гостя (обязательно, валидный email)
 - `guest_phone` - телефон гостя (обязательно)
 
 ### 3. Получить мои заказы
@@ -883,13 +882,12 @@ curl -X GET "http://159.89.99.252:8080/api/v1/products/PRODUCT_ID" \
   -H "Content-Type: application/json"
 ```
 
-### Создание гостевого токена:
+### Быстрый вход по номеру телефона:
 ```bash
 curl -X POST "http://159.89.99.252:8080/api/v1/auth/guest-token" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Гость",
-    "email": "guest@example.com",
+    "name": "Имя пользователя",
     "phone": "+992901234567"
   }'
 ```
@@ -938,7 +936,6 @@ curl -X POST "http://159.89.99.252:8080/api/v1/guest-orders" \
   -H "Content-Type: application/json" \
   -d '{
     "guest_name": "Ахмад Алиев",
-    "guest_email": "ahmad@example.com",
     "guest_phone": "+992901234567",
     "shipping_addr": "ул. Рудаки 123, Душанбе",
     "payment_method": "cash",
@@ -971,14 +968,13 @@ final response = await http.post(
 );
 ```
 
-**Или создайте гостевой токен:**
+**Или быстрый вход по номеру телефона:**
 ```dart
 final response = await http.post(
   Uri.parse('http://159.89.99.252:8080/api/v1/auth/guest-token'),
   headers: {'Content-Type': 'application/json'},
   body: json.encode({
-    'name': 'Гость',
-    'email': 'guest@example.com',
+    'name': 'Имя пользователя',
     'phone': '+992901234567',
   }),
 );
@@ -1059,7 +1055,6 @@ final response = await http.post(
   },
   body: json.encode({
     'guest_name': 'Ахмад Алиев',
-    'guest_email': 'ahmad@example.com',
     'guest_phone': '+992901234567',
     'shipping_addr': 'ул. Рудаки 123, Душанбе',
     'payment_method': 'cash',
