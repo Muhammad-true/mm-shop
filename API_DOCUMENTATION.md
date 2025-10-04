@@ -563,32 +563,146 @@ DELETE /api/v1/admin/roles/:id
 
 ## 📦 Заказы
 
-### 1. Получить заказы (админ)
+### 1. Создать заказ (авторизованный пользователь)
+```bash
+POST /api/v1/orders
+```
+
+**Заголовки:** `Authorization: Bearer {token}`
+
+**Тело запроса:**
+```json
+{
+  "recipient_name": "Имя получателя",
+  "phone": "+992901234567",
+  "shipping_addr": "Полный адрес доставки",
+  "payment_method": "cash",
+  "shipping_method": "courier",
+  "currency": "TJS",
+  "notes": "Комментарий к заказу",
+  "desired_date": "2024-12-25",
+  "desired_time": "14:30",
+  "items": [
+    {
+      "product_id": "uuid",
+      "quantity": 2,
+      "price": 1500.0,
+      "size": "L",
+      "color": "Красный",
+      "sku": "SKU123",
+      "name": "Название товара",
+      "image_url": "https://example.com/image.jpg"
+    }
+  ]
+}
+```
+
+**Описание полей:**
+- `recipient_name` - имя получателя (обязательно)
+- `phone` - телефон получателя (обязательно)
+- `shipping_addr` - адрес доставки (обязательно)
+- `payment_method` - способ оплаты: "cash" или "card" (обязательно)
+- `shipping_method` - способ доставки (по умолчанию "courier")
+- `currency` - валюта (по умолчанию "TJS")
+- `notes` - комментарий к заказу
+- `desired_date` - желаемая дата доставки (YYYY-MM-DD)
+- `desired_time` - желаемое время доставки (HH:mm)
+- `items` - массив товаров (обязательно, минимум 1)
+
+**Автоматический расчет:**
+- Доставка: 10 TJS (бесплатно от 200 TJS)
+- Итоговая сумма пересчитывается на сервере
+
+### 2. Создать гостевой заказ (без авторизации)
+```bash
+POST /api/v1/guest-orders
+```
+
+**Тело запроса:**
+```json
+{
+  "guest_name": "Имя гостя",
+  "guest_email": "guest@example.com",
+  "guest_phone": "+992901234567",
+  "shipping_addr": "Полный адрес доставки",
+  "payment_method": "cash",
+  "shipping_method": "courier",
+  "currency": "TJS",
+  "notes": "Комментарий к заказу",
+  "desired_date": "2024-12-25",
+  "desired_time": "14:30",
+  "items": [
+    {
+      "product_id": "uuid",
+      "quantity": 2,
+      "price": 1500.0,
+      "size": "L",
+      "color": "Красный",
+      "sku": "SKU123",
+      "name": "Название товара",
+      "image_url": "https://example.com/image.jpg"
+    }
+  ]
+}
+```
+
+**Дополнительные поля для гостей:**
+- `guest_name` - имя гостя (обязательно)
+- `guest_email` - email гостя (обязательно, валидный email)
+- `guest_phone` - телефон гостя (обязательно)
+
+### 3. Получить мои заказы
+```bash
+GET /api/v1/orders
+```
+
+**Заголовки:** `Authorization: Bearer {token}`
+
+### 4. Получить конкретный заказ
+```bash
+GET /api/v1/orders/:id
+```
+
+**Заголовки:** `Authorization: Bearer {token}`
+
+### 5. Отменить заказ
+```bash
+POST /api/v1/orders/:id/cancel
+```
+
+**Заголовки:** `Authorization: Bearer {token}`
+
+### 6. Получить гостевой заказ
+```bash
+GET /api/v1/guest-orders
+```
+
+### 7. Получить заказы (админ)
 ```bash
 GET /api/v1/admin/orders
 ```
 
-### 2. Получить конкретный заказ (админ)
+### 8. Получить конкретный заказ (админ)
 ```bash
 GET /api/v1/admin/orders/:id
 ```
 
-### 3. Обновить статус заказа (админ)
+### 9. Обновить статус заказа (админ)
 ```bash
 PUT /api/v1/admin/orders/:id/status
 ```
 
-### 4. Получить заказы магазина
+### 10. Получить заказы магазина
 ```bash
 GET /api/v1/shop/orders
 ```
 
-### 5. Получить заказ магазина
+### 11. Получить заказ магазина
 ```bash
 GET /api/v1/shop/orders/:id
 ```
 
-### 6. Обновить статус заказа магазина
+### 12. Обновить статус заказа магазина
 ```bash
 PUT /api/v1/shop/orders/:id/status
 ```
@@ -758,6 +872,55 @@ curl -X POST "http://159.89.99.252:8080/api/v1/cart/items" \
   }'
 ```
 
+### Создание заказа:
+```bash
+curl -X POST "http://159.89.99.252:8080/api/v1/orders" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipient_name": "Ахмад Алиев",
+    "phone": "+992901234567",
+    "shipping_addr": "ул. Рудаки 123, Душанбе",
+    "payment_method": "cash",
+    "currency": "TJS",
+    "notes": "Позвонить за час до доставки",
+    "items": [
+      {
+        "product_id": "PRODUCT_ID",
+        "quantity": 1,
+        "price": 200.0,
+        "size": "L",
+        "color": "Черный",
+        "name": "Название товара",
+        "image_url": "https://example.com/image.jpg"
+      }
+    ]
+  }'
+```
+
+### Создание гостевого заказа:
+```bash
+curl -X POST "http://159.89.99.252:8080/api/v1/guest-orders" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "guest_name": "Ахмад Алиев",
+    "guest_email": "ahmad@example.com",
+    "guest_phone": "+992901234567",
+    "shipping_addr": "ул. Рудаки 123, Душанбе",
+    "payment_method": "cash",
+    "items": [
+      {
+        "product_id": "PRODUCT_ID",
+        "quantity": 1,
+        "price": 200.0,
+        "size": "L",
+        "color": "Черный",
+        "name": "Название товара"
+      }
+    ]
+  }'
+```
+
 ---
 
 ## 🚀 Быстрый старт для Flutter
@@ -793,6 +956,77 @@ final response = await http.get(
     'Authorization': 'Bearer $token',
     'Content-Type': 'application/json',
   },
+);
+```
+
+4. **Добавьте товар в корзину:**
+```dart
+final response = await http.post(
+  Uri.parse('http://159.89.99.252:8080/api/v1/cart/items'),
+  headers: {
+    'Authorization': 'Bearer $token',
+    'Content-Type': 'application/json',
+  },
+  body: json.encode({
+    'product_id': productId,
+    'variation_id': variationId,
+    'quantity': 2,
+  }),
+);
+```
+
+5. **Создайте заказ:**
+```dart
+final response = await http.post(
+  Uri.parse('http://159.89.99.252:8080/api/v1/orders'),
+  headers: {
+    'Authorization': 'Bearer $token',
+    'Content-Type': 'application/json',
+  },
+  body: json.encode({
+    'recipient_name': 'Ахмад Алиев',
+    'phone': '+992901234567',
+    'shipping_addr': 'ул. Рудаки 123, Душанбе',
+    'payment_method': 'cash',
+    'currency': 'TJS',
+    'items': [
+      {
+        'product_id': productId,
+        'quantity': 1,
+        'price': 200.0,
+        'size': 'L',
+        'color': 'Черный',
+        'name': 'Название товара',
+      }
+    ],
+  }),
+);
+```
+
+6. **Создайте гостевой заказ:**
+```dart
+final response = await http.post(
+  Uri.parse('http://159.89.99.252:8080/api/v1/guest-orders'),
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: json.encode({
+    'guest_name': 'Ахмад Алиев',
+    'guest_email': 'ahmad@example.com',
+    'guest_phone': '+992901234567',
+    'shipping_addr': 'ул. Рудаки 123, Душанбе',
+    'payment_method': 'cash',
+    'items': [
+      {
+        'product_id': productId,
+        'quantity': 1,
+        'price': 200.0,
+        'size': 'L',
+        'color': 'Черный',
+        'name': 'Название товара',
+      }
+    ],
+  }),
 );
 ```
 
