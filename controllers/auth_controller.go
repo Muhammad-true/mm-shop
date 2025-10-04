@@ -3,10 +3,11 @@ package controllers
 import (
 	"net/http"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
 	"github.com/mm-api/mm-api/utils"
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -175,6 +176,98 @@ func (ac *AuthController) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(
 		authResponse,
 		"Login successful",
+	))
+}
+
+// CreateGuestToken создает токен для гостевого пользователя
+func (ac *AuthController) CreateGuestToken(c *gin.Context) {
+	var req struct {
+		Name  string `json:"name" binding:"required"`
+		Email string `json:"email" binding:"required,email"`
+		Phone string `json:"phone" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Invalid request data",
+			err.Error(),
+		))
+		return
+	}
+
+	// Получаем роль "user" для гостей
+	var guestRole models.Role
+	if err := database.DB.Where("name = ?", "user").First(&guestRole).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Failed to find user role",
+		))
+		return
+	}
+
+	// Создаем или находим гостевого пользователя
+	var user models.User
+	err := database.DB.Where("email = ? AND is_guest = true", req.Email).First(&user).Error
+	if err == gorm.ErrRecordNotFound {
+		// Создаем нового гостевого пользователя
+		user = models.User{
+			Name:     req.Name,
+			Email:    req.Email,
+			Phone:    req.Phone,
+			Password: "guest_password_" + uuid.New().String(), // Временный пароль
+			IsGuest:  true,
+			IsActive: true,
+			RoleID:   &guestRole.ID,
+		}
+		if err := database.DB.Create(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+				models.ErrInternalError,
+				"Failed to create guest user",
+			))
+			return
+		}
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Database error",
+		))
+		return
+	} else {
+		// Обновляем данные существующего гостя
+		user.Name = req.Name
+		user.Phone = req.Phone
+		if err := database.DB.Save(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+				models.ErrInternalError,
+				"Failed to update guest user",
+			))
+			return
+		}
+	}
+
+	// Загружаем роль для ответа
+	database.DB.Preload("Role").First(&user, user.ID)
+
+	// Генерируем JWT токен
+	token, err := utils.GenerateJWT(user.ID, user.Email, "user")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Failed to generate token",
+		))
+		return
+	}
+
+	authResponse := models.AuthResponse{
+		User:         user.ToResponse(),
+		Token:        token,
+		RefreshToken: token, // TODO: Реализовать отдельные refresh токены
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(
+		authResponse,
+		"Guest token created successfully",
 	))
 }
 

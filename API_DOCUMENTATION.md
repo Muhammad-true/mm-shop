@@ -14,6 +14,8 @@ Authorization: Bearer {your_token}
 ```
 
 ### Получение токена
+
+#### 1. Вход для зарегистрированных пользователей:
 ```bash
 POST /api/v1/auth/login
 ```
@@ -26,16 +28,31 @@ POST /api/v1/auth/login
 }
 ```
 
-**Ответ:**
+#### 2. Создание токена для гостей:
+```bash
+POST /api/v1/auth/guest-token
+```
+
+**Данные для создания гостевого токена:**
+```json
+{
+  "name": "Имя гостя",
+  "email": "guest@example.com",
+  "phone": "+992901234567"
+}
+```
+
+**Ответ (для обоих методов):**
 ```json
 {
   "success": true,
   "data": {
     "user": {
       "id": "uuid",
-      "name": "Администратор",
-      "email": "admin@mm.com",
-      "role": "admin"
+      "name": "Имя пользователя",
+      "email": "user@example.com",
+      "role": "user",
+      "isGuest": false
     },
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -43,6 +60,12 @@ POST /api/v1/auth/login
   "message": "Login successful"
 }
 ```
+
+**Особенности гостевого токена:**
+- Создает временного пользователя с `isGuest: true`
+- Если гость с таким email уже существует - обновляет его данные
+- Токен действует 24 часа
+- Гость может использовать все функции авторизованного пользователя
 
 ---
 
@@ -860,6 +883,17 @@ curl -X GET "http://159.89.99.252:8080/api/v1/products/PRODUCT_ID" \
   -H "Content-Type: application/json"
 ```
 
+### Создание гостевого токена:
+```bash
+curl -X POST "http://159.89.99.252:8080/api/v1/auth/guest-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Гость",
+    "email": "guest@example.com",
+    "phone": "+992901234567"
+  }'
+```
+
 ### Добавление товара в корзину:
 ```bash
 curl -X POST "http://159.89.99.252:8080/api/v1/cart/items" \
@@ -933,6 +967,19 @@ final response = await http.post(
   body: json.encode({
     'email': 'admin@mm.com',
     'password': 'admin123',
+  }),
+);
+```
+
+**Или создайте гостевой токен:**
+```dart
+final response = await http.post(
+  Uri.parse('http://159.89.99.252:8080/api/v1/auth/guest-token'),
+  headers: {'Content-Type': 'application/json'},
+  body: json.encode({
+    'name': 'Гость',
+    'email': 'guest@example.com',
+    'phone': '+992901234567',
   }),
 );
 ```
