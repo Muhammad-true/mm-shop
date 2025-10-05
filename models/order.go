@@ -22,31 +22,32 @@ const (
 
 // Order представляет заказ пользователя
 type Order struct {
-	ID            uuid.UUID   `json:"id" gorm:"type:uuid;primary_key;"`
-	UserID        uuid.UUID   `json:"user_id" gorm:"type:uuid;not null"`
-	Status        OrderStatus `json:"status" gorm:"default:pending"`
-	TotalAmount   float64     `json:"total_amount" gorm:"not null"`
-	ItemsSubtotal float64     `json:"items_subtotal" gorm:"not null"`
-	DeliveryFee   float64     `json:"delivery_fee" gorm:"not null;default:0"`
-	Currency      string      `json:"currency" gorm:"not null;default:TJS"`
-    AddressID     *uuid.UUID  `json:"address_id" gorm:"type:uuid"`
-	ShippingAddr  string      `json:"shipping_address" gorm:"not null"`
-	PaymentMethod string      `json:"payment_method" gorm:"not null"`
-    ShippingMethod string     `json:"shipping_method" gorm:"not null;default:courier"`
-	PaymentStatus string      `json:"payment_status" gorm:"not null;default:pending"`
-	TransactionID string      `json:"transaction_id"`
-	RecipientName string      `json:"recipient_name" gorm:"not null"`
-	Phone         string      `json:"phone" gorm:"not null"`
-	DesiredAt     *time.Time  `json:"desired_at"`
-	ConfirmedAt   *time.Time  `json:"confirmed_at"`
-	DeliveredAt   *time.Time  `json:"delivered_at"`
-	CancelledAt   *time.Time  `json:"cancelled_at"`
-	Notes         string      `json:"notes"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
+	ID             uuid.UUID   `json:"id" gorm:"type:uuid;primary_key;"`
+	UserID         uuid.UUID   `json:"user_id" gorm:"type:uuid;not null"`
+	Status         OrderStatus `json:"status" gorm:"default:pending"`
+	TotalAmount    float64     `json:"total_amount" gorm:"not null"`
+	ItemsSubtotal  float64     `json:"items_subtotal" gorm:"not null"`
+	DeliveryFee    float64     `json:"delivery_fee" gorm:"not null;default:0"`
+	Currency       string      `json:"currency" gorm:"not null;default:TJS"`
+	AddressID      *uuid.UUID  `json:"address_id" gorm:"type:uuid"`
+	ShippingAddr   string      `json:"shipping_address" gorm:"not null"`
+	PaymentMethod  string      `json:"payment_method" gorm:"not null"`
+	ShippingMethod string      `json:"shipping_method" gorm:"not null;default:courier"`
+	PaymentStatus  string      `json:"payment_status" gorm:"not null;default:pending"`
+	TransactionID  string      `json:"transaction_id"`
+	RecipientName  string      `json:"recipient_name" gorm:"not null"`
+	Phone          string      `json:"phone" gorm:"not null"`
+	DesiredAt      *time.Time  `json:"desired_at"`
+	ConfirmedAt    *time.Time  `json:"confirmed_at"`
+	DeliveredAt    *time.Time  `json:"delivered_at"`
+	CancelledAt    *time.Time  `json:"cancelled_at"`
+	Notes          string      `json:"notes"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
 
 	// Связи
 	User       User        `json:"user,omitempty" gorm:"foreignKey:UserID"`
+	Address    *Address    `json:"address,omitempty" gorm:"foreignKey:AddressID"`
 	OrderItems []OrderItem `json:"order_items,omitempty" gorm:"foreignKey:OrderID"`
 }
 
@@ -60,22 +61,22 @@ func (o *Order) BeforeCreate(tx *gorm.DB) error {
 
 // OrderItem представляет элемент заказа
 type OrderItem struct {
-	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
-	OrderID   uuid.UUID `json:"order_id" gorm:"type:uuid;not null"`
-	ProductID uuid.UUID `json:"product_id" gorm:"type:uuid;not null"`
-	Quantity  int       `json:"quantity" gorm:"not null"`
-	Price     float64   `json:"price" gorm:"not null"` // Цена на момент заказа
-	Size      string    `json:"size"`
-	Color     string    `json:"color"`
-	SKU       string    `json:"sku"`
-	Name      string    `json:"name" gorm:"not null"`
-	ImageURL  string    `json:"image_url"`
-	Total     float64   `json:"total" gorm:"not null"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
+	OrderID     uuid.UUID `json:"order_id" gorm:"type:uuid;not null"`
+	ProductID   uuid.UUID `json:"product_id" gorm:"type:uuid;not null"`
+	VariationID uuid.UUID `json:"variation_id" gorm:"type:uuid;not null"`
+	Quantity    int       `json:"quantity" gorm:"not null"`
+	Price       float64   `json:"price" gorm:"not null"` // Цена на момент заказа
+	SKU         string    `json:"sku"`
+	Name        string    `json:"name" gorm:"not null"`
+	ImageURL    string    `json:"image_url"`
+	Total       float64   `json:"total" gorm:"not null"`
+	CreatedAt   time.Time `json:"created_at"`
 
 	// Связи
-	Order   Order   `json:"order,omitempty" gorm:"foreignKey:OrderID"`
-	Product Product `json:"product,omitempty" gorm:"foreignKey:ProductID"`
+	Order     Order            `json:"order,omitempty" gorm:"foreignKey:OrderID"`
+	Product   Product          `json:"product,omitempty" gorm:"foreignKey:ProductID"`
+	Variation ProductVariation `json:"variation,omitempty" gorm:"foreignKey:VariationID"`
 }
 
 // BeforeCreate устанавливает UUID перед созданием
@@ -108,13 +109,13 @@ type OrderResponse struct {
 
 // OrderItemResponse представляет ответ с элементом заказа
 type OrderItemResponse struct {
-	ID       uuid.UUID       `json:"id"`
-	Quantity int             `json:"quantity"`
-	Price    float64         `json:"price"`
-	Size     string          `json:"size"`
-	Color    string          `json:"color"`
-	Subtotal float64         `json:"subtotal"`
-	Product  ProductResponse `json:"product"`
+	ID          uuid.UUID                `json:"id"`
+	Quantity    int                      `json:"quantity"`
+	Price       float64                  `json:"price"`
+	VariationID uuid.UUID                `json:"variation_id"`
+	Variation   ProductVariationResponse `json:"variation"`
+	Subtotal    float64                  `json:"subtotal"`
+	Product     ProductResponse          `json:"product"`
 }
 
 // ToResponse преобразует Order в OrderResponse
@@ -142,12 +143,12 @@ func (oi *OrderItem) ToResponse() OrderItemResponse {
 	subtotal := oi.Price * float64(oi.Quantity)
 
 	return OrderItemResponse{
-		ID:       oi.ID,
-		Quantity: oi.Quantity,
-		Price:    oi.Price,
-		Size:     oi.Size,
-		Color:    oi.Color,
-		Subtotal: subtotal,
-		Product:  oi.Product.ToResponse(),
+		ID:          oi.ID,
+		Quantity:    oi.Quantity,
+		Price:       oi.Price,
+		VariationID: oi.VariationID,
+		Variation:   oi.Variation.ToResponse(),
+		Subtotal:    subtotal,
+		Product:     oi.Product.ToResponse(),
 	}
 }

@@ -114,6 +114,21 @@ type ProductVariationResponse struct {
 	SKU           string    `json:"sku"`
 }
 
+// ToResponse преобразует ProductVariation в ProductVariationResponse
+func (pv *ProductVariation) ToResponse() ProductVariationResponse {
+	return ProductVariationResponse{
+		ID:            pv.ID,
+		Sizes:         pv.Sizes,
+		Colors:        pv.Colors,
+		Price:         pv.Price,
+		OriginalPrice: pv.OriginalPrice,
+		ImageURLs:     pv.ImageURLs,
+		StockQuantity: pv.StockQuantity,
+		IsAvailable:   pv.IsAvailable,
+		SKU:           pv.SKU,
+	}
+}
+
 // ToResponse преобразует Product в ProductResponse
 func (p *Product) ToResponse() ProductResponse {
 	variations := make([]ProductVariationResponse, len(p.Variations))
