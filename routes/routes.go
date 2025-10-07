@@ -75,6 +75,12 @@ func SetupRoutes() *gin.Engine {
 			categories.GET("/:id", categoryController.GetCategory)
 			categories.GET("/:id/products", categoryController.GetCategoryProducts)
 		}
+
+		// Админские продукты (публичный доступ)
+		adminPublic := public.Group("admin")
+		{
+			adminPublic.GET("/allproducts/", productController.GetAllProducts)
+		}
 	}
 
 	// Защищенные маршруты (требуют аутентификации)
