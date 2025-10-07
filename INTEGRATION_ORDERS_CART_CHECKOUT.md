@@ -38,10 +38,9 @@
 - `id uuid PK`
 - `order_id uuid NOT NULL FK -> orders(id) ON DELETE CASCADE`
 - `product_id uuid NOT NULL`
+- `variation_id uuid NOT NULL` ✅ **Новое поле!**
 - `quantity bigint NOT NULL`
 - `price numeric NOT NULL`
-- `size text NULL`
-- `color text NULL`
 - `name text NOT NULL` (снэпшот)
 - `sku text NULL`
 - `image_url text NULL`
@@ -77,8 +76,8 @@ Request body (пример):
   "currency": "TJS",
   "notes": "2 подъезд, код 1234",
   "items": [
-    { "product_id": "uuid-1", "quantity": 2, "price": 50.0, "size": "M", "color": "Black", "sku": "SKU-1", "name": "Футболка", "image_url": "https://…" },
-    { "product_id": "uuid-2", "quantity": 1, "price": 80.0, "size": "L", "color": "Blue",  "sku": "SKU-2", "name": "Худи",      "image_url": "https://…" }
+    { "variation_id": "var-uuid-1", "quantity": 2, "price": 50.0, "size": "M", "color": "Black", "sku": "SKU-1", "name": "Футболка", "image_url": "https://…" },
+    { "variation_id": "var-uuid-2", "quantity": 1, "price": 80.0, "size": "L", "color": "Blue", "sku": "SKU-2", "name": "Худи", "image_url": "https://…" }
   ]
 }
 ```
@@ -148,14 +147,13 @@ PATCH `/api/v1/admin/orders/{order_id}/status`
 Пример сборки тела (псевдокод):
 ```dart
 final items = cartItems.map((it) => {
-  'product_id': it.product.id,
+  'product_id': it.product.id,      // ✅ Основной продукт
+  'variation_id': it.variation.id,  // ✅ Конкретная вариация
   'quantity': it.quantity,
-  'price': it.product.price,
-  'size': it.selectedSize,
-  'color': it.selectedColor,
-  'sku': it.product.sku,
+  'price': it.variation.price,      // ✅ Цена из вариации
+  'sku': it.variation.sku,          // ✅ SKU из вариации
   'name': it.product.name,
-  'image_url': it.product.imageUrls.isNotEmpty ? it.product.imageUrls.first : null,
+  'image_url': it.variation.imageUrls.isNotEmpty ? it.variation.imageUrls.first : null,
 }).toList();
 
 final body = {
@@ -227,5 +225,158 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 - [x] Валюта TJS
 - [x] Flutter: Cart → Checkout (2 шага) → Orders
 - [x] Проброс даты/времени и способа оплаты
+- [x] **НОВОЕ**: VariationID вместо Size/Color в заказах
+- [x] **НОВОЕ**: Гостевые заказы без авторизации
+- [x] **НОВОЕ**: Быстрый токен по номеру телефона
+
+---
+
+## 7) 🚀 **Новая логика для Flutter (2024)**
+
+### **7.1 Локальная корзина:**
+```dart
+class LocalCartItem {
+  final String variationId;  // ✅ Основное поле!
+  final int quantity;
+  final double price;
+  final String size;         // ✅ Размер товара
+  final String color;        // ✅ Цвет товара
+  final String name;
+  final String sku;
+  final String? imageUrl;
+  
+  // Размеры и цвета теперь берутся из вариации
+  final List<String> sizes;
+  final List<String> colors;
+}
+```
+
+### **7.2 Добавление в корзину:**
+```dart
+void addToCart(Product product, ProductVariation variation, int quantity) {
+  final cartItem = LocalCartItem(
+    variationId: variation.id,  // ✅ Связываем с конкретной вариацией
+    quantity: quantity,
+    price: variation.price,     // ✅ Цена из вариации
+    size: variation.size,       // ✅ Размер из вариации
+    color: variation.color,     // ✅ Цвет из вариации
+    name: product.name,
+    sku: variation.sku,
+    imageUrl: variation.imageUrls.isNotEmpty ? variation.imageUrls.first : null,
+    sizes: variation.sizes,     // ✅ Размеры из вариации
+    colors: variation.colors,   // ✅ Цвета из вариации
+  );
+  
+  // Сохранить в локальное хранилище (SharedPreferences/Hive)
+  _saveToLocalStorage(cartItem);
+}
+```
+
+### **7.3 Оформление заказа:**
+```dart
+Future<Order> createOrder({
+  required String recipientName,
+  required String phone,
+  required String shippingAddr,
+  required String paymentMethod,
+}) async {
+  final localCartItems = _getLocalCartItems();
+  
+  // Расчет сумм
+  final subtotal = localCartItems.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+  final deliveryFee = subtotal >= 200.0 ? 0.0 : 10.0;
+  final total = subtotal + deliveryFee;
+  
+  // Подготовка товаров для API
+  final items = localCartItems.map((item) => {
+    'variation_id': item.variationId,  // ✅ Основное поле!
+    'quantity': item.quantity,
+    'price': item.price,
+    'size': item.size,
+    'color': item.color,
+    'sku': item.sku,
+    'name': item.name,
+    'image_url': item.imageUrl,
+  }).toList();
+  
+  // Создание гостевого заказа (без токена)
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/v1/guest-orders'),
+    headers: {'Content-Type': 'application/json'},
+    body: json.encode({
+      'guest_name': recipientName,
+      'guest_phone': phone,
+      'shipping_addr': shippingAddr,
+      'payment_method': paymentMethod,
+      'items_subtotal': subtotal,
+      'delivery_fee': deliveryFee,
+      'total_amount': total,
+      'currency': 'TJS',
+      'items': items,
+    }),
+  );
+  
+  if (response.statusCode == 200) {
+    // Очистить локальную корзину
+    _clearLocalCart();
+    return Order.fromJson(json.decode(response.body));
+  }
+  
+  throw Exception('Ошибка создания заказа');
+}
+```
+
+### **7.4 Альтернатива: Заказ с токеном:**
+```dart
+Future<Order> createOrderWithToken({
+  required String recipientName,
+  required String phone,
+  required String shippingAddr,
+  required String paymentMethod,
+}) async {
+  // 1. Получить быстрый токен
+  final token = await _getQuickToken(recipientName, phone);
+  
+  // 2. Создать заказ с токеном (обычный эндпоинт)
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/v1/orders'),
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    },
+    body: json.encode({...}), // Те же данные
+  );
+  
+  return Order.fromJson(json.decode(response.body));
+}
+
+Future<String> _getQuickToken(String name, String phone) async {
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/v1/auth/guest-token'),
+    headers: {'Content-Type': 'application/json'},
+    body: json.encode({
+      'name': name,
+      'phone': phone,
+    }),
+  );
+  
+  final data = json.decode(response.body);
+  return data['data']['token'];
+}
+```
+
+### **7.5 Преимущества новой логики:**
+- ✅ **Простота**: Корзина работает полностью локально
+- ✅ **Скорость**: Нет задержек на добавление в корзину
+- ✅ **Надежность**: Точные данные через VariationID
+- ✅ **UX**: Оформление заказа без регистрации
+- ✅ **Гибкость**: Можно использовать с токеном или без
+
+### **7.6 Миграция с старой логики:**
+1. Заменить `size` и `color` на `variation_id`
+2. Обновить структуры данных в корзине
+3. Изменить логику добавления в корзину
+4. Обновить экраны оформления заказа
+5. Тестировать с новыми API эндпоинтами
 
 

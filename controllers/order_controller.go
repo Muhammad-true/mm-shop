@@ -28,10 +28,11 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 	}
 
 	type createItem struct {
-		ProductID   string  `json:"product_id" binding:"required,uuid"`
 		VariationID string  `json:"variation_id" binding:"required,uuid"`
 		Quantity    int     `json:"quantity" binding:"required,gt=0"`
 		Price       float64 `json:"price" binding:"required,gt=0"`
+		Size        string  `json:"size"`
+		Color       string  `json:"color"`
 		SKU         string  `json:"sku"`
 		Name        string  `json:"name"`
 		ImageURL    string  `json:"image_url"`
@@ -130,20 +131,17 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 
 		// Создаём позиции заказа
 		for _, it := range req.Items {
-			pid, err := uuid.Parse(it.ProductID)
-			if err != nil {
-				return err
-			}
 			vid, err := uuid.Parse(it.VariationID)
 			if err != nil {
 				return err
 			}
 			item := models.OrderItem{
 				OrderID:     order.ID,
-				ProductID:   pid,
 				VariationID: vid,
 				Quantity:    it.Quantity,
 				Price:       it.Price,
+				Size:        it.Size,
+				Color:       it.Color,
 				SKU:         it.SKU,
 				Name:        it.Name,
 				ImageURL:    it.ImageURL,
@@ -167,7 +165,7 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 	}
 
 	// Возвращаем заказ с позициями
-	if err := database.DB.Preload("OrderItems").Preload("OrderItems.Product").Preload("OrderItems.Variation").First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
+	if err := database.DB.Preload("OrderItems").Preload("OrderItems.Variation").First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
 			"Ошибка при получении созданного заказа",
@@ -215,7 +213,7 @@ func (oc *OrderController) GetMyOrders(c *gin.Context) {
 	query.Count(&total)
 
 	var orders []models.Order
-	if err := query.Preload("OrderItems").Preload("OrderItems.Product").Preload("OrderItems.Variation").Order("created_at DESC").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
+	if err := query.Preload("OrderItems").Preload("OrderItems.Variation").Order("created_at DESC").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
 			"Ошибка при получении заказов",
@@ -257,7 +255,7 @@ func (oc *OrderController) GetMyOrder(c *gin.Context) {
 
 	orderID := c.Param("id")
 	var order models.Order
-	err := database.DB.Preload("OrderItems").Preload("OrderItems.Product").Preload("OrderItems.Variation").First(&order, "id = ? AND user_id = ?", orderID, currentUserID).Error
+	err := database.DB.Preload("OrderItems").Preload("OrderItems.Variation").First(&order, "id = ? AND user_id = ?", orderID, currentUserID).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponseWithCode(
@@ -332,10 +330,11 @@ func (oc *OrderController) CancelMyOrder(c *gin.Context) {
 // CreateGuestOrder - создать заказ для гостя (без авторизации)
 func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 	type createItem struct {
-		ProductID   string  `json:"product_id" binding:"required,uuid"`
 		VariationID string  `json:"variation_id" binding:"required,uuid"`
 		Quantity    int     `json:"quantity" binding:"required,gt=0"`
 		Price       float64 `json:"price" binding:"required,gt=0"`
+		Size        string  `json:"size"`
+		Color       string  `json:"color"`
 		SKU         string  `json:"sku"`
 		Name        string  `json:"name"`
 		ImageURL    string  `json:"image_url"`
@@ -472,20 +471,17 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 
 		// Создаём позиции заказа
 		for _, it := range req.Items {
-			pid, err := uuid.Parse(it.ProductID)
-			if err != nil {
-				return err
-			}
 			vid, err := uuid.Parse(it.VariationID)
 			if err != nil {
 				return err
 			}
 			item := models.OrderItem{
 				OrderID:     order.ID,
-				ProductID:   pid,
 				VariationID: vid,
 				Quantity:    it.Quantity,
 				Price:       it.Price,
+				Size:        it.Size,
+				Color:       it.Color,
 				SKU:         it.SKU,
 				Name:        it.Name,
 				ImageURL:    it.ImageURL,
@@ -509,7 +505,7 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 	}
 
 	// Возвращаем заказ с позициями
-	if err := database.DB.Preload("OrderItems").Preload("OrderItems.Product").Preload("OrderItems.Variation").First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
+	if err := database.DB.Preload("OrderItems").Preload("OrderItems.Variation").First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
 			"Ошибка при получении созданного заказа",
@@ -538,7 +534,7 @@ func (oc *OrderController) GetGuestOrder(c *gin.Context) {
 	}
 
 	var orders []models.Order
-	query := database.DB.Preload("OrderItems").Preload("OrderItems.Product").Preload("OrderItems.Variation").Joins("JOIN users ON orders.user_id = users.id").Where("users.is_guest = true")
+	query := database.DB.Preload("OrderItems").Preload("OrderItems.Variation").Joins("JOIN users ON orders.user_id = users.id").Where("users.is_guest = true")
 
 	if email != "" {
 		query = query.Where("users.email = ?", email)
@@ -583,7 +579,7 @@ func (oc *OrderController) GetOrders(c *gin.Context) {
 	// Получение заказов с пагинацией
 	result := database.DB.Preload("User").
 		Preload("OrderItems").
-		Preload("OrderItems.Product").Preload("OrderItems.Variation").
+		Preload("OrderItems.Variation").
 		Offset(offset).
 		Limit(limit).
 		Order("created_at DESC").
@@ -625,7 +621,7 @@ func (oc *OrderController) GetOrder(c *gin.Context) {
 	var order models.Order
 	result := database.DB.Preload("User").
 		Preload("OrderItems").
-		Preload("OrderItems.Product").Preload("OrderItems.Variation").
+		Preload("OrderItems.Variation").
 		First(&order, "id = ?", orderID)
 
 	if result.Error != nil {
@@ -772,7 +768,7 @@ func (oc *OrderController) GetShopOrders(c *gin.Context) {
 	// Получение заказов с пагинацией
 	result := query.Preload("User").
 		Preload("OrderItems").
-		Preload("OrderItems.Product").Preload("OrderItems.Variation").
+		Preload("OrderItems.Variation").
 		Offset(offset).
 		Limit(limit).
 		Order("created_at DESC").
@@ -826,7 +822,7 @@ func (oc *OrderController) GetShopOrder(c *gin.Context) {
 	var order models.Order
 	query := database.DB.Preload("User").
 		Preload("OrderItems").
-		Preload("OrderItems.Product").Preload("OrderItems.Variation")
+		Preload("OrderItems.Variation")
 
 	// Если владелец магазина - проверяем, что заказ от обычного пользователя
 	if currentUser.Role != nil && currentUser.Role.Name == "shop_owner" {
@@ -900,7 +896,7 @@ func (oc *OrderController) GetCustomerOrders(c *gin.Context) {
 	// Получение заказов с пагинацией
 	result := query.Preload("User").
 		Preload("OrderItems").
-		Preload("OrderItems.Product").Preload("OrderItems.Variation").
+		Preload("OrderItems.Variation").
 		Offset(offset).
 		Limit(limit).
 		Order("created_at DESC").

@@ -63,10 +63,11 @@ func (o *Order) BeforeCreate(tx *gorm.DB) error {
 type OrderItem struct {
 	ID          uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
 	OrderID     uuid.UUID `json:"order_id" gorm:"type:uuid;not null"`
-	ProductID   uuid.UUID `json:"product_id" gorm:"type:uuid;not null"`
 	VariationID uuid.UUID `json:"variation_id" gorm:"type:uuid;not null"`
 	Quantity    int       `json:"quantity" gorm:"not null"`
 	Price       float64   `json:"price" gorm:"not null"` // Цена на момент заказа
+	Size        string    `json:"size"`
+	Color       string    `json:"color"`
 	SKU         string    `json:"sku"`
 	Name        string    `json:"name" gorm:"not null"`
 	ImageURL    string    `json:"image_url"`
@@ -75,7 +76,6 @@ type OrderItem struct {
 
 	// Связи
 	Order     Order            `json:"order,omitempty" gorm:"foreignKey:OrderID"`
-	Product   Product          `json:"product,omitempty" gorm:"foreignKey:ProductID"`
 	Variation ProductVariation `json:"variation,omitempty" gorm:"foreignKey:VariationID"`
 }
 
@@ -112,10 +112,11 @@ type OrderItemResponse struct {
 	ID          uuid.UUID                `json:"id"`
 	Quantity    int                      `json:"quantity"`
 	Price       float64                  `json:"price"`
+	Size        string                   `json:"size"`
+	Color       string                   `json:"color"`
 	VariationID uuid.UUID                `json:"variation_id"`
 	Variation   ProductVariationResponse `json:"variation"`
 	Subtotal    float64                  `json:"subtotal"`
-	Product     ProductResponse          `json:"product"`
 }
 
 // ToResponse преобразует Order в OrderResponse
@@ -146,9 +147,10 @@ func (oi *OrderItem) ToResponse() OrderItemResponse {
 		ID:          oi.ID,
 		Quantity:    oi.Quantity,
 		Price:       oi.Price,
+		Size:        oi.Size,
+		Color:       oi.Color,
 		VariationID: oi.VariationID,
 		Variation:   oi.Variation.ToResponse(),
 		Subtotal:    subtotal,
-		Product:     oi.Product.ToResponse(),
 	}
 }

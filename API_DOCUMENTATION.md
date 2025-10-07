@@ -407,14 +407,12 @@ POST /api/v1/cart/items
 **Тело запроса:**
 ```json
 {
-  "product_id": "uuid",
   "variation_id": "uuid",
   "quantity": 2
 }
 ```
 
 **Описание полей:**
-- `product_id` - ID продукта (обязательно)
 - `variation_id` - ID конкретной вариации продукта (обязательно)
 - `quantity` - количество товара (обязательно, больше 0)
 
@@ -608,7 +606,7 @@ POST /api/v1/orders
   "desired_time": "14:30",
   "items": [
     {
-      "product_id": "uuid",
+      "variation_id": "uuid",
       "quantity": 2,
       "price": 1500.0,
       "size": "L",
@@ -656,7 +654,7 @@ POST /api/v1/guest-orders
   "desired_time": "14:30",
   "items": [
     {
-      "product_id": "uuid",
+      "variation_id": "uuid",
       "quantity": 2,
       "price": 1500.0,
       "size": "L",
@@ -918,11 +916,12 @@ curl -X POST "http://159.89.99.252:8080/api/v1/orders" \
     "notes": "Позвонить за час до доставки",
     "items": [
       {
-        "product_id": "PRODUCT_ID",
+        "variation_id": "VARIATION_ID",
         "quantity": 1,
         "price": 200.0,
         "size": "L",
         "color": "Черный",
+        "sku": "SKU-123",
         "name": "Название товара",
         "image_url": "https://example.com/image.jpg"
       }
@@ -941,11 +940,12 @@ curl -X POST "http://159.89.99.252:8080/api/v1/guest-orders" \
     "payment_method": "cash",
     "items": [
       {
-        "product_id": "PRODUCT_ID",
+        "variation_id": "VARIATION_ID",
         "quantity": 1,
         "price": 200.0,
         "size": "L",
         "color": "Черный",
+        "sku": "SKU-123",
         "name": "Название товара"
       }
     ]
@@ -1037,8 +1037,7 @@ final response = await http.post(
         'product_id': productId,
         'quantity': 1,
         'price': 200.0,
-        'size': 'L',
-        'color': 'Черный',
+        'sku': 'SKU-123',
         'name': 'Название товара',
       }
     ],
@@ -1063,14 +1062,216 @@ final response = await http.post(
         'product_id': productId,
         'quantity': 1,
         'price': 200.0,
-        'size': 'L',
-        'color': 'Черный',
+        'sku': 'SKU-123',
         'name': 'Название товара',
       }
     ],
   }),
 );
 ```
+
+---
+
+## 🎯 **Интеграция с Flutter приложением**
+
+### **Логика работы с заказами:**
+
+#### **1. Локальная корзина на клиенте:**
+- Пользователь собирает товары в локальной корзине
+- Корзина хранится в локальном хранилище (SharedPreferences/Hive)
+- Расчет доставки: 10 TJS (бесплатно от 200 TJS)
+
+#### **2. Быстрое оформление заказа:**
+```dart
+// 1. Получить быстрый токен (если нужен)
+final token = await getQuickToken(name, phone);
+
+// 2. Создать заказ из локальной корзины
+final order = await createOrderFromLocalCart(
+  recipientName: name,
+  phone: phone,
+  shippingAddr: address,
+  paymentMethod: 'cash',
+  items: localCartItems, // Из локальной корзины
+);
+```
+
+#### **3. Создание заказа без токена (гостевой заказ):**
+```dart
+// Прямо из локальной корзины без авторизации
+final order = await createGuestOrder(
+  guestName: name,
+  guestPhone: phone,
+  shippingAddr: address,
+  paymentMethod: 'cash',
+  items: localCartItems,
+);
+```
+
+#### **4. Структура товара в заказе:**
+```dart
+class OrderItem {
+  final String productId;
+  final String variationId;  // ✅ Новое поле!
+  final int quantity;
+  final double price;
+  final String sku;
+  final String name;
+  final String? imageUrl;
+}
+```
+
+### **Flutter Cubit примеры:**
+
+#### **CartCubit (локальная корзина):**
+```dart
+class CartCubit extends Cubit<CartState> {
+  // Добавить в локальную корзину
+  void addToLocalCart(Product product, ProductVariation variation, int quantity) {
+    final cartItem = CartItem(
+      productId: product.id,
+      variationId: variation.id,  // ✅ Используем VariationID
+      quantity: quantity,
+      price: variation.price,
+      name: product.name,
+      sku: variation.sku,
+    );
+    // Сохранить в локальное хранилище
+  }
+
+  // Расчет доставки
+  double calculateDeliveryFee(double subtotal) {
+    return subtotal >= 200.0 ? 0.0 : 10.0;
+  }
+
+  // Итоговая сумма
+  double calculateTotal(double subtotal) {
+    return subtotal + calculateDeliveryFee(subtotal);
+  }
+}
+```
+
+#### **OrdersCubit (заказы):**
+```dart
+class OrdersCubit extends Cubit<OrdersState> {
+  // Создать заказ из локальной корзины
+  Future<void> createOrderFromLocalCart({
+    required String recipientName,
+    required String phone,
+    required String shippingAddr,
+    required String paymentMethod,
+    required List<CartItem> localCartItems,
+  }) async {
+    final items = localCartItems.map((item) => {
+      'variation_id': item.variationId,  // ✅ Новое поле!
+      'quantity': item.quantity,
+      'price': item.price,
+      'size': item.size,
+      'color': item.color,
+      'sku': item.sku,
+      'name': item.name,
+      'image_url': item.imageUrl,
+    }).toList();
+
+    final subtotal = localCartItems.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    final deliveryFee = subtotal >= 200.0 ? 0.0 : 10.0;
+    final total = subtotal + deliveryFee;
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/v1/guest-orders'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'guest_name': recipientName,
+        'guest_phone': phone,
+        'shipping_addr': shippingAddr,
+        'payment_method': paymentMethod,
+        'items_subtotal': subtotal,
+        'delivery_fee': deliveryFee,
+        'total_amount': total,
+        'currency': 'TJS',
+        'items': items,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      // Очистить локальную корзину
+      clearLocalCart();
+      // Показать успех
+      emit(OrdersSuccess());
+    }
+  }
+}
+```
+
+### **Экран оформления заказа (CheckoutScreen):**
+```dart
+class CheckoutScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CartCubit, CartState>(
+      builder: (context, cartState) {
+        final cartItems = cartState.cartItems;
+        final subtotal = cartState.subtotal;
+        final deliveryFee = cartState.deliveryFee;
+        final total = cartState.total;
+
+        return Column(
+          children: [
+            // Товары из локальной корзины
+            ...cartItems.map((item) => CartItemWidget(item)),
+            
+            // Расчеты
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Сумма товаров:'),
+                Text('${subtotal.toStringAsFixed(0)} с'),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Доставка:'),
+                Text(deliveryFee == 0 ? 'Бесплатно' : '${deliveryFee.toStringAsFixed(0)} с'),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Итого:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('${total.toStringAsFixed(0)} с', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+
+            // Кнопка оформления
+            ElevatedButton(
+              onPressed: () => _createOrder(context),
+              child: Text('Оформить заказ'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _createOrder(BuildContext context) {
+    context.read<OrdersCubit>().createOrderFromLocalCart(
+      recipientName: _nameController.text,
+      phone: _phoneController.text,
+      shippingAddr: _addressController.text,
+      paymentMethod: _selectedPaymentMethod,
+      localCartItems: context.read<CartCubit>().state.cartItems,
+    );
+  }
+}
+```
+
+### **Преимущества новой логики:**
+- ✅ **Простота**: Корзина работает локально, заказ создается одним запросом
+- ✅ **Скорость**: Нет необходимости в токенах для добавления в корзину
+- ✅ **Надежность**: Точные данные через VariationID
+- ✅ **UX**: Пользователь может оформить заказ без регистрации
+- ✅ **Гибкость**: Позже можно привязать заказы к аккаунту
 
 ---
 
