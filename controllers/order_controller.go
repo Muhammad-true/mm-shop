@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -157,21 +158,40 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 	})
 
 	if err != nil {
+		log.Printf("❌ Ошибка при создании заказа: %v", err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
-			"Ошибка при создании заказа",
+			"Ошибка при создании заказа: "+err.Error(),
 		))
 		return
 	}
 
 	// Возвращаем заказ с позициями
-	if err := database.DB.Preload("OrderItems").Preload("OrderItems.Variation").First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
+	log.Printf("🔍 Загружаем заказ с ID: %s", createdOrder.ID)
+
+	// Сначала попробуем без Preload для диагностики
+	if err := database.DB.First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
+		log.Printf("❌ Ошибка при получении созданного заказа: %v", err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
-			"Ошибка при получении созданного заказа",
+			"Ошибка при получении созданного заказа: "+err.Error(),
 		))
 		return
 	}
+
+	// Теперь загружаем OrderItems отдельно
+	var orderItems []models.OrderItem
+	if err := database.DB.Where("order_id = ?", createdOrder.ID).Find(&orderItems).Error; err != nil {
+		log.Printf("❌ Ошибка при получении OrderItems: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при получении OrderItems: "+err.Error(),
+		))
+		return
+	}
+	createdOrder.OrderItems = orderItems
+
+	log.Printf("✅ Заказ успешно загружен с %d позициями", len(orderItems))
 
 	c.JSON(http.StatusOK, models.StandardResponse{
 		Success: true,
@@ -497,21 +517,40 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 	})
 
 	if err != nil {
+		log.Printf("❌ Ошибка при создании заказа: %v", err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
-			"Ошибка при создании заказа",
+			"Ошибка при создании заказа: "+err.Error(),
 		))
 		return
 	}
 
 	// Возвращаем заказ с позициями
-	if err := database.DB.Preload("OrderItems").Preload("OrderItems.Variation").First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
+	log.Printf("🔍 Загружаем заказ с ID: %s", createdOrder.ID)
+
+	// Сначала попробуем без Preload для диагностики
+	if err := database.DB.First(&createdOrder, "id = ?", createdOrder.ID).Error; err != nil {
+		log.Printf("❌ Ошибка при получении созданного заказа: %v", err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
-			"Ошибка при получении созданного заказа",
+			"Ошибка при получении созданного заказа: "+err.Error(),
 		))
 		return
 	}
+
+	// Теперь загружаем OrderItems отдельно
+	var orderItems []models.OrderItem
+	if err := database.DB.Where("order_id = ?", createdOrder.ID).Find(&orderItems).Error; err != nil {
+		log.Printf("❌ Ошибка при получении OrderItems: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при получении OrderItems: "+err.Error(),
+		))
+		return
+	}
+	createdOrder.OrderItems = orderItems
+
+	log.Printf("✅ Заказ успешно загружен с %d позициями", len(orderItems))
 
 	c.JSON(http.StatusOK, models.StandardResponse{
 		Success: true,
