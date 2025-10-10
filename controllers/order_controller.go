@@ -690,7 +690,7 @@ func (oc *OrderController) UpdateOrderStatus(c *gin.Context) {
 	orderID := c.Param("id")
 
 	var updateRequest struct {
-		Status string `json:"status" binding:"required,oneof=pending processing shipped delivered cancelled"`
+		Status string `json:"status" binding:"required,oneof=pending confirmed preparing inDelivery delivered completed cancelled"`
 	}
 
 	if err := c.ShouldBindJSON(&updateRequest); err != nil {

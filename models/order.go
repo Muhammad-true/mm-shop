@@ -37,9 +37,8 @@ type Order struct {
 	TransactionID  string      `json:"transaction_id"`
 	RecipientName  string      `json:"recipient_name" gorm:"not null"`
 	Phone          string      `json:"phone" gorm:"not null"`
-	DesiredAt      *time.Time  `json:"desired_at"`
+	DesiredAt      *time.Time  `json:"desired_at" gorm:"type:timestamp with time zone"`
 	ConfirmedAt    *time.Time  `json:"confirmed_at"`
-	DeliveredAt    *time.Time  `json:"delivered_at"`
 	CancelledAt    *time.Time  `json:"cancelled_at"`
 	Notes          string      `json:"notes"`
 	CreatedAt      time.Time   `json:"created_at"`
@@ -103,6 +102,7 @@ type OrderResponse struct {
 	PaymentMethod string              `json:"payment_method"`
 	Notes         string              `json:"notes"`
 	OrderItems    []OrderItemResponse `json:"order_items"`
+	DesiredAt     *time.Time          `json:"desired_at"`
 	CreatedAt     time.Time           `json:"created_at"`
 	UpdatedAt     time.Time           `json:"updated_at"`
 }
@@ -134,6 +134,7 @@ func (o *Order) ToResponse() OrderResponse {
 		PaymentMethod: o.PaymentMethod,
 		Notes:         o.Notes,
 		OrderItems:    orderItems,
+		DesiredAt:     o.DesiredAt,
 		CreatedAt:     o.CreatedAt,
 		UpdatedAt:     o.UpdatedAt,
 	}
