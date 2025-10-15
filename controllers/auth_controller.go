@@ -27,12 +27,12 @@ func (ac *AuthController) Register(c *gin.Context) {
 		return
 	}
 
-	// Проверяем, существует ли пользователь с таким email
+	// Проверяем, существует ли пользователь с таким телефоном
 	var existingUser models.User
-	if err := database.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+	if err := database.DB.Where("phone = ?", req.Phone).First(&existingUser).Error; err == nil {
 		c.JSON(http.StatusConflict, models.ErrorResponseWithCode(
 			models.ErrUserAlreadyExists,
-			"User with this email already exists",
+			"User with this phone already exists",
 		))
 		return
 	}
@@ -50,7 +50,8 @@ func (ac *AuthController) Register(c *gin.Context) {
 	// Создаем нового пользователя
 	user := models.User{
 		Name:     req.Name,
-		Email:    req.Email,
+		Email:    req.Email, // может быть пустым
+		Phone:    req.Phone,
 		IsActive: true,
 		RoleID:   &defaultRole.ID, // Присваиваем роль пользователя по умолчанию
 	}
@@ -125,13 +126,13 @@ func (ac *AuthController) Login(c *gin.Context) {
 		return
 	}
 
-	// Ищем пользователя по email
+	// Ищем пользователя по телефону
 	var user models.User
-	if err := database.DB.Preload("Addresses").Preload("Role").Where("email = ? AND is_active = ?", req.Email, true).First(&user).Error; err != nil {
+	if err := database.DB.Preload("Addresses").Preload("Role").Where("phone = ? AND is_active = ?", req.Phone, true).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
 				models.ErrInvalidCredentials,
-				"Invalid email or password",
+				"Invalid phone or password",
 			))
 		} else {
 			c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
@@ -146,7 +147,7 @@ func (ac *AuthController) Login(c *gin.Context) {
 	if !user.CheckPassword(req.Password) {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
 			models.ErrInvalidCredentials,
-			"Invalid email or password",
+			"Invalid phone or password",
 		))
 		return
 	}
@@ -381,5 +382,28 @@ func (ac *AuthController) RefreshToken(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 		"token":        newToken,
 		"refreshToken": newToken, // TODO: Генерировать отдельный refresh токен
+	}))
+}
+
+// ForgotPassword инициирует восстановление пароля по телефону
+func (ac *AuthController) ForgotPassword(c *gin.Context) {
+	var req models.UserForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Invalid request data",
+			err.Error(),
+		))
+		return
+	}
+
+	// Заглушка: в проде отправляем SMS код или ссылку
+	// Здесь подтверждаем, что телефон существует (но не раскрываем факт отсутствия)
+	var user models.User
+	_ = database.DB.Where("phone = ?", req.Phone).First(&user)
+
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
+		"status":  "pending",
+		"message": "If this phone exists, a reset code was sent",
 	}))
 }

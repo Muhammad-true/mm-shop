@@ -60,17 +60,24 @@ func (u *User) CheckPassword(password string) bool {
 	return err == nil
 }
 
-// UserRegisterRequest представляет запрос на регистрацию
+// UserRegisterRequest представляет запрос на регистрацию клиента (Flutter)
+// Email опционален (для отправки чека), регистрация по телефону обязательна
 type UserRegisterRequest struct {
 	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
+	Phone    string `json:"phone" binding:"required"`
+	Email    string `json:"email" binding:"omitempty,email"`
 	Password string `json:"password" binding:"required,min=8"`
 }
 
-// UserLoginRequest представляет запрос на вход
+// UserLoginRequest представляет запрос на вход по телефону
 type UserLoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
+	Phone    string `json:"phone" binding:"required"`
 	Password string `json:"password" binding:"required"`
+}
+
+// UserForgotPasswordRequest запрос на восстановление пароля по телефону
+type UserForgotPasswordRequest struct {
+	Phone string `json:"phone" binding:"required"`
 }
 
 // UserUpdateRequest представляет запрос на обновление профиля

@@ -53,7 +53,7 @@ func SetupRoutes() *gin.Engine {
 			auth.POST("/login", authController.Login)
 			auth.POST("/refresh", authController.RefreshToken)
 			auth.POST("/guest-token", authController.CreateGuestToken) // Новый эндпоинт для гостевого токена
-			// auth.POST("/forgot-password", authController.ForgotPassword) // TODO: Реализовать
+			auth.POST("/forgot-password", authController.ForgotPassword)
 			// auth.POST("/logout", authController.Logout) // TODO: Реализовать
 		}
 
