@@ -27,15 +27,86 @@ func (ac *AuthController) Register(c *gin.Context) {
 		return
 	}
 
-	// Проверяем, существует ли пользователь с таким телефоном
-	var existingUser models.User
-	if err := database.DB.Where("phone = ?", req.Phone).First(&existingUser).Error; err == nil {
-		c.JSON(http.StatusConflict, models.ErrorResponseWithCode(
-			models.ErrUserAlreadyExists,
-			"User with this phone already exists",
-		))
-		return
-	}
+    // Проверяем, существует ли пользователь с таким телефоном
+    var existingUser models.User
+    if err := database.DB.Where("phone = ?", req.Phone).First(&existingUser).Error; err == nil {
+        // Если это гость — конвертируем в обычного пользователя
+        if existingUser.IsGuest {
+            // Проверяем email, если передан: не занят ли другим
+            if req.Email != "" {
+                var emailOwner models.User
+                if err := database.DB.Where("email = ?", req.Email).First(&emailOwner).Error; err == nil && emailOwner.ID != existingUser.ID {
+                    c.JSON(http.StatusConflict, models.ErrorResponseWithCode(
+                        models.ErrUserAlreadyExists,
+                        "User with this email already exists",
+                    ))
+                    return
+                }
+                existingUser.Email = req.Email
+            }
+
+            // Обновляем имя, пароль, статус гостя
+            existingUser.Name = req.Name
+            if err := existingUser.HashPassword(req.Password); err != nil {
+                c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+                    models.ErrInternalError,
+                    "Failed to hash password",
+                ))
+                return
+            }
+            existingUser.IsGuest = false
+            existingUser.IsActive = true
+
+            if err := database.DB.Save(&existingUser).Error; err != nil {
+                c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+                    models.ErrInternalError,
+                    "Failed to update user",
+                ))
+                return
+            }
+
+            // Убедимся, что у пользователя роль user
+            var userRole models.Role
+            if err := database.DB.Where("name = ?", "user").First(&userRole).Error; err == nil {
+                existingUser.RoleID = &userRole.ID
+                _ = database.DB.Save(&existingUser).Error
+                database.DB.Preload("Role").First(&existingUser, existingUser.ID)
+            }
+
+            // Генерируем JWT токен
+            roleName := "user"
+            if existingUser.Role != nil {
+                roleName = existingUser.Role.Name
+            }
+            token, err := utils.GenerateJWT(existingUser.ID, existingUser.Email, roleName)
+            if err != nil {
+                c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+                    models.ErrInternalError,
+                    "Failed to generate token",
+                ))
+                return
+            }
+
+            authResponse := models.AuthResponse{
+                User:         existingUser.ToResponse(),
+                Token:        token,
+                RefreshToken: token,
+            }
+
+            c.JSON(http.StatusOK, models.SuccessResponse(
+                authResponse,
+                "Guest account upgraded and registered successfully",
+            ))
+            return
+        }
+
+        // Если это не гость — конфликт
+        c.JSON(http.StatusConflict, models.ErrorResponseWithCode(
+            models.ErrUserAlreadyExists,
+            "User with this phone already exists",
+        ))
+        return
+    }
 
 	// Получаем роль "user" по умолчанию
 	var defaultRole models.Role
@@ -47,10 +118,10 @@ func (ac *AuthController) Register(c *gin.Context) {
 		return
 	}
 
-	// Создаем нового пользователя
+    // Создаем нового пользователя
 	user := models.User{
 		Name:     req.Name,
-		Email:    req.Email, // может быть пустым
+        Email:    req.Email, // может быть пустым
 		Phone:    req.Phone,
 		IsActive: true,
 		RoleID:   &defaultRole.ID, // Присваиваем роль пользователя по умолчанию
@@ -65,7 +136,22 @@ func (ac *AuthController) Register(c *gin.Context) {
 		return
 	}
 
-	// Сохраняем в базу данных
+    // Если email не указан, генерируем временный
+    if user.Email == "" {
+        user.Email = "user_" + uuid.New().String() + "@temp.local"
+    } else {
+        // Проверяем уникальность email
+        var emailOwner models.User
+        if err := database.DB.Where("email = ?", user.Email).First(&emailOwner).Error; err == nil {
+            c.JSON(http.StatusConflict, models.ErrorResponseWithCode(
+                models.ErrUserAlreadyExists,
+                "User with this email already exists",
+            ))
+            return
+        }
+    }
+
+    // Сохраняем в базу данных
 	if err := database.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
