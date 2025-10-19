@@ -213,7 +213,7 @@ func SetupRoutes() *gin.Engine {
 		adminProducts := admin.Group("products")
 		{
 			adminProducts.GET("/", productController.GetAllProducts)
-			adminProducts.GET("/:id", productController.GetProductAdmin)
+			// adminProducts.GET("/:id", productController.GetProductAdmin) // Перенесено в публичные маршруты
 		}
 		// Диагностика БД для админов
 		admin.GET("/debug/db", debugController.DBInfo)
