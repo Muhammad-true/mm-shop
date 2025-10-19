@@ -80,6 +80,7 @@ func SetupRoutes() *gin.Engine {
 		adminPublic := public.Group("admin")
 		{
 			adminPublic.GET("/allproducts/", productController.GetAllProducts)
+			adminPublic.GET("/products/:id", productController.GetProductAdmin)
 		}
 	}
 
