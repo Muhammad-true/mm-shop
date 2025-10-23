@@ -65,6 +65,7 @@ func (c *CartItem) ToResponse() CartItemResponse {
 		Colors:        c.Variation.Colors,
 		Price:         c.Variation.Price,
 		OriginalPrice: c.Variation.OriginalPrice,
+		Discount:      c.Variation.Discount,
 		ImageURLs:     c.Variation.ImageURLs,
 		StockQuantity: c.Variation.StockQuantity,
 		IsAvailable:   c.Variation.IsAvailable,

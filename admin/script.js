@@ -202,7 +202,7 @@ function setupLoginForm() {
 async function handleLogin(e) {
     e.preventDefault();
     
-    const email = document.getElementById('login-email').value;
+    const phone = document.getElementById('login-phone').value;
     const password = document.getElementById('login-password').value;
     
     // Показываем сообщение о загрузке
@@ -214,7 +214,7 @@ async function handleLogin(e) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ phone, password })
         });
         
         const data = await response.json();
@@ -3008,6 +3008,7 @@ function addVariation() {
         colors: [],
         price: 0,
         originalPrice: null,
+        discount: 0,
         stockQuantity: 0,
         sku: '',
         imageUrls: [] // Множественные фото
@@ -3242,6 +3243,16 @@ function renderVariations() {
                            min="0" 
                            step="0.01" 
                            placeholder="0.00">
+                </div>
+                <div class="variation-field">
+                    <label>Скидка (в процентах 0-100%)</label>
+                    <input type="number" 
+                           value="${variation.discount || 0}" 
+                           onchange="updateVariation(${index}, 'discount', parseInt(this.value) || 0)"
+                           min="0" 
+                           max="100" 
+                           placeholder="0"
+                           title="Например: 15 = скидка 15%">
                 </div>
                 <div class="variation-field">
                     <label>Количество</label>

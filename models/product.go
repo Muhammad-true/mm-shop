@@ -34,6 +34,7 @@ type ProductVariation struct {
 	Colors        []string  `json:"colors" gorm:"serializer:json"` // Множественные цвета
 	Price         float64   `json:"price" gorm:"not null"`
 	OriginalPrice *float64  `json:"originalPrice"`
+	Discount      int       `json:"discount" gorm:"default:0"`        // Скидка в процентах (0-100%), например: 15 = 15%
 	ImageURLs     []string  `json:"imageUrls" gorm:"serializer:json"` // Множественные фото
 	StockQuantity int       `json:"stockQuantity" gorm:"default:0"`
 	IsAvailable   bool      `json:"isAvailable" gorm:"default:true"`
@@ -78,7 +79,8 @@ type ProductVariationRequest struct {
 	Colors        []string `json:"colors" binding:"required,min=1"`
 	Price         float64  `json:"price" binding:"required,gt=0"`
 	OriginalPrice *float64 `json:"originalPrice"`
-	ImageURLs     []string `json:"imageUrls"` // Множественные фото
+	Discount      int      `json:"discount" binding:"gte=0,lte=100"` // Скидка в процентах 0-100%, например: 15 = 15%
+	ImageURLs     []string `json:"imageUrls"`                        // Множественные фото
 	StockQuantity int      `json:"stockQuantity" binding:"gte=0"`
 	SKU           string   `json:"sku"`
 }
@@ -108,6 +110,7 @@ type ProductVariationResponse struct {
 	Colors        []string  `json:"colors"`
 	Price         float64   `json:"price"`
 	OriginalPrice *float64  `json:"originalPrice"`
+	Discount      int       `json:"discount"`  // Скидка в процентах (0-100%), например: 15 = 15%
 	ImageURLs     []string  `json:"imageUrls"` // Множественные фото
 	StockQuantity int       `json:"stockQuantity"`
 	IsAvailable   bool      `json:"isAvailable"`
@@ -122,6 +125,7 @@ func (pv *ProductVariation) ToResponse() ProductVariationResponse {
 		Colors:        pv.Colors,
 		Price:         pv.Price,
 		OriginalPrice: pv.OriginalPrice,
+		Discount:      pv.Discount,
 		ImageURLs:     pv.ImageURLs,
 		StockQuantity: pv.StockQuantity,
 		IsAvailable:   pv.IsAvailable,
@@ -139,6 +143,7 @@ func (p *Product) ToResponse() ProductResponse {
 			Colors:        v.Colors,
 			Price:         v.Price,
 			OriginalPrice: v.OriginalPrice,
+			Discount:      v.Discount,
 			ImageURLs:     v.ImageURLs, // Assuming the first image is the main one for response
 			StockQuantity: v.StockQuantity,
 			IsAvailable:   v.IsAvailable,
