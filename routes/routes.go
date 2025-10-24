@@ -131,6 +131,7 @@ func SetupRoutes() *gin.Engine {
 		{
 			orders.POST("/", orderController.CreateOrder)
 			orders.GET("/", orderController.GetMyOrders)
+			orders.GET("/active", orderController.GetActiveOrder) // Получить активный заказ для отслеживания
 			orders.GET("/:id", orderController.GetMyOrder)
 			orders.POST("/:id/cancel", orderController.CancelMyOrder)
 		}
