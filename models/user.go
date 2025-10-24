@@ -65,7 +65,7 @@ func (u *User) CheckPassword(password string) bool {
 type UserRegisterRequest struct {
 	Name     string `json:"name" binding:"required"`
 	Phone    string `json:"phone" binding:"required"`
-	Email    string `json:"email" binding:"omitempty,email"`
+	Email    string `json:"email"`
 	Password string `json:"password" binding:"required,min=8"`
 }
 
