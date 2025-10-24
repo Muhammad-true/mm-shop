@@ -347,7 +347,7 @@ func (oc *OrderController) CancelMyOrder(c *gin.Context) {
 	})
 }
 
-// GetActiveOrder - получить активный заказ пользователя для отслеживания
+// GetActiveOrder - получить все активные заказы пользователя для отслеживания
 func (oc *OrderController) GetActiveOrder(c *gin.Context) {
 	userIDValue, ok := c.Get("userID")
 	if !ok {
@@ -359,8 +359,8 @@ func (oc *OrderController) GetActiveOrder(c *gin.Context) {
 	}
 	currentUserID := userIDValue.(uuid.UUID)
 
-	// Получаем самый последний активный заказ (не завершённый и не отменённый)
-	var order models.Order
+	// Получаем все активные заказы (не завершённые и не отменённые)
+	var orders []models.Order
 	err := database.DB.
 		Preload("OrderItems").
 		Preload("OrderItems.Variation").
@@ -369,83 +369,87 @@ func (oc *OrderController) GetActiveOrder(c *gin.Context) {
 			models.OrderStatusCancelled,
 		}).
 		Order("created_at DESC").
-		First(&order).Error
+		Find(&orders).Error
 
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// Нет активных заказов
-			c.JSON(http.StatusOK, models.StandardResponse{
-				Success: true,
-				Data:    nil,
-				Message: "Нет активных заказов",
-			})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
-			"Ошибка при получении заказа",
+			"Ошибка при получении заказов",
 		))
 		return
 	}
 
-	// Формируем расширенный ответ с информацией о статусе
-	response := gin.H{
-		"order": order.ToResponse(),
-		"tracking": gin.H{
-			"current_status": order.Status,
-			"status_history": []gin.H{
-				{
-					"status":      "pending",
-					"label":       "Ожидает подтверждения",
-					"completed":   order.Status != models.OrderStatusPending,
-					"is_current":  order.Status == models.OrderStatusPending,
-					"icon":        "clock",
-					"description": "Ваш заказ принят и ожидает подтверждения",
+	// Если нет активных заказов
+	if len(orders) == 0 {
+		c.JSON(http.StatusOK, models.StandardResponse{
+			Success: true,
+			Data:    []interface{}{},
+			Message: "Нет активных заказов",
+		})
+		return
+	}
+
+	// Формируем ответ для каждого заказа с информацией о статусе
+	var activeOrders []gin.H
+	for _, order := range orders {
+		activeOrders = append(activeOrders, gin.H{
+			"order": order.ToResponse(),
+			"tracking": gin.H{
+				"current_status": order.Status,
+				"status_history": []gin.H{
+					{
+						"status":      "pending",
+						"label":       "Ожидает подтверждения",
+						"completed":   order.Status != models.OrderStatusPending,
+						"is_current":  order.Status == models.OrderStatusPending,
+						"icon":        "clock",
+						"description": "Ваш заказ принят и ожидает подтверждения",
+					},
+					{
+						"status":      "confirmed",
+						"label":       "Подтвержден",
+						"completed":   order.Status != models.OrderStatusPending && order.Status != models.OrderStatusConfirmed,
+						"is_current":  order.Status == models.OrderStatusConfirmed,
+						"icon":        "check-circle",
+						"description": "Заказ подтвержден и готовится к отправке",
+					},
+					{
+						"status":      "preparing",
+						"label":       "Готовится",
+						"completed":   order.Status == models.OrderStatusInDelivery || order.Status == models.OrderStatusDelivered,
+						"is_current":  order.Status == models.OrderStatusPreparing,
+						"icon":        "package",
+						"description": "Ваш заказ готовится к отправке",
+					},
+					{
+						"status":      "inDelivery",
+						"label":       "В доставке",
+						"completed":   order.Status == models.OrderStatusDelivered,
+						"is_current":  order.Status == models.OrderStatusInDelivery,
+						"icon":        "truck",
+						"description": "Курьер в пути к вам",
+					},
+					{
+						"status":      "delivered",
+						"label":       "Доставлен",
+						"completed":   false,
+						"is_current":  order.Status == models.OrderStatusDelivered,
+						"icon":        "check-double",
+						"description": "Заказ доставлен",
+					},
 				},
-				{
-					"status":      "confirmed",
-					"label":       "Подтвержден",
-					"completed":   order.Status != models.OrderStatusPending && order.Status != models.OrderStatusConfirmed,
-					"is_current":  order.Status == models.OrderStatusConfirmed,
-					"icon":        "check-circle",
-					"description": "Заказ подтвержден и готовится к отправке",
-				},
-				{
-					"status":      "preparing",
-					"label":       "Готовится",
-					"completed":   order.Status == models.OrderStatusInDelivery || order.Status == models.OrderStatusDelivered,
-					"is_current":  order.Status == models.OrderStatusPreparing,
-					"icon":        "package",
-					"description": "Ваш заказ готовится к отправке",
-				},
-				{
-					"status":      "inDelivery",
-					"label":       "В доставке",
-					"completed":   order.Status == models.OrderStatusDelivered,
-					"is_current":  order.Status == models.OrderStatusInDelivery,
-					"icon":        "truck",
-					"description": "Курьер в пути к вам",
-				},
-				{
-					"status":      "delivered",
-					"label":       "Доставлен",
-					"completed":   false,
-					"is_current":  order.Status == models.OrderStatusDelivered,
-					"icon":        "check-double",
-					"description": "Заказ доставлен",
-				},
+				"estimated_delivery": order.DesiredAt,
+				"recipient_name":     order.RecipientName,
+				"phone":              order.Phone,
+				"shipping_address":   order.ShippingAddr,
 			},
-			"estimated_delivery": order.DesiredAt,
-			"recipient_name":     order.RecipientName,
-			"phone":              order.Phone,
-			"shipping_address":   order.ShippingAddr,
-		},
+		})
 	}
 
 	c.JSON(http.StatusOK, models.StandardResponse{
 		Success: true,
-		Data:    response,
-		Message: "Активный заказ получен",
+		Data:    activeOrders,
+		Message: "Активные заказы получены",
 	})
 }
 
