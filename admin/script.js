@@ -614,10 +614,15 @@ function showTab(tabName, userRole = 'admin') {
             }
             break;
         case 'orders':
+            console.log('📦 Загружаем заказы для роли:', userRole);
             if (userRole === 'super_admin' || userRole === 'admin') {
+                console.log('👑 Загружаем заказы через админский эндпоинт');
                 loadOrders();
             } else if (userRole === 'shop_owner') {
-                loadShopOrders();
+                console.log('🏪 Загружаем заказы через эндпоинт владельца магазина');
+                loadOrders(); // Используем ту же функцию, но с другой ролью
+            } else {
+                console.log('⚠️ Неизвестная роль для загрузки заказов:', userRole);
             }
             break;
                 case 'settings':
@@ -1788,14 +1793,18 @@ async function loadOrders(page = 1, filters = {}) {
         
         // Определяем роль пользователя
         const userRole = localStorage.getItem('userRole') || 'admin';
+        console.log('🔍 Роль пользователя для загрузки заказов:', userRole);
         
         let endpoint;
         if (userRole === 'super_admin' || userRole === 'admin') {
             endpoint = '/api/v1/admin/orders';
+            console.log('👑 Используем админский эндпоинт для заказов');
         } else if (userRole === 'shop_owner') {
             endpoint = '/api/v1/shop/orders/';
+            console.log('🏪 Используем эндпоинт владельца магазина для заказов');
         } else {
             endpoint = '/api/v1/admin/orders';
+            console.log('⚠️ Неизвестная роль, используем админский эндпоинт по умолчанию');
         }
         
         // Добавляем параметры фильтрации
@@ -1807,8 +1816,10 @@ async function loadOrders(page = 1, filters = {}) {
         
         const fullEndpoint = `${endpoint}?${params.toString()}`;
         console.log('📡 Загрузка заказов:', fullEndpoint);
+        console.log('🔑 Токен авторизации:', localStorage.getItem('adminToken') ? 'Есть' : 'Отсутствует');
         
         const response = await fetchData(fullEndpoint);
+        console.log('📦 Ответ от сервера:', response);
         
         if (response.data) {
             // Сохраняем список владельцев магазинов для фильтра
@@ -1817,20 +1828,33 @@ async function loadOrders(page = 1, filters = {}) {
             }
             displayOrders(response.data.orders || [], response.data.pagination, response.data.stats);
         } else {
+            console.log('⚠️ Нет данных в ответе сервера');
             displayOrders([], {}, {});
         }
     } catch (error) {
-        console.error('Ошибка загрузки заказов:', error);
-        showMessage('Ошибка загрузки заказов', 'error');
+        console.error('❌ Ошибка загрузки заказов:', error);
+        console.error('❌ Детали ошибки:', {
+            message: error.message,
+            stack: error.stack,
+            userRole: localStorage.getItem('userRole'),
+            token: localStorage.getItem('adminToken') ? 'Есть' : 'Отсутствует'
+        });
+        showMessage('Ошибка загрузки заказов: ' + error.message, 'error');
     }
 }
 
 // Отображение заказов с расширенной информацией
 function displayOrders(orders, pagination = {}, stats = {}) {
+    console.log('📊 Отображение заказов:', {
+        ordersCount: orders.length,
+        pagination: pagination,
+        stats: stats
+    });
+    
     const container = document.getElementById('orders-table');
     
     if (!container) {
-        console.warn('Контейнер orders-table не найден');
+        console.warn('❌ Контейнер orders-table не найден');
         return;
     }
     
