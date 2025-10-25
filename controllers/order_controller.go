@@ -723,6 +723,7 @@ func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 	search := c.Query("search")            // Поиск по номеру заказа, имени, телефону
 	orderNumber := c.Query("order_number") // Поиск по номеру заказа
 	phone := c.Query("phone")              // Поиск по телефону
+	shopOwnerID := c.Query("shop_owner_id") // Фильтр по владельцу магазина
 	dateFrom := c.Query("date_from")       // Фильтр по дате от (YYYY-MM-DD)
 	dateTo := c.Query("date_to")           // Фильтр по дате до (YYYY-MM-DD)
 
@@ -752,17 +753,25 @@ func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 		)
 	}
 
+	// Фильтр по владельцу магазина
+	if shopOwnerID != "" {
+		query = query.Joins("JOIN order_items ON orders.id = order_items.order_id").
+			Joins("JOIN product_variations ON order_items.variation_id = product_variations.id").
+			Joins("JOIN products ON product_variations.product_id = products.id").
+			Where("products.owner_id = ?", shopOwnerID)
+	}
+
 	// Фильтр по дате создания
 	if dateFrom != "" {
 		if t, err := time.Parse("2006-01-02", dateFrom); err == nil {
-			query = query.Where("created_at >= ?", t)
+			query = query.Where("orders.created_at >= ?", t)
 		}
 	}
 	if dateTo != "" {
 		if t, err := time.Parse("2006-01-02", dateTo); err == nil {
 			// Добавляем 1 день чтобы включить весь день dateTo
 			t = t.Add(24 * time.Hour)
-			query = query.Where("created_at < ?", t)
+			query = query.Where("orders.created_at < ?", t)
 		}
 	}
 
@@ -773,9 +782,11 @@ func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 	result := query.Preload("User").
 		Preload("OrderItems").
 		Preload("OrderItems.Variation").
+		Preload("OrderItems.Variation.Product").
+		Preload("OrderItems.Variation.Product.Owner").
 		Offset(offset).
 		Limit(limit).
-		Order("created_at DESC").
+		Order("orders.created_at DESC").
 		Find(&orders)
 
 	if result.Error != nil {
@@ -807,6 +818,13 @@ func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 		statusStats[stat.Status] = stat.Count
 	}
 
+	// Получаем список владельцев магазинов для фильтра
+	var shopOwners []models.User
+	database.DB.Joins("JOIN roles ON users.role_id = roles.id").
+		Where("roles.name = ?", "shop_owner").
+		Select("id, name, phone, email").
+		Find(&shopOwners)
+
 	c.JSON(http.StatusOK, models.StandardResponse{
 		Success: true,
 		Data: gin.H{
@@ -818,6 +836,7 @@ func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 				TotalPages: int((total + int64(limit) - 1) / int64(limit)),
 			},
 			"stats": statusStats,
+			"shop_owners": shopOwners,
 		},
 		Message: "Заказы получены успешно",
 	})

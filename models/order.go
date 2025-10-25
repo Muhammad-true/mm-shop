@@ -139,6 +139,7 @@ type AdminOrderResponse struct {
 	CreatedAt      time.Time           `json:"created_at"`
 	UpdatedAt      time.Time           `json:"updated_at"`
 	User           *UserBasicInfo      `json:"user,omitempty"` // Информация о пользователе
+	ShopOwner      *UserBasicInfo      `json:"shop_owner,omitempty"` // Информация о владельце магазина
 }
 
 // UserBasicInfo базовая информация о пользователе для заказа
@@ -233,6 +234,17 @@ func (o *Order) ToAdminResponse() AdminOrderResponse {
 			Phone:   o.User.Phone,
 			Email:   o.User.Email,
 			IsGuest: o.User.IsGuest,
+		}
+	}
+
+	// Добавляем информацию о владельце магазина из первого товара в заказе
+	if len(o.OrderItems) > 0 && o.OrderItems[0].Variation.Product.Owner != nil && o.OrderItems[0].Variation.Product.Owner.ID != uuid.Nil {
+		response.ShopOwner = &UserBasicInfo{
+			ID:      o.OrderItems[0].Variation.Product.Owner.ID,
+			Name:    o.OrderItems[0].Variation.Product.Owner.Name,
+			Phone:   o.OrderItems[0].Variation.Product.Owner.Phone,
+			Email:   o.OrderItems[0].Variation.Product.Owner.Email,
+			IsGuest: o.OrderItems[0].Variation.Product.Owner.IsGuest,
 		}
 	}
 

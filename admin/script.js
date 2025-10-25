@@ -1811,6 +1811,10 @@ async function loadOrders(page = 1, filters = {}) {
         const response = await fetchData(fullEndpoint);
         
         if (response.data) {
+            // Сохраняем список владельцев магазинов для фильтра
+            if (response.data.shop_owners) {
+                window.shopOwners = response.data.shop_owners;
+            }
             displayOrders(response.data.orders || [], response.data.pagination, response.data.stats);
         } else {
             displayOrders([], {}, {});
@@ -1849,6 +1853,12 @@ function displayOrders(orders, pagination = {}, stats = {}) {
                     <option value="delivered" ${currentOrdersFilters.status === 'delivered' ? 'selected' : ''}>Доставлены (${stats.delivered || 0})</option>
                     <option value="completed" ${currentOrdersFilters.status === 'completed' ? 'selected' : ''}>Завершены (${stats.completed || 0})</option>
                     <option value="cancelled" ${currentOrdersFilters.status === 'cancelled' ? 'selected' : ''}>Отменены (${stats.cancelled || 0})</option>
+                </select>
+                <select id="order-shop-filter" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="">Все магазины</option>
+                    ${(window.shopOwners || []).map(shop => 
+                        `<option value="${shop.id}" ${currentOrdersFilters.shop_owner_id === shop.id ? 'selected' : ''}>${shop.name} (${shop.phone})</option>`
+                    ).join('')}
                 </select>
                 <input type="date" id="order-date-from" placeholder="Дата от" 
                     style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
@@ -1893,6 +1903,7 @@ function displayOrders(orders, pagination = {}, stats = {}) {
                         <th>№ Заказа</th>
                         <th>Клиент</th>
                         <th>Телефон</th>
+                        <th>Магазин</th>
                         <th>Товары</th>
                         <th>Сумма</th>
                         <th>Статус</th>
@@ -1912,6 +1923,12 @@ function displayOrders(orders, pagination = {}, stats = {}) {
                                 </div>
                             </td>
                             <td><a href="tel:${order.phone}" style="color: #667eea;">${order.phone}</a></td>
+                            <td>
+                                <div style="line-height: 1.4;">
+                                    <div><strong>${order.shop_owner?.name || 'N/A'}</strong></div>
+                                    <small style="color: #999;">${order.shop_owner?.phone || ''}</small>
+                                </div>
+                            </td>
                             <td>${order.order_items?.length || 0} шт.</td>
                             <td><strong>${order.total_amount || 0} ${order.currency || 'TJS'}</strong></td>
                             <td>
@@ -1956,12 +1973,14 @@ function displayOrders(orders, pagination = {}, stats = {}) {
 function applyOrdersFilters() {
     const search = document.getElementById('order-search')?.value || '';
     const status = document.getElementById('order-status-filter')?.value || '';
+    const shopOwnerId = document.getElementById('order-shop-filter')?.value || '';
     const dateFrom = document.getElementById('order-date-from')?.value || '';
     const dateTo = document.getElementById('order-date-to')?.value || '';
     
     const filters = {};
     if (search) filters.search = search;
     if (status) filters.status = status;
+    if (shopOwnerId) filters.shop_owner_id = shopOwnerId;
     if (dateFrom) filters.date_from = dateFrom;
     if (dateTo) filters.date_to = dateTo;
     
@@ -1972,6 +1991,7 @@ function applyOrdersFilters() {
 function resetOrdersFilters() {
     document.getElementById('order-search').value = '';
     document.getElementById('order-status-filter').value = '';
+    document.getElementById('order-shop-filter').value = '';
     document.getElementById('order-date-from').value = '';
     document.getElementById('order-date-to').value = '';
     loadOrders(1, {});
