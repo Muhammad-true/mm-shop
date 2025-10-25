@@ -138,7 +138,7 @@ type AdminOrderResponse struct {
 	CancelledAt    *time.Time          `json:"cancelled_at"`
 	CreatedAt      time.Time           `json:"created_at"`
 	UpdatedAt      time.Time           `json:"updated_at"`
-	User           *UserBasicInfo      `json:"user,omitempty"` // Информация о пользователе
+	User           *UserBasicInfo      `json:"user,omitempty"`       // Информация о пользователе
 	ShopOwner      *UserBasicInfo      `json:"shop_owner,omitempty"` // Информация о владельце магазина
 }
 
