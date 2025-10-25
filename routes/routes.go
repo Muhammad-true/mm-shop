@@ -205,9 +205,11 @@ func SetupRoutes() *gin.Engine {
 		// Управление заказами (админы и супер админы)
 		adminOrders := admin.Group("orders")
 		{
-			adminOrders.GET("/", orderController.GetOrders)
-			adminOrders.GET("/:id", orderController.GetOrder)
-			adminOrders.PUT("/:id/status", orderController.UpdateOrderStatus)
+			adminOrders.GET("/", orderController.GetAdminOrders)              // Получить все заказы с фильтрами и поиском
+			adminOrders.GET("/:id", orderController.GetOrder)                 // Получить один заказ
+			adminOrders.PUT("/:id/status", orderController.UpdateOrderStatus) // Обновить статус заказа
+			adminOrders.POST("/:id/confirm", orderController.ConfirmOrder)    // Подтвердить заказ
+			adminOrders.POST("/:id/reject", orderController.RejectOrder)      // Отклонить заказ
 		}
 
 		// Управление продуктами (админы и супер админы)

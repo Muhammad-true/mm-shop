@@ -1776,8 +1776,16 @@ async function deleteUser(id) {
 }
 
 // Загрузка заказов
-async function loadOrders() {
+// Глобальные переменные для заказов
+let currentOrdersPage = 1;
+let currentOrdersFilters = {};
+let ordersStats = {};
+
+async function loadOrders(page = 1, filters = {}) {
     try {
+        currentOrdersPage = page;
+        currentOrdersFilters = filters;
+        
         // Определяем роль пользователя
         const userRole = localStorage.getItem('userRole') || 'admin';
         
@@ -1786,18 +1794,26 @@ async function loadOrders() {
             endpoint = '/api/v1/admin/orders';
         } else if (userRole === 'shop_owner') {
             endpoint = '/api/v1/shop/orders/';
-    } else {
-            endpoint = '/api/v1/admin/orders'; // По умолчанию для админа
+        } else {
+            endpoint = '/api/v1/admin/orders';
         }
         
-        const response = await fetchData(endpoint);
+        // Добавляем параметры фильтрации
+        const params = new URLSearchParams({
+            page: page,
+            limit: 20,
+            ...filters
+        });
         
-        if (response.data && response.data.orders) {
-            displayOrders(response.data.orders);
-        } else if (response.orders) {
-            displayOrders(response.orders);
+        const fullEndpoint = `${endpoint}?${params.toString()}`;
+        console.log('📡 Загрузка заказов:', fullEndpoint);
+        
+        const response = await fetchData(fullEndpoint);
+        
+        if (response.data) {
+            displayOrders(response.data.orders || [], response.data.pagination, response.data.stats);
         } else {
-            displayOrders([]);
+            displayOrders([], {}, {});
         }
     } catch (error) {
         console.error('Ошибка загрузки заказов:', error);
@@ -1805,55 +1821,399 @@ async function loadOrders() {
     }
 }
 
-// Отображение заказов
-function displayOrders(orders) {
+// Отображение заказов с расширенной информацией
+function displayOrders(orders, pagination = {}, stats = {}) {
     const container = document.getElementById('orders-table');
     
-    // Проверяем, существует ли контейнер
     if (!container) {
         console.warn('Контейнер orders-table не найден');
         return;
     }
     
+    // Сохраняем статистику
+    ordersStats = stats;
+    
+    // Создаём фильтры и поиск
+    const filtersHTML = `
+        <div class="orders-filters" style="margin-bottom: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                <input type="text" id="order-search" placeholder="Поиск по имени, телефону, номеру..." 
+                    style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;" 
+                    value="${currentOrdersFilters.search || ''}">
+                <select id="order-status-filter" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="">Все статусы</option>
+                    <option value="pending" ${currentOrdersFilters.status === 'pending' ? 'selected' : ''}>Ожидают (${stats.pending || 0})</option>
+                    <option value="confirmed" ${currentOrdersFilters.status === 'confirmed' ? 'selected' : ''}>Подтверждены (${stats.confirmed || 0})</option>
+                    <option value="preparing" ${currentOrdersFilters.status === 'preparing' ? 'selected' : ''}>Готовятся (${stats.preparing || 0})</option>
+                    <option value="inDelivery" ${currentOrdersFilters.status === 'inDelivery' ? 'selected' : ''}>В доставке (${stats.inDelivery || 0})</option>
+                    <option value="delivered" ${currentOrdersFilters.status === 'delivered' ? 'selected' : ''}>Доставлены (${stats.delivered || 0})</option>
+                    <option value="completed" ${currentOrdersFilters.status === 'completed' ? 'selected' : ''}>Завершены (${stats.completed || 0})</option>
+                    <option value="cancelled" ${currentOrdersFilters.status === 'cancelled' ? 'selected' : ''}>Отменены (${stats.cancelled || 0})</option>
+                </select>
+                <input type="date" id="order-date-from" placeholder="Дата от" 
+                    style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
+                    value="${currentOrdersFilters.date_from || ''}">
+                <input type="date" id="order-date-to" placeholder="Дата до" 
+                    style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;"
+                    value="${currentOrdersFilters.date_to || ''}">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="applyOrdersFilters()" class="btn btn-primary">
+                    <i class="fas fa-filter"></i> Применить фильтры
+                </button>
+                <button onclick="resetOrdersFilters()" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Сбросить
+                </button>
+            </div>
+        </div>
+    `;
+    
     if (orders.length === 0) {
-        container.innerHTML = '<p>Заказов пока нет</p>';
+        container.innerHTML = filtersHTML + '<p style="text-align: center; padding: 40px;">Заказов не найдено</p>';
         return;
     }
     
+    // Функция для перевода статусов
+    const statusLabels = {
+        'pending': 'Ожидает',
+        'confirmed': 'Подтвержден',
+        'preparing': 'Готовится',
+        'inDelivery': 'В доставке',
+        'delivered': 'Доставлен',
+        'completed': 'Завершен',
+        'cancelled': 'Отменен'
+    };
+    
     const table = `
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Пользователь</th>
-                    <th>Статус</th>
-                    <th>Сумма</th>
-                    <th>Дата</th>
-                    <th>Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${orders.map(order => `
+        ${filtersHTML}
+        <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>${order.id?.substring(0, 8)}...</td>
-                        <td>${order.user_id?.substring(0, 8)}...</td>
-                        <td><span class="status-badge ${order.status}">${order.status}</span></td>
-                        <td>₽${order.total_amount || 0}</td>
-                        <td>${new Date(order.created_at).toLocaleDateString()}</td>
-                        <td>
-                            <div class="action-buttons">
-                                <button class="action-btn edit" onclick="viewOrder('${order.id}')">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                        </td>
+                        <th>№ Заказа</th>
+                        <th>Клиент</th>
+                        <th>Телефон</th>
+                        <th>Товары</th>
+                        <th>Сумма</th>
+                        <th>Статус</th>
+                        <th>Дата</th>
+                        <th>Желаемая доставка</th>
+                        <th>Действия</th>
                     </tr>
-                `).join('')}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    ${orders.map(order => `
+                        <tr>
+                            <td><strong>${order.order_number || order.id?.substring(0, 8)}</strong></td>
+                            <td>
+                                <div style="line-height: 1.4;">
+                                    <div><strong>${order.recipient_name || order.user?.name || 'N/A'}</strong></div>
+                                    ${order.user?.is_guest ? '<small style="color: #999;">🎭 Гость</small>' : ''}
+                                </div>
+                            </td>
+                            <td><a href="tel:${order.phone}" style="color: #667eea;">${order.phone}</a></td>
+                            <td>${order.order_items?.length || 0} шт.</td>
+                            <td><strong>${order.total_amount || 0} ${order.currency || 'TJS'}</strong></td>
+                            <td>
+                                <span class="status-badge ${order.status}" style="padding: 5px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                                    ${statusLabels[order.status] || order.status}
+                                </span>
+                            </td>
+                            <td>${new Date(order.created_at).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</td>
+                            <td>${order.desired_at ? new Date(order.desired_at).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '-'}</td>
+                            <td>
+                                <div class="action-buttons" style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                    <button class="action-btn view" onclick="viewOrderDetails('${order.id}')" title="Просмотр">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    ${order.status === 'pending' ? `
+                                        <button class="action-btn success" onclick="confirmOrder('${order.id}')" title="Подтвердить">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button class="action-btn danger" onclick="rejectOrder('${order.id}')" title="Отклонить">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    ` : ''}
+                                    ${order.status !== 'cancelled' && order.status !== 'completed' ? `
+                                        <button class="action-btn edit" onclick="changeOrderStatus('${order.id}', '${order.status}')" title="Изменить статус">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        ${pagination.totalPages > 1 ? createPagination(pagination) : ''}
     `;
     
     container.innerHTML = table;
+}
+
+// Применить фильтры
+function applyOrdersFilters() {
+    const search = document.getElementById('order-search')?.value || '';
+    const status = document.getElementById('order-status-filter')?.value || '';
+    const dateFrom = document.getElementById('order-date-from')?.value || '';
+    const dateTo = document.getElementById('order-date-to')?.value || '';
+    
+    const filters = {};
+    if (search) filters.search = search;
+    if (status) filters.status = status;
+    if (dateFrom) filters.date_from = dateFrom;
+    if (dateTo) filters.date_to = dateTo;
+    
+    loadOrders(1, filters);
+}
+
+// Сбросить фильтры
+function resetOrdersFilters() {
+    document.getElementById('order-search').value = '';
+    document.getElementById('order-status-filter').value = '';
+    document.getElementById('order-date-from').value = '';
+    document.getElementById('order-date-to').value = '';
+    loadOrders(1, {});
+}
+
+// Создать пагинацию
+function createPagination(pagination) {
+    const { page, totalPages } = pagination;
+    let pages = '';
+    
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === page) {
+            pages += `<button class="pagination-btn active">${i}</button>`;
+        } else if (i === 1 || i === totalPages || (i >= page - 2 && i <= page + 2)) {
+            pages += `<button class="pagination-btn" onclick="loadOrders(${i}, currentOrdersFilters)">${i}</button>`;
+        } else if (i === page - 3 || i === page + 3) {
+            pages += `<span>...</span>`;
+        }
+    }
+    
+    return `
+        <div class="pagination" style="display: flex; justify-content: center; gap: 5px; margin-top: 20px; padding: 20px;">
+            ${page > 1 ? `<button class="pagination-btn" onclick="loadOrders(${page - 1}, currentOrdersFilters)"><i class="fas fa-chevron-left"></i></button>` : ''}
+            ${pages}
+            ${page < totalPages ? `<button class="pagination-btn" onclick="loadOrders(${page + 1}, currentOrdersFilters)"><i class="fas fa-chevron-right"></i></button>` : ''}
+        </div>
+    `;
+}
+
+// Подтвердить заказ
+async function confirmOrder(orderId) {
+    if (!confirm('Подтвердить этот заказ?')) return;
+    
+    try {
+        const response = await fetch(getApiUrl(`/api/v1/admin/orders/${orderId}/confirm`), {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('Заказ подтвержден!', 'success');
+            loadOrders(currentOrdersPage, currentOrdersFilters);
+        } else {
+            showMessage(data.message || 'Ошибка при подтверждении заказа', 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showMessage('Ошибка при подтверждении заказа', 'error');
+    }
+}
+
+// Отклонить заказ
+async function rejectOrder(orderId) {
+    if (!confirm('Отклонить этот заказ?')) return;
+    
+    try {
+        const response = await fetch(getApiUrl(`/api/v1/admin/orders/${orderId}/reject`), {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('Заказ отклонен', 'success');
+            loadOrders(currentOrdersPage, currentOrdersFilters);
+        } else {
+            showMessage(data.message || 'Ошибка при отклонении заказа', 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showMessage('Ошибка при отклонении заказа', 'error');
+    }
+}
+
+// Изменить статус заказа
+async function changeOrderStatus(orderId, currentStatus) {
+    const statuses = [
+        { value: 'pending', label: 'Ожидает подтверждения' },
+        { value: 'confirmed', label: 'Подтвержден' },
+        { value: 'preparing', label: 'Готовится' },
+        { value: 'inDelivery', label: 'В доставке' },
+        { value: 'delivered', label: 'Доставлен' },
+        { value: 'completed', label: 'Завершен' },
+        { value: 'cancelled', label: 'Отменен' }
+    ];
+    
+    const options = statuses.map(s => 
+        `<option value="${s.value}" ${s.value === currentStatus ? 'selected' : ''}>${s.label}</option>`
+    ).join('');
+    
+    const newStatus = prompt(`Выберите новый статус:\n\n${statuses.map((s, i) => `${i+1}. ${s.label}`).join('\n')}\n\nВведите номер или название:`, currentStatus);
+    
+    if (!newStatus || newStatus === currentStatus) return;
+    
+    // Находим статус по номеру или названию
+    let selectedStatus = newStatus;
+    const num = parseInt(newStatus);
+    if (!isNaN(num) && num >= 1 && num <= statuses.length) {
+        selectedStatus = statuses[num - 1].value;
+    }
+    
+    try {
+        const response = await fetch(getApiUrl(`/api/v1/admin/orders/${orderId}/status`), {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${adminToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: selectedStatus })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showMessage('Статус заказа изменен!', 'success');
+            loadOrders(currentOrdersPage, currentOrdersFilters);
+        } else {
+            showMessage(data.message || 'Ошибка при изменении статуса', 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showMessage('Ошибка при изменении статуса', 'error');
+    }
+}
+
+// Просмотр деталей заказа
+async function viewOrderDetails(orderId) {
+    try {
+        const response = await fetchData(`/api/v1/admin/orders/${orderId}`);
+        
+        if (response.data) {
+            const order = response.data;
+            
+            const statusLabels = {
+                'pending': 'Ожидает подтверждения',
+                'confirmed': 'Подтвержден',
+                'preparing': 'Готовится',
+                'inDelivery': 'В доставке',
+                'delivered': 'Доставлен',
+                'completed': 'Завершен',
+                'cancelled': 'Отменен'
+            };
+            
+            const itemsHTML = order.order_items?.map(item => `
+                <tr>
+                    <td>${item.name || 'N/A'}</td>
+                    <td>${item.size || '-'}</td>
+                    <td>${item.color || '-'}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.price} ${order.currency || 'TJS'}</td>
+                    <td><strong>${item.subtotal || (item.price * item.quantity)} ${order.currency || 'TJS'}</strong></td>
+                </tr>
+            `).join('') || '<tr><td colspan="6">Нет товаров</td></tr>';
+            
+            const detailsHTML = `
+                <div style="max-height: 70vh; overflow-y: auto; padding: 20px;">
+                    <h3 style="margin-bottom: 20px;">Заказ №${order.order_number || order.id?.substring(0, 8)}</h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <h4>Информация о клиенте</h4>
+                            <p><strong>Имя:</strong> ${order.recipient_name || 'N/A'}</p>
+                            <p><strong>Телефон:</strong> <a href="tel:${order.phone}">${order.phone}</a></p>
+                            <p><strong>Адрес:</strong> ${order.shipping_address || 'N/A'}</p>
+                            ${order.notes ? `<p><strong>Примечания:</strong> ${order.notes}</p>` : ''}
+                        </div>
+                        <div>
+                            <h4>Информация о заказе</h4>
+                            <p><strong>Статус:</strong> <span class="status-badge ${order.status}">${statusLabels[order.status] || order.status}</span></p>
+                            <p><strong>Способ оплаты:</strong> ${order.payment_method === 'cash' ? 'Наличные' : 'Карта'}</p>
+                            <p><strong>Способ доставки:</strong> ${order.shipping_method === 'courier' ? 'Курьер' : 'Самовывоз'}</p>
+                            <p><strong>Дата создания:</strong> ${new Date(order.created_at).toLocaleString('ru-RU')}</p>
+                            ${order.desired_at ? `<p><strong>Желаемое время:</strong> ${new Date(order.desired_at).toLocaleString('ru-RU')}</p>` : ''}
+                            ${order.confirmed_at ? `<p><strong>Подтвержден:</strong> ${new Date(order.confirmed_at).toLocaleString('ru-RU')}</p>` : ''}
+                        </div>
+                    </div>
+                    
+                    <h4>Товары в заказе</h4>
+                    <table class="data-table" style="margin-bottom: 20px;">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Размер</th>
+                                <th>Цвет</th>
+                                <th>Количество</th>
+                                <th>Цена</th>
+                                <th>Сумма</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHTML}
+                        </tbody>
+                    </table>
+                    
+                    <div style="text-align: right; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+                        <p><strong>Стоимость товаров:</strong> ${order.items_subtotal || 0} ${order.currency || 'TJS'}</p>
+                        <p><strong>Доставка:</strong> ${order.delivery_fee || 0} ${order.currency || 'TJS'}</p>
+                        <h3 style="margin-top: 10px; color: #667eea;"><strong>Итого:</strong> ${order.total_amount || 0} ${order.currency || 'TJS'}</h3>
+                    </div>
+                </div>
+            `;
+            
+            // Показываем в модальном окне (нужно создать универсальное модальное окно)
+            showModal('Детали заказа', detailsHTML);
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки деталей заказа:', error);
+        showMessage('Ошибка загрузки деталей заказа', 'error');
+    }
+}
+
+// Универсальное модальное окно
+function showModal(title, content) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3>${title}</h3>
+                <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+            </div>
+            ${content}
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // Закрытие при клике вне модального окна
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
 }
 
 // Настройка форм

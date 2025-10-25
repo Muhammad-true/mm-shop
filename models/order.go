@@ -95,16 +95,59 @@ type OrderRequest struct {
 
 // OrderResponse представляет ответ с информацией о заказе
 type OrderResponse struct {
-	ID            uuid.UUID           `json:"id"`
-	Status        OrderStatus         `json:"status"`
-	TotalAmount   float64             `json:"total_amount"`
-	ShippingAddr  string              `json:"shipping_address"`
-	PaymentMethod string              `json:"payment_method"`
-	Notes         string              `json:"notes"`
-	OrderItems    []OrderItemResponse `json:"order_items"`
-	DesiredAt     *time.Time          `json:"desired_at"`
-	CreatedAt     time.Time           `json:"created_at"`
-	UpdatedAt     time.Time           `json:"updated_at"`
+	ID             uuid.UUID           `json:"id"`
+	Status         OrderStatus         `json:"status"`
+	TotalAmount    float64             `json:"total_amount"`
+	ItemsSubtotal  float64             `json:"items_subtotal"`
+	DeliveryFee    float64             `json:"delivery_fee"`
+	Currency       string              `json:"currency"`
+	ShippingAddr   string              `json:"shipping_address"`
+	PaymentMethod  string              `json:"payment_method"`
+	ShippingMethod string              `json:"shipping_method"`
+	PaymentStatus  string              `json:"payment_status"`
+	RecipientName  string              `json:"recipient_name"`
+	Phone          string              `json:"phone"`
+	Notes          string              `json:"notes"`
+	OrderItems     []OrderItemResponse `json:"order_items"`
+	DesiredAt      *time.Time          `json:"desired_at"`
+	ConfirmedAt    *time.Time          `json:"confirmed_at"`
+	CancelledAt    *time.Time          `json:"cancelled_at"`
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
+}
+
+// AdminOrderResponse представляет расширенный ответ для админ панели
+type AdminOrderResponse struct {
+	ID             uuid.UUID           `json:"id"`
+	OrderNumber    string              `json:"order_number"` // Короткий номер для отображения
+	Status         OrderStatus         `json:"status"`
+	TotalAmount    float64             `json:"total_amount"`
+	ItemsSubtotal  float64             `json:"items_subtotal"`
+	DeliveryFee    float64             `json:"delivery_fee"`
+	Currency       string              `json:"currency"`
+	ShippingAddr   string              `json:"shipping_address"`
+	PaymentMethod  string              `json:"payment_method"`
+	ShippingMethod string              `json:"shipping_method"`
+	PaymentStatus  string              `json:"payment_status"`
+	RecipientName  string              `json:"recipient_name"`
+	Phone          string              `json:"phone"`
+	Notes          string              `json:"notes"`
+	OrderItems     []OrderItemResponse `json:"order_items"`
+	DesiredAt      *time.Time          `json:"desired_at"`
+	ConfirmedAt    *time.Time          `json:"confirmed_at"`
+	CancelledAt    *time.Time          `json:"cancelled_at"`
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
+	User           *UserBasicInfo      `json:"user,omitempty"` // Информация о пользователе
+}
+
+// UserBasicInfo базовая информация о пользователе для заказа
+type UserBasicInfo struct {
+	ID      uuid.UUID `json:"id"`
+	Name    string    `json:"name"`
+	Phone   string    `json:"phone"`
+	Email   string    `json:"email"`
+	IsGuest bool      `json:"is_guest"`
 }
 
 // OrderItemResponse представляет ответ с элементом заказа
@@ -127,17 +170,73 @@ func (o *Order) ToResponse() OrderResponse {
 	}
 
 	return OrderResponse{
-		ID:            o.ID,
-		Status:        o.Status,
-		TotalAmount:   o.TotalAmount,
-		ShippingAddr:  o.ShippingAddr,
-		PaymentMethod: o.PaymentMethod,
-		Notes:         o.Notes,
-		OrderItems:    orderItems,
-		DesiredAt:     o.DesiredAt,
-		CreatedAt:     o.CreatedAt,
-		UpdatedAt:     o.UpdatedAt,
+		ID:             o.ID,
+		Status:         o.Status,
+		TotalAmount:    o.TotalAmount,
+		ItemsSubtotal:  o.ItemsSubtotal,
+		DeliveryFee:    o.DeliveryFee,
+		Currency:       o.Currency,
+		ShippingAddr:   o.ShippingAddr,
+		PaymentMethod:  o.PaymentMethod,
+		ShippingMethod: o.ShippingMethod,
+		PaymentStatus:  o.PaymentStatus,
+		RecipientName:  o.RecipientName,
+		Phone:          o.Phone,
+		Notes:          o.Notes,
+		OrderItems:     orderItems,
+		DesiredAt:      o.DesiredAt,
+		ConfirmedAt:    o.ConfirmedAt,
+		CancelledAt:    o.CancelledAt,
+		CreatedAt:      o.CreatedAt,
+		UpdatedAt:      o.UpdatedAt,
 	}
+}
+
+// ToAdminResponse преобразует Order в AdminOrderResponse с информацией о пользователе
+func (o *Order) ToAdminResponse() AdminOrderResponse {
+	orderItems := make([]OrderItemResponse, len(o.OrderItems))
+	for i, item := range o.OrderItems {
+		orderItems[i] = item.ToResponse()
+	}
+
+	// Создаём короткий номер заказа из первых 8 символов UUID
+	orderNumber := o.ID.String()[:8]
+
+	response := AdminOrderResponse{
+		ID:             o.ID,
+		OrderNumber:    orderNumber,
+		Status:         o.Status,
+		TotalAmount:    o.TotalAmount,
+		ItemsSubtotal:  o.ItemsSubtotal,
+		DeliveryFee:    o.DeliveryFee,
+		Currency:       o.Currency,
+		ShippingAddr:   o.ShippingAddr,
+		PaymentMethod:  o.PaymentMethod,
+		ShippingMethod: o.ShippingMethod,
+		PaymentStatus:  o.PaymentStatus,
+		RecipientName:  o.RecipientName,
+		Phone:          o.Phone,
+		Notes:          o.Notes,
+		OrderItems:     orderItems,
+		DesiredAt:      o.DesiredAt,
+		ConfirmedAt:    o.ConfirmedAt,
+		CancelledAt:    o.CancelledAt,
+		CreatedAt:      o.CreatedAt,
+		UpdatedAt:      o.UpdatedAt,
+	}
+
+	// Добавляем информацию о пользователе если она загружена
+	if o.User.ID != uuid.Nil {
+		response.User = &UserBasicInfo{
+			ID:      o.User.ID,
+			Name:    o.User.Name,
+			Phone:   o.User.Phone,
+			Email:   o.User.Email,
+			IsGuest: o.User.IsGuest,
+		}
+	}
+
+	return response
 }
 
 // ToResponse преобразует OrderItem в OrderItemResponse

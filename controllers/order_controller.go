@@ -708,8 +708,8 @@ func (oc *OrderController) GetGuestOrder(c *gin.Context) {
 	})
 }
 
-// GetOrders - получить все заказы (только для админов)
-func (oc *OrderController) GetOrders(c *gin.Context) {
+// GetAdminOrders - получить все заказы для админ панели с расширенной информацией
+func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 	var orders []models.Order
 	var total int64
 
@@ -718,11 +718,59 @@ func (oc *OrderController) GetOrders(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset := (page - 1) * limit
 
-	// Подсчет общего количества
-	database.DB.Model(&models.Order{}).Count(&total)
+	// Параметры фильтрации
+	status := c.Query("status")            // pending, confirmed, preparing, inDelivery, delivered, completed, cancelled
+	search := c.Query("search")            // Поиск по номеру заказа, имени, телефону
+	orderNumber := c.Query("order_number") // Поиск по номеру заказа
+	phone := c.Query("phone")              // Поиск по телефону
+	dateFrom := c.Query("date_from")       // Фильтр по дате от (YYYY-MM-DD)
+	dateTo := c.Query("date_to")           // Фильтр по дате до (YYYY-MM-DD)
+
+	// Начинаем строить запрос
+	query := database.DB.Model(&models.Order{})
+
+	// Фильтр по статусу
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	// Поиск по номеру заказа (первые 8 символов UUID)
+	if orderNumber != "" {
+		query = query.Where("CAST(id AS TEXT) LIKE ?", orderNumber+"%")
+	}
+
+	// Поиск по телефону
+	if phone != "" {
+		query = query.Where("phone LIKE ?", "%"+phone+"%")
+	}
+
+	// Общий поиск (по имени получателя, телефону или номеру заказа)
+	if search != "" {
+		query = query.Where(
+			"recipient_name ILIKE ? OR phone LIKE ? OR CAST(id AS TEXT) LIKE ?",
+			"%"+search+"%", "%"+search+"%", "%"+search+"%",
+		)
+	}
+
+	// Фильтр по дате создания
+	if dateFrom != "" {
+		if t, err := time.Parse("2006-01-02", dateFrom); err == nil {
+			query = query.Where("created_at >= ?", t)
+		}
+	}
+	if dateTo != "" {
+		if t, err := time.Parse("2006-01-02", dateTo); err == nil {
+			// Добавляем 1 день чтобы включить весь день dateTo
+			t = t.Add(24 * time.Hour)
+			query = query.Where("created_at < ?", t)
+		}
+	}
+
+	// Подсчет общего количества с учетом фильтров
+	query.Count(&total)
 
 	// Получение заказов с пагинацией
-	result := database.DB.Preload("User").
+	result := query.Preload("User").
 		Preload("OrderItems").
 		Preload("OrderItems.Variation").
 		Offset(offset).
@@ -738,10 +786,25 @@ func (oc *OrderController) GetOrders(c *gin.Context) {
 		return
 	}
 
-	// Преобразование в ответы
-	var orderResponses []models.OrderResponse
+	// Преобразование в расширенные ответы для админ панели
+	var orderResponses []models.AdminOrderResponse
 	for _, order := range orders {
-		orderResponses = append(orderResponses, order.ToResponse())
+		orderResponses = append(orderResponses, order.ToAdminResponse())
+	}
+
+	// Статистика по статусам
+	var stats []struct {
+		Status string
+		Count  int64
+	}
+	database.DB.Model(&models.Order{}).
+		Select("status, COUNT(*) as count").
+		Group("status").
+		Scan(&stats)
+
+	statusStats := make(map[string]int64)
+	for _, stat := range stats {
+		statusStats[stat.Status] = stat.Count
 	}
 
 	c.JSON(http.StatusOK, models.StandardResponse{
@@ -754,9 +817,16 @@ func (oc *OrderController) GetOrders(c *gin.Context) {
 				Total:      int(total),
 				TotalPages: int((total + int64(limit) - 1) / int64(limit)),
 			},
+			"stats": statusStats,
 		},
 		Message: "Заказы получены успешно",
 	})
+}
+
+// GetOrders - получить все заказы (только для админов) - старый метод для обратной совместимости
+func (oc *OrderController) GetOrders(c *gin.Context) {
+	// Перенаправляем на новый метод
+	oc.GetAdminOrders(c)
 }
 
 // GetOrder - получить заказ по ID (только для админов)
@@ -808,7 +878,7 @@ func (oc *OrderController) UpdateOrderStatus(c *gin.Context) {
 	}
 
 	var order models.Order
-	result := database.DB.First(&order, "id = ?", orderID)
+	result := database.DB.Preload("User").Preload("OrderItems").Preload("OrderItems.Variation").First(&order, "id = ?", orderID)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponseWithCode(
@@ -824,7 +894,17 @@ func (oc *OrderController) UpdateOrderStatus(c *gin.Context) {
 		return
 	}
 
+	now := time.Now()
 	order.Status = models.OrderStatus(updateRequest.Status)
+
+	// Устанавливаем время подтверждения или отмены
+	if updateRequest.Status == "confirmed" && order.ConfirmedAt == nil {
+		order.ConfirmedAt = &now
+	}
+	if updateRequest.Status == "cancelled" && order.CancelledAt == nil {
+		order.CancelledAt = &now
+	}
+
 	if err := database.DB.Save(&order).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
@@ -835,8 +915,88 @@ func (oc *OrderController) UpdateOrderStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, models.StandardResponse{
 		Success: true,
-		Data:    order.ToResponse(),
+		Data:    order.ToAdminResponse(),
 		Message: "Статус заказа обновлен успешно",
+	})
+}
+
+// ConfirmOrder - подтвердить заказ (быстрый метод для админ панели)
+func (oc *OrderController) ConfirmOrder(c *gin.Context) {
+	orderID := c.Param("id")
+
+	var order models.Order
+	result := database.DB.Preload("User").Preload("OrderItems").Preload("OrderItems.Variation").First(&order, "id = ?", orderID)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponseWithCode(
+				models.ErrNotFound,
+				"Заказ не найден",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при поиске заказа",
+		))
+		return
+	}
+
+	now := time.Now()
+	order.Status = models.OrderStatusConfirmed
+	order.ConfirmedAt = &now
+
+	if err := database.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при подтверждении заказа",
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.StandardResponse{
+		Success: true,
+		Data:    order.ToAdminResponse(),
+		Message: "Заказ подтвержден",
+	})
+}
+
+// RejectOrder - отклонить заказ (быстрый метод для админ панели)
+func (oc *OrderController) RejectOrder(c *gin.Context) {
+	orderID := c.Param("id")
+
+	var order models.Order
+	result := database.DB.Preload("User").Preload("OrderItems").Preload("OrderItems.Variation").First(&order, "id = ?", orderID)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponseWithCode(
+				models.ErrNotFound,
+				"Заказ не найден",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при поиске заказа",
+		))
+		return
+	}
+
+	now := time.Now()
+	order.Status = models.OrderStatusCancelled
+	order.CancelledAt = &now
+
+	if err := database.DB.Save(&order).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка при отклонении заказа",
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.StandardResponse{
+		Success: true,
+		Data:    order.ToAdminResponse(),
+		Message: "Заказ отклонен",
 	})
 }
 

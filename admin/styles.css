@@ -929,9 +929,58 @@ textarea.form-input {
     color: white;
 }
 
+.action-btn.view {
+    background: #6c757d;
+    color: white;
+}
+
+.action-btn.success {
+    background: #28a745;
+    color: white;
+}
+
+.action-btn.danger {
+    background: #dc3545;
+    color: white;
+}
+
 .action-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Пагинация */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin: 20px 0;
+    padding: 20px;
+}
+
+.pagination-btn {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    background: white;
+    color: #333;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.pagination-btn:hover {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.pagination-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+    font-weight: bold;
 } 
 
 /* Загрузка изображений */
