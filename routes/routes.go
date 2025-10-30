@@ -286,7 +286,7 @@ func SetupRoutes() *gin.Engine {
 		c.JSON(200, gin.H{
 			"status":  "ok",
 			"message": "MM API is running",
-			"version": "1.1.0",
+			"version": "1.2.0",
 		})
 	}
 	r.GET("/health", healthHandler)
@@ -294,16 +294,17 @@ func SetupRoutes() *gin.Engine {
 
 	r.GET("/version", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"version": "1.1.0",
+			"version": "1.2.0",
 			"name":    "MM API",
 			"build":   "development",
+			"changes": "Categories: Added icon support (PNG), improved subcategories hierarchy display",
 		})
 	})
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "Welcome to MM API",
-			"version": "1.1.0",
+			"version": "1.2.0",
 			"docs":    "/api/v1/docs",
 			"health":  "/health",
 		})

@@ -1,0 +1,64 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Environment files
+.env
+.env.local
+.env.*.local
+# env.development  # Не игнорируем, это шаблон для разработчиков
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Images (если не нужно коммитить)
+# images/*
+
+# Backup files
+*.bak
+*.backup
+
+# Docker volumes data
+*_data/
+
+# Database dumps
+dump.sql
+dump.custom
+*.dump
+*.dump.sql
+
+# Backups directory
+backups/
+
+# Compiled binaries
+mm_shop
+mm_shop.exe
+

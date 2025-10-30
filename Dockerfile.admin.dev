@@ -1,13 +1,13 @@
-# MM Admin Panel - Production Release
-# ===================================
+# MM Admin Panel - Development
+# ============================
 
 FROM nginx:alpine
 
 # Устанавливаем необходимые пакеты
 RUN apk add --no-cache curl
 
-# Копируем конфигурацию Nginx для продакшена
-COPY nginx.production.conf /etc/nginx/nginx.conf
+# Копируем конфигурацию Nginx для разработки
+COPY nginx.development.conf /etc/nginx/nginx.conf
 
 # Копируем файлы админки
 COPY admin/ /usr/share/nginx/html/
@@ -21,7 +21,7 @@ EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/health || exit 1
+    CMD curl -f http://localhost/ || exit 1
 
 # Запускаем Nginx
 CMD ["nginx", "-g", "daemon off;"]

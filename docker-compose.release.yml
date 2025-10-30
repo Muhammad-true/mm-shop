@@ -31,8 +31,6 @@ services:
     image: redis:7-alpine
     container_name: mm-redis-prod
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -40,7 +38,7 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
-      timeout: 10s
+      timeout: 3s
       retries: 3
 
   # MM API
@@ -54,10 +52,11 @@ services:
       - "8080:8080"
     environment:
       - GIN_MODE=release
-      - LOG_LEVEL=warn
-      - DATABASE_URL=postgres://mm_user:${POSTGRES_PASSWORD:-muhammadjon}@postgres:5432/mm_shop_prod?sslmode=disable
+      - DATABASE_URL=postgres://mm_user:muhammadjon@postgres:5432/mm_shop_prod?sslmode=disable
       - REDIS_URL=redis://redis:6379/0
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://159.89.99.252,http://localhost}
+      - CORS_ALLOW_ORIGINS=*
+      - PUBLIC_HOST=159.89.99.252
+      - JWT_SECRET=${JWT_SECRET:-moya-super-secretnaya-fraza-dlya-api-777}
     volumes:
       - ./images:/app/images
       - ./logs:/app/logs
@@ -82,7 +81,7 @@ services:
     container_name: mm-admin-prod
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "3000:80"
     depends_on:
       api:
         condition: service_healthy
@@ -94,22 +93,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # PgAdmin (опционально)
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: mm-pgadmin-prod
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@mm-api.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
-    ports:
-      - "8081:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - mm-network
-
 volumes:
   postgres_data:
     driver: local
@@ -119,3 +102,4 @@ volumes:
 networks:
   mm-network:
     driver: bridge
+

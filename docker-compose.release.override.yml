@@ -17,3 +17,4 @@ services:
       SERVER_HOST: "0.0.0.0"
       SERVER_PORT: "8080"
       PUBLIC_HOST: "159.89.99.252"
+

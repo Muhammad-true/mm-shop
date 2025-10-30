@@ -60,22 +60,24 @@ func (o *Order) BeforeCreate(tx *gorm.DB) error {
 
 // OrderItem представляет элемент заказа
 type OrderItem struct {
-	ID          uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
-	OrderID     uuid.UUID `json:"order_id" gorm:"type:uuid;not null"`
-	VariationID uuid.UUID `json:"variation_id" gorm:"type:uuid;not null"`
-	Quantity    int       `json:"quantity" gorm:"not null"`
-	Price       float64   `json:"price" gorm:"not null"` // Цена на момент заказа
-	Size        string    `json:"size"`
-	Color       string    `json:"color"`
-	SKU         string    `json:"sku"`
-	Name        string    `json:"name" gorm:"not null"`
-	ImageURL    string    `json:"image_url"`
-	Total       float64   `json:"total" gorm:"not null"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;"`
+	OrderID     uuid.UUID  `json:"order_id" gorm:"type:uuid;not null"`
+	VariationID uuid.UUID  `json:"variation_id" gorm:"type:uuid;not null"`
+	ShopOwnerID *uuid.UUID `json:"shop_owner_id" gorm:"type:uuid"` // ID владельца магазина
+	Quantity    int        `json:"quantity" gorm:"not null"`
+	Price       float64    `json:"price" gorm:"not null"` // Цена на момент заказа
+	Size        string     `json:"size"`
+	Color       string     `json:"color"`
+	SKU         string     `json:"sku"`
+	Name        string     `json:"name" gorm:"not null"`
+	ImageURL    string     `json:"image_url"`
+	Total       float64    `json:"total" gorm:"not null"`
+	CreatedAt   time.Time  `json:"created_at"`
 
 	// Связи
 	Order     Order            `json:"order,omitempty" gorm:"foreignKey:OrderID"`
 	Variation ProductVariation `json:"variation,omitempty" gorm:"foreignKey:VariationID"`
+	ShopOwner *User            `json:"shop_owner,omitempty" gorm:"foreignKey:ShopOwnerID"`
 }
 
 // BeforeCreate устанавливает UUID перед созданием

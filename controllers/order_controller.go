@@ -136,9 +136,18 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 			if err != nil {
 				return err
 			}
+
+			// Получаем variation с продуктом, чтобы узнать owner_id
+			var variation models.ProductVariation
+			if err := tx.Preload("Product").First(&variation, "id = ?", vid).Error; err != nil {
+				log.Printf("⚠️ Не удалось загрузить вариацию %s: %v", vid, err)
+				// Продолжаем без owner_id, но логируем ошибку
+			}
+
 			item := models.OrderItem{
 				OrderID:     order.ID,
 				VariationID: vid,
+				ShopOwnerID: variation.Product.OwnerID, // Устанавливаем владельца магазина
 				Quantity:    it.Quantity,
 				Price:       it.Price,
 				Size:        it.Size,
@@ -601,9 +610,18 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 			if err != nil {
 				return err
 			}
+
+			// Получаем variation с продуктом, чтобы узнать owner_id
+			var variation models.ProductVariation
+			if err := tx.Preload("Product").First(&variation, "id = ?", vid).Error; err != nil {
+				log.Printf("⚠️ Не удалось загрузить вариацию %s: %v", vid, err)
+				// Продолжаем без owner_id, но логируем ошибку
+			}
+
 			item := models.OrderItem{
 				OrderID:     order.ID,
 				VariationID: vid,
+				ShopOwnerID: variation.Product.OwnerID, // Устанавливаем владельца магазина
 				Quantity:    it.Quantity,
 				Price:       it.Price,
 				Size:        it.Size,
@@ -719,13 +737,13 @@ func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 	offset := (page - 1) * limit
 
 	// Параметры фильтрации
-	status := c.Query("status")            // pending, confirmed, preparing, inDelivery, delivered, completed, cancelled
-	search := c.Query("search")            // Поиск по номеру заказа, имени, телефону
-	orderNumber := c.Query("order_number") // Поиск по номеру заказа
-	phone := c.Query("phone")              // Поиск по телефону
+	status := c.Query("status")             // pending, confirmed, preparing, inDelivery, delivered, completed, cancelled
+	search := c.Query("search")             // Поиск по номеру заказа, имени, телефону
+	orderNumber := c.Query("order_number")  // Поиск по номеру заказа
+	phone := c.Query("phone")               // Поиск по телефону
 	shopOwnerID := c.Query("shop_owner_id") // Фильтр по владельцу магазина
-	dateFrom := c.Query("date_from")       // Фильтр по дате от (YYYY-MM-DD)
-	dateTo := c.Query("date_to")           // Фильтр по дате до (YYYY-MM-DD)
+	dateFrom := c.Query("date_from")        // Фильтр по дате от (YYYY-MM-DD)
+	dateTo := c.Query("date_to")            // Фильтр по дате до (YYYY-MM-DD)
 
 	// Начинаем строить запрос
 	query := database.DB.Model(&models.Order{})
@@ -835,7 +853,7 @@ func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 				Total:      int(total),
 				TotalPages: int((total + int64(limit) - 1) / int64(limit)),
 			},
-			"stats": statusStats,
+			"stats":       statusStats,
 			"shop_owners": shopOwners,
 		},
 		Message: "Заказы получены успешно",
@@ -1072,26 +1090,44 @@ func (oc *OrderController) GetShopOrders(c *gin.Context) {
 
 	currentUser := user.(models.User)
 
+	// Логируем информацию о пользователе
+	log.Printf("🔍 GetShopOrders вызван пользователем: %s (Role: %s)", currentUser.ID, currentUser.Role.Name)
+
 	// Параметры пагинации
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset := (page - 1) * limit
 
-	// Если админ - показываем все заказы, если владелец магазина - только заказы клиентов
+	// Если админ - показываем все заказы, если владелец магазина - только заказы с его товарами
 	query := database.DB.Model(&models.Order{})
 	if currentUser.Role != nil && currentUser.Role.Name == "shop_owner" {
-		// Для владельца магазина показываем только заказы обычных пользователей
-		query = query.Joins("JOIN users ON orders.user_id = users.id").
-			Joins("JOIN roles ON users.role_id = roles.id").
-			Where("roles.name = ?", "user")
+		// Для владельца магазина показываем только заказы, где есть его товары
+		// Используем DISTINCT, чтобы не дублировать заказы при нескольких товарах
+		log.Printf("🏪 Фильтруем заказы по shop_owner_id: %s", currentUser.ID)
+		query = query.Distinct().
+			Joins("JOIN order_items ON orders.id = order_items.order_id").
+			Where("order_items.shop_owner_id = ?", currentUser.ID)
+	} else {
+		log.Printf("👑 Админ/супер-админ - показываем все заказы")
 	}
 
 	// Подсчет общего количества
 	query.Count(&total)
+	log.Printf("📊 Найдено заказов: %d", total)
 
 	// Получение заказов с пагинацией
-	result := query.Preload("User").
-		Preload("OrderItems").
+	preloadQuery := query.Preload("User")
+
+	// Для владельца магазина загружаем только его товары в заказах
+	if currentUser.Role != nil && currentUser.Role.Name == "shop_owner" {
+		log.Printf("📦 Загружаем OrderItems только для shop_owner_id: %s", currentUser.ID)
+		preloadQuery = preloadQuery.Preload("OrderItems", "shop_owner_id = ?", currentUser.ID)
+	} else {
+		log.Printf("📦 Загружаем все OrderItems")
+		preloadQuery = preloadQuery.Preload("OrderItems")
+	}
+
+	result := preloadQuery.
 		Preload("OrderItems.Variation").
 		Offset(offset).
 		Limit(limit).
@@ -1099,11 +1135,19 @@ func (oc *OrderController) GetShopOrders(c *gin.Context) {
 		Find(&orders)
 
 	if result.Error != nil {
+		log.Printf("❌ Ошибка при получении заказов: %v", result.Error)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
 			"Ошибка при получении заказов",
 		))
 		return
+	}
+
+	log.Printf("✅ Загружено заказов: %d", len(orders))
+
+	// Логируем количество items в каждом заказе
+	for i, order := range orders {
+		log.Printf("  📋 Заказ %d: ID=%s, Items=%d", i+1, order.ID, len(order.OrderItems))
 	}
 
 	// Преобразование в ответы

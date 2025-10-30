@@ -4,16 +4,15 @@ const CONFIG = {
   // === API НАСТРОЙКИ ===
   API: {
     // Базовый URL для разработки
-    DEV_BASE_URL: 'http://localhost:8080',
+    DEV_BASE_URL: '',  // Пусто для same-origin через Nginx
 
     // Базовый URL для продакшена — пусто, чтобы ходить на тот же хост (same-origin)
     PROD_BASE_URL: '',
 
     // Автоматический выбор URL
     get BASE_URL() {
-      return (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-        ? this.DEV_BASE_URL
-        : this.PROD_BASE_URL; // в проде даст относительные /api/... /images/...
+      // Везде используем относительные пути, чтобы ходить через Nginx
+      return this.PROD_BASE_URL; // Same-origin через прокси
     },
 
     // Эндпоинты API
@@ -52,7 +51,7 @@ const CONFIG = {
         GET:    (id) => `/api/v1/admin/roles/${id}`,
       },
       ORDERS: {
-        LIST: '/api/v1/admin/orders', // если у бэка нужен конечный слэш — поставь '/'
+        LIST: '/api/v1/admin/orders/', // со слешем для совместимости с Go Gin
         SHOP_LIST: '/api/v1/shop/orders/',
       },
       UPLOAD: {
