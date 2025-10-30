@@ -3,10 +3,16 @@
 ## На сервере выполните:
 
 ```bash
-cd /root/mm-shop
+cd /root/mm-shop/release
+
+# Если есть локальные изменения - откатываем их
+git checkout .
+
+# Обновляем код
 git pull origin main
-docker-compose -f docker-compose.release.yml up -d --build api
-docker-compose -f docker-compose.release.yml up -d --build admin
+
+# Пересобираем контейнеры
+docker compose -f docker-compose.release.yml up -d --build api admin
 ```
 
 ## Проверка:
@@ -18,5 +24,5 @@ docker logs mm-api-prod --tail 50 -f
 
 ## Версия:
 
-**1.2.0** - Categories icons, subcategories, enhanced variations
+**1.2.3** - Fixed image URLs to use relative paths
 
