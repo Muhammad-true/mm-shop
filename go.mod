@@ -1,6 +1,6 @@
 module github.com/mm-api/mm-api
 
-go 1.24.5
+go 1.23.5
 
 require (
 	github.com/gin-gonic/gin v1.9.1
