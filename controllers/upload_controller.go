@@ -20,17 +20,9 @@ type UploadController struct{}
 func (uc *UploadController) GetImageURL(filename, folder string) string {
 	cfg := config.GetConfig()
 
-	// Определяем правильный хост для URL
-	var baseURL string
-	if cfg.IsDevelopment() {
-		// В режиме разработки используем localhost
-		baseURL = fmt.Sprintf("http://localhost:%s", cfg.Port)
-	} else {
-		// В продакшене используем PUBLIC_HOST
-		baseURL = fmt.Sprintf("http://%s:%s", cfg.PublicHost, cfg.Port)
-	}
-
-	return fmt.Sprintf("%s/images/%s/%s", baseURL, folder, filename)
+	// Всегда возвращаем относительный путь для same-origin запросов
+	// nginx будет проксировать /images/ к API
+	return fmt.Sprintf("/images/%s/%s", folder, filename)
 }
 
 // UploadImage загружает изображение
