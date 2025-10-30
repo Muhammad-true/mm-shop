@@ -18,8 +18,6 @@ type UploadController struct{}
 
 // GetImageURL возвращает правильный URL для изображения
 func (uc *UploadController) GetImageURL(filename, folder string) string {
-	cfg := config.GetConfig()
-
 	// Всегда возвращаем относительный путь для same-origin запросов
 	// nginx будет проксировать /images/ к API
 	return fmt.Sprintf("/images/%s/%s", folder, filename)
