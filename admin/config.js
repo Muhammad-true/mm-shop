@@ -105,39 +105,6 @@ const CONFIG = {
 
 // ===== УТИЛИТЫ =====
 
-// Полный URL для API
-function getApiUrl(endpoint) {
-  return CONFIG.API.BASE_URL + endpoint;
-}
-
-// Картинка: ВСЕГДА same-origin
-function getImageUrl(url) {
-  if (!url) return '';
-
-  // 1) Если API вернул полный URL к /images/ — делаем относительным
-  const m = url.match(/^https?:\/\/[^/]+(\/images\/.+)$/i);
-  if (m) return m[1]; // -> "/images/variations/.."
-
-  // 2) Иначе — как раньше: добавим BASE_URL при относительном пути
-  if (!url.startsWith('http')) {
-    return (url.startsWith('/') ? CONFIG.API.BASE_URL + url
-                                : CONFIG.API.BASE_URL + '/' + url);
-  }
-
-  // 3) На всякий случай: замены «плохих» хостов
-  let imageUrl = url;
-  const REPL = {
-    'http://0.0.0.0:8080': '',
-    'http://127.0.0.1:8080': '',
-    'http://localhost:8080': '',
-    'http://localhost': '',
-  };
-  Object.entries(REPL).forEach(([from, to]) => {
-    if (imageUrl.startsWith(from + '/images/')) imageUrl = imageUrl.replace(from, '');
-  });
-
-  return imageUrl;
-}
 // Логирование
 function log(level, message, data = null) {
   if (!CONFIG.LOGGING.ENABLED) return;
@@ -147,10 +114,34 @@ function log(level, message, data = null) {
        : console.log(`${prefix} [${timestamp}] ${message}`);
 }
 
+// Картинка: ВСЕГДА same-origin (относительный путь)
+window.getImageUrl = function(url) {
+  if (!url) return '';
+
+  // Если абсолютный URL с /images/ — оставим только путь
+  const m = String(url).match(/^https?:\/\/[^/]+(\/images\/.+)$/i);
+  if (m) return m[1];
+
+  // Если относительный путь — добавляем / если нужно
+  if (!/^https?:\/\//i.test(url)) {
+    return url.startsWith('/') ? url : '/' + url;
+  }
+
+  // Срежем «плохие» хосты у /images/, если вдруг попались
+  let imageUrl = url;
+  ['http://0.0.0.0:8080','http://127.0.0.1:8080','http://localhost:8080','http://localhost','https://localhost']
+    .forEach((h) => { if (imageUrl.startsWith(h + '/images/')) imageUrl = imageUrl.replace(h, ''); });
+
+  return imageUrl;
+};
+
+// URL для API
+window.getApiUrl = function(endpoint) {
+  return (CONFIG.API.BASE_URL || '') + endpoint;
+};
+
 // Экспорт
 window.CONFIG = CONFIG;
-window.getApiUrl = getApiUrl;
-window.getImageUrl = getImageUrl;
 window.log = log;
 
 // Отладочный лог
@@ -158,64 +149,3 @@ log('INFO', 'Конфигурация загружена', {
   baseUrl: CONFIG.API.BASE_URL,
   environment: (location.hostname === 'localhost' || location.hostname === '127.0.0.1') ? 'development' : 'production',
 });
-
-
-/* ==== RUNTIME OVERRIDES (prod safe) ==== */
-
-/** Формирует URL для API.
- *  В деве:  http://localhost:8080 + endpoint
- *  В проде: '' + endpoint -> получится относительный /api/...
- */
-window.getApiUrl = function(endpoint) {
-  return (CONFIG.API.BASE_URL || '') + endpoint;
-};
-
-/** Нормализует расширение файла к нижнему регистру (JPG -> jpg) */
-function normalizeExtLower(p) {
-  return String(p).replace(/(\.[a-zA-Z0-9]+)$/, s => s.toLowerCase());
-}
-
-/** Делает корректный URL картинки (предпочтительно относительный /images/...) */
-window.getImageUrl = function(url) {
-  if (!url) return '';
-
-  // Если прилетел абсолютный URL с /images/ — оставим только путь
-  const m = String(url).match(/^https?:\/\/[^/]+(\/images\/.+)$/i);
-  if (m) return normalizeExtLower(m[1]); // "/images/variations/...."
-
-  // Если относительный путь — добавим BASE_URL (в деве это http://localhost:8080)
-  if (!/^https?:\/\//i.test(url)) {
-    const rel = url.startsWith('/') ? url : '/' + url;
-    return (CONFIG.API.BASE_URL || '') + normalizeExtLower(rel);
-  }
-
-  // На всякий случай: срежем "плохие" хосты у /images/
-  let imageUrl = url;
-  ['http://0.0.0.0:8080','http://127.0.0.1:8080','http://localhost:8080','http://localhost']
-    .forEach((h) => { if (imageUrl.startsWith(h + '/images/')) imageUrl = imageUrl.replace(h, ''); });
-
-  // Если всё равно абсолютный — вернём как есть, но с нижним регистром расширения
-  return normalizeExtLower(imageUrl);
-};
-
-/* ==== Override: сохраняем регистр расширения (важно для Linux FS) ==== */
-window.getImageUrl = function(url) {
-  if (!url) return '';
-
-  // Если абсолютный URL на /images — вернём только путь (оставляя регистр)
-  const m = String(url).match(/^https?:\/\/[^/]+(\/images\/.+)$/i);
-  if (m) return m[1];
-
-  // Если относительный — добавим BASE_URL только в dev (в prod BASE_URL пустой)
-  if (!/^https?:\/\//i.test(url)) {
-    const rel = url.startsWith('/') ? url : '/' + url;
-    return (CONFIG.API.BASE_URL || '') + rel;
-  }
-
-  // Срежем «плохие» хосты у /images/, если вдруг попались
-  let imageUrl = url;
-  ['http://0.0.0.0:8080','http://127.0.0.1:8080','http://localhost:8080','http://localhost']
-    .forEach((h) => { if (imageUrl.startsWith(h + '/images/')) imageUrl = imageUrl.replace(h, ''); });
-
-  return imageUrl;
-};
