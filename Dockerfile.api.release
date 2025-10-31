@@ -24,13 +24,13 @@ FROM alpine:latest
 # Устанавливаем ca-certificates для HTTPS запросов
 RUN apk --no-cache add ca-certificates wget
 
-WORKDIR /root/
+WORKDIR /app
 
 # Копируем бинарник из builder
 COPY --from=builder /app/mm_shop .
 
 # Создаем директории для изображений и логов
-RUN mkdir -p /root/images /root/logs
+RUN mkdir -p /app/images /app/logs
 
 # Открываем порт
 EXPOSE 8080
