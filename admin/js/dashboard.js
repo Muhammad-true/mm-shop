@@ -87,16 +87,21 @@ async function loadDashboard(userRole = null) {
         }
         
         // Извлекаем данные с учетом разных структур ответа
-        const productsList = products?.products || products?.data?.products || [];
+        const productsList = Array.isArray(products?.products) ? products.products 
+            : Array.isArray(products?.data?.products) ? products.data.products : [];
         const usersList = (roleName === 'super_admin' || roleName === 'admin') 
-            ? (users?.data?.users || users?.users || [])
-            : (users?.data?.customers || users?.customers || []);
-        const ordersList = orders?.data?.orders || orders?.orders || orders?.data || [];
+            ? (Array.isArray(users?.data?.users) ? users.data.users 
+                : Array.isArray(users?.users) ? users.users : [])
+            : (Array.isArray(users?.data?.customers) ? users.data.customers 
+                : Array.isArray(users?.customers) ? users.customers : []);
+        const ordersList = Array.isArray(orders?.data?.orders) ? orders.data.orders 
+            : Array.isArray(orders?.orders) ? orders.orders 
+            : Array.isArray(orders?.data) ? orders.data : [];
         
         const totalProducts = productsList.length;
         const totalUsers = usersList.length;
         const totalOrders = ordersList.length;
-        const revenue = ordersList.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+        const revenue = Array.isArray(ordersList) ? ordersList.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0 : 0;
         
         console.log('📊 Итоговые данные:', { 
             products: totalProducts, 
