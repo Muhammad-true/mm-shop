@@ -276,7 +276,8 @@ func SetupRoutes() *gin.Engine {
 	}
 
 	// Статические файлы для изображений
-	r.Static("/images", "./images")
+	// Используем абсолютный путь для продакшена в Docker
+	r.Static("/images", "/app/images")
 
 	// Обслуживание админ панели (если файлы присутствуют)
 	r.Static("/admin", "./admin")
