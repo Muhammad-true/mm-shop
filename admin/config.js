@@ -119,7 +119,7 @@ window.getImageUrl = function(url) {
   if (!url) return '';
 
   // Если абсолютный URL с /images/ — оставим только путь
-  const m = String(url).match(/^https?:\/\/[^/]+(\/images\/.+)$/i);
+  const m = String(url).match(/^https?:\/\/[^/]+(?::\d+)?(\/images\/.+)$/i);
   if (m) return m[1];
 
   // Если относительный путь — добавляем / если нужно
@@ -127,9 +127,10 @@ window.getImageUrl = function(url) {
     return url.startsWith('/') ? url : '/' + url;
   }
 
-  // Срежем «плохие» хосты у /images/, если вдруг попались
+  // Срежем «плохие» хосты у /images/, включая порт 3000
   let imageUrl = url;
-  ['http://0.0.0.0:8080','http://127.0.0.1:8080','http://localhost:8080','http://localhost','https://localhost']
+  ['http://0.0.0.0:8080','http://127.0.0.1:8080','http://localhost:8080','http://localhost','https://localhost',
+   'http://159.89.99.252:3000','http://159.89.99.252:8080']
     .forEach((h) => { if (imageUrl.startsWith(h + '/images/')) imageUrl = imageUrl.replace(h, ''); });
 
   return imageUrl;
