@@ -118,13 +118,21 @@ function log(level, message, data = null) {
 window.getImageUrl = function(url) {
   if (!url) return '';
 
+  const originalUrl = url;
+  
   // Если абсолютный URL с /images/ — оставим только путь
   const m = String(url).match(/^https?:\/\/[^/]+(?::\d+)?(\/images\/.+)$/i);
-  if (m) return m[1];
+  if (m) {
+    const result = m[1];
+    console.log('🔗 getImageUrl:', originalUrl, '->', result);
+    return result;
+  }
 
   // Если относительный путь — добавляем / если нужно
   if (!/^https?:\/\//i.test(url)) {
-    return url.startsWith('/') ? url : '/' + url;
+    const result = url.startsWith('/') ? url : '/' + url;
+    console.log('🔗 getImageUrl:', originalUrl, '->', result);
+    return result;
   }
 
   // Срежем «плохие» хосты у /images/, включая порт 3000
@@ -133,6 +141,7 @@ window.getImageUrl = function(url) {
    'http://159.89.99.252:3000','http://159.89.99.252:8080']
     .forEach((h) => { if (imageUrl.startsWith(h + '/images/')) imageUrl = imageUrl.replace(h, ''); });
 
+  console.log('🔗 getImageUrl:', originalUrl, '->', imageUrl);
   return imageUrl;
 };
 
