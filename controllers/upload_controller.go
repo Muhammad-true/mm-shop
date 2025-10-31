@@ -95,12 +95,15 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 	if ext == "" {
 		ext = ".jpg" // По умолчанию
 	}
+	
+	// Нормализуем расширение к нижнему регистру для Linux
+	ext = strings.ToLower(ext)
 
 	// Проверяем допустимые расширения
-	allowedExts := []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".JPG", ".JPEG", ".PNG", ".GIF", ".WEBP"}
+	allowedExts := []string{".jpg", ".jpeg", ".png", ".gif", ".webp"}
 	isAllowed := false
 	for _, allowedExt := range allowedExts {
-		if strings.EqualFold(ext, allowedExt) {
+		if ext == allowedExt {
 			isAllowed = true
 			break
 		}
