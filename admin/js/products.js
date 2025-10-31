@@ -760,14 +760,13 @@ async function uploadVariationImages(variationIndex, inputEl) {
     }
 
     // Создаем временный контейнер для превью загрузки
-    // Используем глобальный контейнер вместо локального
     let loadingContainer = document.getElementById(`loading-preview-${variationIndex}`);
     
     if (!loadingContainer) {
         loadingContainer = document.createElement('div');
         loadingContainer.id = `loading-preview-${variationIndex}`;
         loadingContainer.className = 'loading-preview';
-        loadingContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; position: fixed; top: 20px; right: 20px; z-index: 9999; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);';
+        loadingContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; position: fixed; top: 20px; right: 20px; z-index: 9999; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-width: 400px; max-height: 80vh; overflow-y: auto;';
         document.body.appendChild(loadingContainer);
     }
 
@@ -778,15 +777,21 @@ async function uploadVariationImages(variationIndex, inputEl) {
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
-        // Добавляем превью загружаемого файла
+        // Создаем превью файла перед загрузкой
+        const filePreview = URL.createObjectURL(file);
+        
+        // Добавляем превью загружаемого файла с большим размером
         const loadingItem = document.createElement('div');
         loadingItem.className = 'loading-item';
-        loadingItem.style.cssText = 'position: relative; width: 70px; height: 70px; border: 2px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: #f8f9fa;';
+        loadingItem.style.cssText = 'position: relative; width: 120px; height: 120px; border: 2px solid #667eea; border-radius: 8px; overflow: hidden; background: #f8f9fa;';
         loadingItem.innerHTML = `
-            <div style="text-align: center; font-size: 10px; color: #666;">
-                <i class="fas fa-spinner fa-spin" style="font-size: 20px; color: #667eea;"></i>
-                <div style="margin-top: 4px;">${i + 1}/${files.length}</div>
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.9); z-index: 2;">
+                <div style="text-align: center;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: #667eea;"></i>
+                    <div style="margin-top: 8px; font-size: 12px; color: #666; font-weight: bold;">${i + 1}/${files.length}</div>
+                </div>
             </div>
+            <img src="${filePreview}" style="width: 100%; height: 100%; object-fit: cover;" alt="Preview">
         `;
         loadingContainer?.appendChild(loadingItem);
         
@@ -807,39 +812,54 @@ async function uploadVariationImages(variationIndex, inputEl) {
                 uploadedUrls.push(url);
                 successCount++;
                 
-                // Меняем индикатор на успешный
+                // Меняем индикатор на успешный с превью
+                const imageUrl = window.getImageUrl ? window.getImageUrl(url) : url;
                 loadingItem.innerHTML = `
-                    <i class="fas fa-check-circle" style="font-size: 24px; color: #28a745;"></i>
+                    <div style="position: absolute; top: 5px; right: 5px; background: #28a745; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; z-index: 3; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                        <i class="fas fa-check" style="font-size: 12px; color: white;"></i>
+                    </div>
+                    <img src="${imageUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Uploaded" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22%3E%3Crect fill=%22%23f8f9fa%22 width=%22120%22 height=%22120%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%236c757d%22 text-anchor=%22middle%22 dy=%22.3em%22%3EОшибка%3C/text%3E%3C/svg%3E';">
                 `;
                 
-                // Сразу добавляем в вариацию и перерисовываем
+                // Добавляем в вариацию, но не перерисовываем сразу
                 const vars = getVariations();
                 if (!Array.isArray(vars[variationIndex].imageUrls)) vars[variationIndex].imageUrls = [];
                 vars[variationIndex].imageUrls.push(url);
                 setVariations(vars);
-                renderVariations();
+                
+                // Освобождаем память от превью
+                URL.revokeObjectURL(filePreview);
                 
             } else {
                 failCount++;
                 loadingItem.innerHTML = `
-                    <i class="fas fa-times-circle" style="font-size: 24px; color: #dc3545;"></i>
+                    <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(220,53,69,0.1);">
+                        <i class="fas fa-times-circle" style="font-size: 32px; color: #dc3545;"></i>
+                    </div>
                 `;
+                URL.revokeObjectURL(filePreview);
             }
         } catch (e) {
             console.error('upload error', e);
             failCount++;
             loadingItem.innerHTML = `
-                <i class="fas fa-times-circle" style="font-size: 24px; color: #dc3545;"></i>
+                <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(220,53,69,0.1);">
+                    <i class="fas fa-times-circle" style="font-size: 32px; color: #dc3545;"></i>
+                </div>
             `;
+            URL.revokeObjectURL(filePreview);
         }
     }
 
-    // Убираем контейнер загрузки через 2 секунды
+    // Перерисовываем вариации один раз после всех загрузок
+    renderVariations();
+
+    // Убираем контейнер загрузки через 3 секунды (увеличено для лучшей видимости)
     setTimeout(() => {
         if (loadingContainer) {
             loadingContainer.remove();
         }
-    }, 2000);
+    }, 3000);
 
     // Показываем финальное сообщение
     if (window.ui && window.ui.showMessage) {
