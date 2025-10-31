@@ -38,12 +38,20 @@ func (ic *ImageController) FixImageURLs(c *gin.Context) {
 
 				// Проверяем и исправляем каждый URL
 				for j, imageURL := range variation.ImageURLs {
-					if strings.Contains(imageURL, "0.0.0.0") {
-						// Исправляем URL
-						newURL := strings.Replace(imageURL, "0.0.0.0", "localhost", 1)
-						product.Variations[i].ImageURLs[j] = newURL
-						fixedCount++
-						log.Printf("🔧 Исправлен URL: %s -> %s", imageURL, newURL)
+					if imageURL != "" {
+						// Если абсолютный URL на /images/ — делаем относительным
+						if strings.HasPrefix(imageURL, "http://") || strings.HasPrefix(imageURL, "https://") {
+							if strings.Contains(imageURL, "/images/") {
+								// Извлекаем путь /images/... из абсолютного URL
+								parts := strings.Split(imageURL, "/images/")
+								if len(parts) > 1 {
+									newURL := "/images/" + parts[1]
+									product.Variations[i].ImageURLs[j] = newURL
+									fixedCount++
+									log.Printf("🔧 Исправлен URL: %s -> %s", imageURL, newURL)
+								}
+							}
+						}
 					}
 				}
 			}
