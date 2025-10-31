@@ -11,8 +11,16 @@ git checkout .
 # Обновляем код
 git pull origin main
 
-# Пересобираем контейнеры
-docker compose -f docker-compose.release.yml up -d --build api admin
+# ОСТАНОВКА и удаление контейнеров для чистого билда
+docker compose -f docker-compose.release.yml stop api admin
+docker compose -f docker-compose.release.yml rm -f api admin
+
+# Удаляем старые образы
+docker rmi release-api release-admin 2>/dev/null || true
+
+# ПЕРЕСБОРКА без кэша и запуск
+docker compose -f docker-compose.release.yml build --no-cache api admin
+docker compose -f docker-compose.release.yml up -d api admin
 ```
 
 ## Проверка:
@@ -24,5 +32,5 @@ docker logs mm-api-prod --tail 50 -f
 
 ## Версия:
 
-**1.2.3** - Fixed image URLs to use relative paths
+**1.2.6** - Fixed dashboard array checks and image URLs
 
