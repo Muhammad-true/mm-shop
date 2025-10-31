@@ -32,5 +32,5 @@ docker logs mm-api-prod --tail 50 -f
 
 ## Версия:
 
-**1.2.6** - Fixed dashboard array checks and image URLs
+**1.2.7** - Fixed Docker WORKDIR to match volume mount path
 
