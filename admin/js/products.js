@@ -919,6 +919,9 @@ async function handleProductSubmit(e) {
     
     console.log('📝 Отправка формы товара...');
     
+    // Синхронизируем размеры из DOM перед сохранением
+    syncVariationsFromDOM();
+    
     try {
         const formData = {
             name: document.getElementById('product-name').value,
@@ -930,6 +933,7 @@ async function handleProductSubmit(e) {
         };
         
         console.log('📦 Данные формы:', formData);
+        console.log('📦 Вариации с размерами:', formData.variations.map(v => ({ sizes: v.sizes, colors: v.colors })));
         
         // Проверка: обязательно наличие хотя бы одной вариации
         if (!formData.variations || formData.variations.length === 0) {
@@ -1034,8 +1038,40 @@ function changeSizeType(variationIndex, sizeType) {
     }
     
     container.innerHTML = sizesHTML;
+    
+    // Обновляем размеры в хранилище после смены типа
+    // Извлекаем размеры из новых чекбоксов (которые могут быть отмечены, если были совпадения)
+    setTimeout(() => {
+        updateVariationSize(variationIndex);
+    }, 0);
+    
     console.log(`✅ Тип размеров изменен на: ${sizeType} для вариации ${variationIndex}`);
     console.log(`📊 Новые размеры:`, sizeType === 'shoes' ? '36-46' : sizeType === 'pants' ? '28-40' : 'XS-XXL');
+}
+
+// Синхронизация всех вариаций из DOM в хранилище
+function syncVariationsFromDOM() {
+    const vars = getVariations();
+    let updated = false;
+    
+    for (let i = 0; i < vars.length; i++) {
+        const container = document.getElementById(`sizes-container-${i}`);
+        if (container) {
+            const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+            const selectedSizes = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (JSON.stringify(vars[i].sizes) !== JSON.stringify(selectedSizes)) {
+                vars[i].sizes = selectedSizes;
+                updated = true;
+                console.log(`🔄 Синхронизированы размеры для вариации ${i}:`, selectedSizes);
+            }
+        }
+    }
+    
+    if (updated) {
+        setVariations(vars);
+        console.log('✅ Все вариации синхронизированы из DOM');
+    }
 }
 
 // Функция для обновления размеров вариации
@@ -1046,10 +1082,17 @@ function updateVariationSize(variationIndex) {
     const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
     const selectedSizes = Array.from(checkboxes).map(cb => cb.value);
     
-    // Обновляем в глобальном объекте
+    // Обновляем в хранилище (важно!)
+    const vars = getVariations();
+    if (vars[variationIndex]) {
+        vars[variationIndex].sizes = selectedSizes;
+        setVariations(vars);
+        console.log(`✅ Размеры обновлены для вариации ${variationIndex}:`, selectedSizes);
+    }
+    
+    // Также обновляем в глобальном объекте для совместимости
     if (currentProduct && currentProduct.variations && currentProduct.variations[variationIndex]) {
         currentProduct.variations[variationIndex].sizes = selectedSizes;
-        console.log(`✅ Размеры обновлены для вариации ${variationIndex}:`, selectedSizes);
     }
 }
 
