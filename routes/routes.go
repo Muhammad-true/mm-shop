@@ -313,7 +313,7 @@ func SetupRoutes() *gin.Engine {
 		c.JSON(200, gin.H{
 			"status":  "ok",
 			"message": "MM API is running",
-			"version": "1.3.2",
+			"version": "1.3.3",
 		})
 	}
 	r.GET("/health", healthHandler)
@@ -321,10 +321,10 @@ func SetupRoutes() *gin.Engine {
 
 	r.GET("/version", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"version": "1.3.2",
+			"version": "1.3.3",
 			"name":    "MM API",
 			"build":   "development",
-			"changes": "Added FCM integration for push notifications, auto-send push on login for unread notifications, deep linking support",
+			"changes": "Added automatic FCM token registration for web admin panel, Service Worker for push notifications",
 		})
 	})
 

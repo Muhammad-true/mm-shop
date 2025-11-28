@@ -63,6 +63,10 @@ async function handleLogin(e) {
                 if (window.app && window.app.loadInitialData) {
                     window.app.loadInitialData(role);
                 }
+                // Регистрируем FCM токен для push-уведомлений
+                if (window.fcm && window.fcm.checkAndRegisterFCMToken) {
+                    window.fcm.checkAndRegisterFCMToken();
+                }
             }, 100);
             
             const roleText = (role === 'super_admin' || role === 'admin') ? 'админ панель' : 'панель управления магазином';
