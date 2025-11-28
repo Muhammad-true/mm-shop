@@ -45,6 +45,19 @@ async function loadDashboard(userRole = null) {
         let products = { data: [] };
         let users = { data: { users: [] } };
         let orders = { data: { orders: [] } };
+        let subscribers = { data: { subscribers: [] } };
+        let shopId = null;
+        
+        // Получаем ID магазина для shop_owner
+        if (roleName === 'shop_owner') {
+            try {
+                const profile = await window.api.fetchData('/api/v1/users/profile');
+                shopId = profile?.data?.id || profile?.id;
+                console.log('🏪 ID магазина:', shopId);
+            } catch (error) {
+                console.warn('⚠️ Ошибка получения профиля:', error.message);
+            }
+        }
         
         try {
             let productsEndpoint = CONFIG.API.ENDPOINTS.PRODUCTS.LIST;
@@ -66,12 +79,13 @@ async function loadDashboard(userRole = null) {
             if (roleName === 'super_admin' || roleName === 'admin') {
                 users = await window.api.fetchData(CONFIG.API.ENDPOINTS.USERS.LIST);
                 console.log('✅ Пользователи загружены:', users.data?.users?.length || 0);
-            } else if (roleName === 'shop_owner') {
-                users = await window.api.fetchData('/api/v1/shop/customers/');
-                console.log('✅ Клиенты загружены:', users.data?.customers?.length || 0);
+            } else if (roleName === 'shop_owner' && shopId) {
+                // Загружаем подписчиков для магазина
+                subscribers = await window.api.fetchData(`/api/v1/shops/${shopId}/subscribers`);
+                console.log('✅ Подписчики загружены:', subscribers.data?.subscribers?.length || 0);
             }
         } catch (error) {
-            console.warn('⚠️ Ошибка загрузки пользователей/клиентов:', error.message);
+            console.warn('⚠️ Ошибка загрузки пользователей/подписчиков:', error.message);
         }
         
         try {
@@ -92,33 +106,59 @@ async function loadDashboard(userRole = null) {
         const usersList = (roleName === 'super_admin' || roleName === 'admin') 
             ? (Array.isArray(users?.data?.users) ? users.data.users 
                 : Array.isArray(users?.users) ? users.users : [])
-            : (Array.isArray(users?.data?.customers) ? users.data.customers 
-                : Array.isArray(users?.customers) ? users.customers : []);
+            : [];
+        const subscribersList = (roleName === 'shop_owner')
+            ? (Array.isArray(subscribers?.data?.subscribers) ? subscribers.data.subscribers : [])
+            : [];
         const ordersList = Array.isArray(orders?.data?.orders) ? orders.data.orders 
             : Array.isArray(orders?.orders) ? orders.orders 
             : Array.isArray(orders?.data) ? orders.data : [];
         
         const totalProducts = productsList.length;
-        const totalUsers = usersList.length;
+        const totalUsers = roleName === 'shop_owner' ? subscribersList.length : usersList.length;
         const totalOrders = ordersList.length;
-        const revenue = Array.isArray(ordersList) ? ordersList.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0 : 0;
+        
+        // Доход считаем только из завершенных заказов
+        const completedOrders = ordersList.filter(order => {
+            const status = (order.status || '').toLowerCase();
+            return status === 'completed' || status === 'завершен';
+        });
+        const revenue = completedOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
         
         console.log('📊 Итоговые данные:', { 
             products: totalProducts, 
             users: totalUsers, 
             orders: totalOrders, 
             revenue,
-            ordersList: ordersList.slice(0, 5)
+            completedOrders: completedOrders.length
         });
         
         console.log('🎯 Обновляем счетчики:', { products: totalProducts, users: totalUsers, orders: totalOrders, revenue });
+        
+        // Обновляем UI для shop_owner
+        if (roleName === 'shop_owner') {
+            const usersLabel = document.querySelector('#total-users').parentElement.querySelector('p');
+            if (usersLabel) {
+                usersLabel.textContent = 'Подписчики';
+            }
+        }
         
         animateCounter('total-products', totalProducts);
         animateCounter('total-users', totalUsers);
         animateCounter('total-orders', totalOrders);
         animateRevenue('total-revenue', revenue);
         
-        displayRecentOrders(ordersList.slice(0, 5));
+        // Скрываем список последних заказов для shop_owner
+        const recentSection = document.querySelector('.recent-section');
+        if (roleName === 'shop_owner' && recentSection) {
+            recentSection.style.display = 'none';
+        } else if (recentSection) {
+            recentSection.style.display = 'block';
+            displayRecentOrders(ordersList.slice(0, 5));
+        }
+        
+        // Делаем карточки кликабельными
+        setupDashboardCards(roleName);
         
         console.log('✅ Дашборд загружен успешно');
         
@@ -297,12 +337,76 @@ function displayRecentOrders(orders) {
     container.innerHTML = table;
 }
 
+// Настройка кликабельных карточек дашборда
+function setupDashboardCards(roleName) {
+    const productsCard = document.querySelector('.stat-card:nth-child(1)');
+    const usersCard = document.querySelector('.stat-card:nth-child(2)');
+    const ordersCard = document.querySelector('.stat-card:nth-child(3)');
+    const revenueCard = document.querySelector('.stat-card:nth-child(4)');
+    
+    if (productsCard) {
+        productsCard.style.cursor = 'pointer';
+        productsCard.addEventListener('click', () => {
+            const productsTab = document.querySelector('[onclick*="showTab"]');
+            if (productsTab) {
+                const event = new Event('click');
+                document.querySelector('[onclick*="products"]')?.dispatchEvent(event);
+            } else {
+                // Альтернативный способ перехода
+                window.location.hash = '#products';
+                if (window.products && window.products.loadProducts) {
+                    window.products.loadProducts();
+                }
+            }
+        });
+    }
+    
+    if (usersCard && roleName === 'shop_owner') {
+        usersCard.style.cursor = 'pointer';
+        usersCard.addEventListener('click', () => {
+            // Для shop_owner можно перейти на страницу подписчиков или клиентов
+            console.log('Переход к подписчикам');
+        });
+    }
+    
+    if (ordersCard) {
+        ordersCard.style.cursor = 'pointer';
+        ordersCard.addEventListener('click', () => {
+            const ordersTab = document.querySelector('[onclick*="orders"]');
+            if (ordersTab) {
+                ordersTab.click();
+            } else {
+                window.location.hash = '#orders';
+                if (window.orders && window.orders.loadOrders) {
+                    window.orders.loadOrders();
+                }
+            }
+        });
+    }
+    
+    if (revenueCard) {
+        revenueCard.style.cursor = 'pointer';
+        revenueCard.addEventListener('click', () => {
+            const ordersTab = document.querySelector('[onclick*="orders"]');
+            if (ordersTab) {
+                ordersTab.click();
+            } else {
+                window.location.hash = '#orders';
+                if (window.orders && window.orders.loadOrders) {
+                    window.orders.loadOrders();
+                }
+            }
+        });
+    }
+}
+
 // Экспорт
 window.dashboard = {
     loadDashboard,
     displayRecentOrders,
     animateCounter,
-    animateRevenue
+    animateRevenue,
+    setupDashboardCards
 };
 
 

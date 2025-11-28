@@ -280,11 +280,14 @@ body {
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     display: flex;
     align-items: center;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
 }
 
 .stat-card:hover {
     transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
 }
 
 .stat-icon {
@@ -1985,7 +1988,7 @@ code {
 }
 
 .data-table tbody tr:hover td {
-    color: white;
+    color: #333; /* Темный текст для читаемости */
 }
 
 /* Бейджи ролей */
@@ -2228,6 +2231,11 @@ code {
 .data-table tbody tr.active {
     box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
     border: 2px solid #667eea;
+    background-color: #f0f4ff !important; /* Светло-синий фон вместо белого текста */
+}
+
+.data-table tbody tr.active td {
+    color: #333 !important; /* Темный текст для читаемости */
 }
 
 /* Стили для статуса пользователя */
