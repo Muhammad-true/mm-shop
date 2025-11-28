@@ -190,13 +190,12 @@ func (p *Product) ToResponse() ProductResponse {
 		ownerResponse := p.Owner.ToResponse()
 		response.Owner = &ownerResponse
 		
-		// Добавляем информацию о магазине (имя и ИНН) если владелец - магазин
-		if p.Owner.Role != nil && p.Owner.Role.Name == "shop_owner" {
-			response.Shop = &ShopInfo{
-				ID:   p.Owner.ID,
-				Name: p.Owner.Name,
-				INN:  p.Owner.INN,
-			}
+		// Добавляем информацию о магазине (id, имя и ИНН) всегда, если есть владелец
+		// Это позволяет пользователю видеть магазин и перейти к нему
+		response.Shop = &ShopInfo{
+			ID:   p.Owner.ID,
+			Name: p.Owner.Name,
+			INN:  p.Owner.INN,
 		}
 	}
 
