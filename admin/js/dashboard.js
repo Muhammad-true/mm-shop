@@ -247,7 +247,7 @@ function displayRecentOrders(orders) {
     }
     
     const table = `
-        <table>
+        <table class="data-table">
             <thead>
                 <tr>
                     <th><i class="fas fa-hashtag"></i> ID</th>
@@ -260,30 +260,30 @@ function displayRecentOrders(orders) {
             </thead>
             <tbody>
                 ${orders.map(order => `
-                    <tr>
-                        <td><code>${order.id?.substring(0, 8)}...</code></td>
-                        <td>
+                    <tr data-order-id="${order.id}">
+                        <td data-label="ID"><code>${order.id?.substring(0, 8)}...</code></td>
+                        <td data-label="Пользователь">
                             <div class="user-info">
                                 <i class="fas fa-user-circle"></i>
                                 <span>${order.user_id?.substring(0, 8)}...</span>
                             </div>
                         </td>
-                        <td>
+                        <td data-label="Статус">
                             <span class="status-badge ${getStatusClass(order.status)}">
                                 <i class="fas ${getStatusIcon(order.status)}"></i>
                                 ${order.status || 'Новый'}
                             </span>
                         </td>
-                        <td class="amount">
+                        <td data-label="Сумма" class="amount">
                             <strong>₽${(order.total_amount || 0).toLocaleString()}</strong>
                         </td>
-                        <td>
+                        <td data-label="Дата">
                             <div class="date-info">
                                 <div class="date">${new Date(order.created_at).toLocaleDateString()}</div>
                                 <div class="time">${new Date(order.created_at).toLocaleTimeString()}</div>
                             </div>
                         </td>
-                        <td>
+                        <td data-label="Действия">
                             <button class="action-btn view" onclick="window.orders && window.orders.viewOrderDetails ? window.orders.viewOrderDetails('${order.id}') : (typeof viewOrderDetails === 'function' ? viewOrderDetails('${order.id}') : alert('Функция просмотра недоступна'))" title="Просмотр">
                                 <i class="fas fa-eye"></i>
                             </button>

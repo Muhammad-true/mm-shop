@@ -115,8 +115,10 @@ function displayOrders(orders, pagination = {}, stats = {}) {
     };
     
     const table = `
-        <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
-            <table class="data-table">
+        <div class="table-container">
+            <h3><i class="fas fa-shopping-cart"></i> Список заказов</h3>
+            <div class="table-responsive">
+                <table class="data-table">
                 <thead>
                     <tr>
                         <th>№ Заказа</th>
@@ -176,7 +178,8 @@ function displayOrders(orders, pagination = {}, stats = {}) {
                         </tr>
                     `).join('')}
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
         ${pagination.totalPages > 1 ? createPagination(pagination) : ''}
     `;
