@@ -722,6 +722,9 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 
 	log.Printf("✅ Заказ успешно загружен с %d позициями", len(orderItems))
 
+	// Создаем уведомления для владельцев магазинов
+	go oc.notifyShopOwnersAboutNewOrder(createdOrder, orderItems)
+
 	c.JSON(http.StatusOK, models.StandardResponse{
 		Success: true,
 		Data:    createdOrder.ToResponse(),
