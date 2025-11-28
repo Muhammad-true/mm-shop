@@ -282,6 +282,28 @@ function setupUIFeatures() {
     }
 }
 
+// Обработка deep links из push-уведомлений
+function handleDeepLink() {
+    const hash = window.location.hash;
+    if (hash && hash.includes('?')) {
+        const [tabName, params] = hash.substring(1).split('?');
+        const urlParams = new URLSearchParams(params);
+        const orderId = urlParams.get('orderId');
+        
+        // Переключаемся на нужную вкладку
+        if (tabName && window.navigation && window.navigation.showTab) {
+            window.navigation.showTab(tabName);
+        }
+        
+        // Если есть orderId, открываем детали заказа
+        if (orderId && tabName === 'orders' && window.orders && window.orders.viewOrderDetails) {
+            setTimeout(() => {
+                window.orders.viewOrderDetails(orderId);
+            }, 1500); // Задержка для загрузки списка заказов
+        }
+    }
+}
+
 // Функции для обратной совместимости
 window.allProducts = [];
 window.filterProducts = filterProducts;

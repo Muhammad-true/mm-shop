@@ -118,7 +118,23 @@ function showTab(tabName, userRole = 'admin') {
                     }
                     break;
                 case 'orders':
-                    if (typeof loadOrders === 'function') loadOrders(1, {});
+                    if (typeof loadOrders === 'function') {
+                        // Проверяем наличие параметра orderId в hash (deep link)
+                        const hash = window.location.hash;
+                        if (hash.includes('?')) {
+                            const params = new URLSearchParams(hash.split('?')[1]);
+                            const orderId = params.get('orderId');
+                            loadOrders(1, {});
+                            // Если есть orderId, открываем детали заказа
+                            if (orderId && window.orders && window.orders.viewOrderDetails) {
+                                setTimeout(() => {
+                                    window.orders.viewOrderDetails(orderId);
+                                }, 1000);
+                            }
+                        } else {
+                            loadOrders(1, {});
+                        }
+                    }
                     break;
                 case 'settings':
                     if (typeof loadSettings === 'function') loadSettings();
