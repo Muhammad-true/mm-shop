@@ -145,6 +145,7 @@ func runMigrations() error {
 		&models.Notification{},
 		&models.UserSettings{},
 		&models.ShopSubscription{},
+		&models.DeviceToken{},
 	)
 }
 

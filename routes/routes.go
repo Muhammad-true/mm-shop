@@ -34,6 +34,7 @@ func SetupRoutes() *gin.Engine {
 	imageController := &controllers.ImageController{}
 	debugController := &controllers.DebugController{}
 	shopController := &controllers.ShopController{}
+	deviceTokenController := &controllers.DeviceTokenController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -160,6 +161,14 @@ func SetupRoutes() *gin.Engine {
 			notifications.PUT("/read-all", notificationController.MarkAllAsRead)
 			notifications.DELETE("/:id", notificationController.DeleteNotification)
 			notifications.GET("/unread-count", notificationController.GetUnreadCount)
+		}
+
+		// Токены устройств для push-уведомлений
+		deviceTokens := protected.Group("device-tokens")
+		{
+			deviceTokens.POST("/", deviceTokenController.RegisterDeviceToken)
+			deviceTokens.DELETE("/:token", deviceTokenController.UnregisterDeviceToken)
+			deviceTokens.GET("/", deviceTokenController.GetUserDeviceTokens)
 		}
 
 		// Настройки

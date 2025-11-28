@@ -160,6 +160,9 @@ async function loadDashboard(userRole = null) {
         // Делаем карточки кликабельными
         setupDashboardCards(roleName);
         
+        // Загружаем уведомления
+        await loadNotifications();
+        
         console.log('✅ Дашборд загружен успешно');
         
     } catch (error) {
@@ -400,13 +403,193 @@ function setupDashboardCards(roleName) {
     }
 }
 
+// Загрузка уведомлений
+async function loadNotifications() {
+    try {
+        const notifications = await window.api.fetchData('/api/v1/notifications/?limit=10&isRead=false');
+        const unreadCount = await window.api.fetchData('/api/v1/notifications/unread-count');
+        
+        const notificationsList = Array.isArray(notifications?.data) ? notifications.data 
+            : Array.isArray(notifications?.notifications) ? notifications.notifications : [];
+        const count = unreadCount?.data?.unreadCount || unreadCount?.unreadCount || 0;
+        
+        displayNotifications(notificationsList);
+        updateUnreadCountBadge(count);
+    } catch (error) {
+        console.warn('⚠️ Ошибка загрузки уведомлений:', error.message);
+        const container = document.getElementById('notifications-list');
+        if (container) {
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:#777;">Ошибка загрузки уведомлений</p>';
+        }
+    }
+}
+
+// Отображение уведомлений
+function displayNotifications(notifications) {
+    const container = document.getElementById('notifications-list');
+    if (!container) return;
+    
+    if (notifications.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-bell-slash"></i>
+                <p>Нет непрочитанных уведомлений</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const notificationsHTML = notifications.map(notif => {
+        const date = new Date(notif.timestamp || notif.createdAt);
+        const typeIcon = {
+            'order': 'fa-shopping-cart',
+            'promotion': 'fa-tag',
+            'system': 'fa-info-circle',
+            'reminder': 'fa-clock'
+        }[notif.type] || 'fa-bell';
+        
+        const typeColor = {
+            'order': '#667eea',
+            'promotion': '#f5576c',
+            'system': '#4ecdc4',
+            'reminder': '#ffa726'
+        }[notif.type] || '#666';
+        
+        return `
+            <div class="notification-item" style="
+                background: white;
+                border-radius: 10px;
+                padding: 15px;
+                margin-bottom: 10px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                cursor: pointer;
+                transition: all 0.3s ease;
+                border-left: 4px solid ${typeColor};
+            " onclick="window.dashboard && window.dashboard.openNotification('${notif.id}', '${notif.actionUrl || ''}')">
+                <div style="display: flex; align-items: start; gap: 15px;">
+                    <div style="
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        background: ${typeColor};
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-size: 18px;
+                        flex-shrink: 0;
+                    ">
+                        <i class="fas ${typeIcon}"></i>
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: #333; margin-bottom: 5px; font-size: 14px;">
+                            ${notif.title || 'Уведомление'}
+                        </div>
+                        <div style="color: #666; font-size: 13px; margin-bottom: 8px;">
+                            ${notif.body || ''}
+                        </div>
+                        <div style="color: #999; font-size: 11px;">
+                            ${date.toLocaleString('ru-RU')}
+                        </div>
+                    </div>
+                    ${!notif.isRead ? `
+                        <div style="
+                            width: 10px;
+                            height: 10px;
+                            border-radius: 50%;
+                            background: #ff6b6b;
+                            flex-shrink: 0;
+                            margin-top: 5px;
+                        "></div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = notificationsHTML;
+    
+    // Добавляем hover эффект
+    const items = container.querySelectorAll('.notification-item');
+    items.forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateX(5px)';
+            this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        });
+        item.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateX(0)';
+            this.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        });
+    });
+}
+
+// Обновление бейджа непрочитанных
+function updateUnreadCountBadge(count) {
+    const badge = document.getElementById('unread-count-badge');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+// Открытие уведомления
+async function openNotification(notificationId, actionUrl) {
+    try {
+        // Отмечаем как прочитанное
+        await window.api.fetchData(`/api/v1/notifications/${notificationId}/read`, {
+            method: 'PUT'
+        });
+        
+        // Перезагружаем уведомления
+        await loadNotifications();
+        
+        // Если есть actionUrl, переходим по нему
+        if (actionUrl) {
+            // Можно открыть в новой вкладке или перейти на страницу
+            window.location.href = actionUrl;
+        }
+    } catch (error) {
+        console.error('❌ Ошибка открытия уведомления:', error);
+    }
+}
+
+// Отметить все уведомления как прочитанные
+async function markAllNotificationsRead() {
+    try {
+        await window.api.fetchData('/api/v1/notifications/read-all', {
+            method: 'PUT'
+        });
+        
+        // Перезагружаем уведомления
+        await loadNotifications();
+        
+        if (window.ui && window.ui.showMessage) {
+            window.ui.showMessage('Все уведомления отмечены как прочитанные', 'success');
+        }
+    } catch (error) {
+        console.error('❌ Ошибка отметки уведомлений:', error);
+        if (window.ui && window.ui.showMessage) {
+            window.ui.showMessage('Ошибка при отметке уведомлений', 'error');
+        }
+    }
+}
+
 // Экспорт
 window.dashboard = {
     loadDashboard,
     displayRecentOrders,
     animateCounter,
     animateRevenue,
-    setupDashboardCards
+    setupDashboardCards,
+    loadNotifications,
+    displayNotifications,
+    updateUnreadCountBadge,
+    openNotification,
+    markAllNotificationsRead
 };
 
 

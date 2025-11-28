@@ -238,7 +238,7 @@ func (oc *OrderController) notifyShopOwnersAboutNewOrder(order models.Order, ord
 			continue
 		}
 
-		// Создаем уведомление
+		// Создаем уведомление в БД
 		notification := models.Notification{
 			UserID:    shopOwnerID,
 			Title:     "Новый заказ",
@@ -251,8 +251,41 @@ func (oc *OrderController) notifyShopOwnersAboutNewOrder(order models.Order, ord
 			log.Printf("❌ Ошибка создания уведомления для владельца магазина %s: %v", shopOwnerID, err)
 		} else {
 			log.Printf("✅ Уведомление создано для владельца магазина %s о заказе %s", shopOwnerID, order.ID)
+			
+			// Отправляем push-уведомление на все активные устройства пользователя
+			go oc.sendPushNotification(shopOwnerID, notification.Title, notification.Body, notification.ActionURL)
 		}
 	}
+}
+
+// sendPushNotification отправляет push-уведомление на все активные устройства пользователя
+func (oc *OrderController) sendPushNotification(userID uuid.UUID, title, body, actionURL string) {
+	// Получаем все активные токены устройств пользователя
+	var deviceTokens []models.DeviceToken
+	if err := database.DB.Where("user_id = ? AND is_active = ?", userID, true).Find(&deviceTokens).Error; err != nil {
+		log.Printf("⚠️ Ошибка получения токенов устройств для пользователя %s: %v", userID, err)
+		return
+	}
+
+	if len(deviceTokens) == 0 {
+		log.Printf("ℹ️ Нет активных токенов устройств для пользователя %s", userID)
+		return
+	}
+
+	// Здесь можно добавить отправку через FCM/APNS
+	// Пока просто логируем
+	log.Printf("📱 Отправка push-уведомления на %d устройств пользователя %s: %s - %s", 
+		len(deviceTokens), userID, title, body)
+	
+	// TODO: Реализовать отправку через FCM для Android/Web и APNS для iOS
+	// Пример для FCM:
+	// for _, token := range deviceTokens {
+	//     if token.Platform == "android" || token.Platform == "web" {
+	//         // Отправка через FCM
+	//     } else if token.Platform == "ios" {
+	//         // Отправка через APNS
+	//     }
+	// }
 }
 
 // GetMyOrders - список заказов текущего пользователя
