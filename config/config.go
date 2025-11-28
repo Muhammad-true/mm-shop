@@ -51,6 +51,9 @@ type Config struct {
 	// Redis
 	RedisURL string
 
+	// FCM (Firebase Cloud Messaging) для push-уведомлений
+	FCMServerKey string
+
 	// Мониторинг
 	EnableMetrics bool
 	MetricsPort   string
@@ -115,6 +118,9 @@ func Load() *Config {
 
 		// Redis
 		RedisURL: getEnv("REDIS_URL", "redis://localhost:6379"),
+
+		// FCM (Firebase Cloud Messaging) для push-уведомлений
+		FCMServerKey: getEnv("FCM_SERVER_KEY", ""),
 
 		// Мониторинг
 		EnableMetrics: getBoolEnv("ENABLE_METRICS", true),

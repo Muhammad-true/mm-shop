@@ -8,6 +8,7 @@ import (
 	"github.com/mm-api/mm-api/config"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/routes"
+	"github.com/mm-api/mm-api/services"
 )
 
 func main() {
@@ -39,6 +40,14 @@ func main() {
 		log.Fatal("❌ Failed to connect to database:", err)
 	}
 	log.Println("✅ Database connected successfully")
+
+	// Инициализация FCM сервиса для push-уведомлений
+	if cfg.FCMServerKey != "" {
+		services.InitFCMService(cfg.FCMServerKey)
+		log.Println("✅ FCM Service initialized")
+	} else {
+		log.Println("⚠️ FCM Server Key not configured, push notifications will be disabled")
+	}
 
 	// Настройка маршрутов
 	log.Println("🛣️  Setting up routes...")

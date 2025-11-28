@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
+	"github.com/mm-api/mm-api/services"
 	"gorm.io/gorm"
 )
 
@@ -239,12 +240,14 @@ func (oc *OrderController) notifyShopOwnersAboutNewOrder(order models.Order, ord
 		}
 
 		// Создаем уведомление в БД
+		// ActionURL будет работать как deep link - при клике откроется страница заказа
+		// Если токен истек, пользователь будет перенаправлен на логин
 		notification := models.Notification{
 			UserID:    shopOwnerID,
 			Title:     "Новый заказ",
 			Body:      fmt.Sprintf("Получен новый заказ №%s на сумму ₽%.2f", order.ID.String()[:8], order.TotalAmount),
 			Type:      models.NotificationTypeOrder,
-			ActionURL: fmt.Sprintf("/admin/orders/%s", order.ID.String()),
+			ActionURL: fmt.Sprintf("/admin#orders?orderId=%s", order.ID.String()), // Deep link с параметром
 		}
 
 		if err := database.DB.Create(&notification).Error; err != nil {
@@ -272,20 +275,31 @@ func (oc *OrderController) sendPushNotification(userID uuid.UUID, title, body, a
 		return
 	}
 
-	// Здесь можно добавить отправку через FCM/APNS
-	// Пока просто логируем
-	log.Printf("📱 Отправка push-уведомления на %d устройств пользователя %s: %s - %s", 
-		len(deviceTokens), userID, title, body)
-	
-	// TODO: Реализовать отправку через FCM для Android/Web и APNS для iOS
-	// Пример для FCM:
-	// for _, token := range deviceTokens {
-	//     if token.Platform == "android" || token.Platform == "web" {
-	//         // Отправка через FCM
-	//     } else if token.Platform == "ios" {
-	//         // Отправка через APNS
-	//     }
-	// }
+	// Группируем токены по платформам
+	var fcmTokens []string
+	for _, token := range deviceTokens {
+		// FCM работает для Android, Web и iOS (через FCM)
+		if token.Platform == "android" || token.Platform == "web" || token.Platform == "ios" {
+			fcmTokens = append(fcmTokens, token.Token)
+		}
+	}
+
+	if len(fcmTokens) == 0 {
+		log.Printf("ℹ️ Нет FCM токенов для отправки push-уведомления пользователю %s", userID)
+		return
+	}
+
+	// Отправляем через FCM
+	fcmService := services.GetFCMService()
+	if fcmService != nil {
+		if err := fcmService.SendPushNotificationToMultiple(fcmTokens, title, body, actionURL); err != nil {
+			log.Printf("❌ Ошибка отправки push-уведомления: %v", err)
+		} else {
+			log.Printf("✅ Push-уведомление отправлено на %d устройств пользователя %s", len(fcmTokens), userID)
+		}
+	} else {
+		log.Printf("⚠️ FCM Service не инициализирован, push-уведомление не отправлено")
+	}
 }
 
 // GetMyOrders - список заказов текущего пользователя

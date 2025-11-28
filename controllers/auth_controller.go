@@ -1,12 +1,15 @@
 package controllers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
+	"github.com/mm-api/mm-api/services"
 	"github.com/mm-api/mm-api/utils"
 	"gorm.io/gorm"
 )
@@ -260,6 +263,9 @@ func (ac *AuthController) Login(c *gin.Context) {
 		RefreshToken: token, // TODO: Реализовать отдельные refresh токены
 	}
 
+	// Отправляем push-уведомления о непрочитанных уведомлениях при входе
+	go sendUnreadNotificationsPush(user.ID)
+
 	c.JSON(http.StatusOK, models.SuccessResponse(
 		authResponse,
 		"Login successful",
@@ -492,4 +498,58 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 		"status":  "pending",
 		"message": "If this phone exists, a reset code was sent",
 	}))
+}
+
+// sendUnreadNotificationsPush отправляет push-уведомления о непрочитанных уведомлениях при входе
+func sendUnreadNotificationsPush(userID uuid.UUID) {
+	// Получаем все непрочитанные уведомления пользователя
+	var unreadNotifications []models.Notification
+	if err := database.DB.Where("user_id = ? AND is_read = ?", userID, false).
+		Order("timestamp DESC").
+		Limit(5). // Отправляем только последние 5 непрочитанных
+		Find(&unreadNotifications).Error; err != nil {
+		log.Printf("⚠️ Ошибка получения непрочитанных уведомлений для пользователя %s: %v", userID, err)
+		return
+	}
+
+	if len(unreadNotifications) == 0 {
+		return // Нет непрочитанных уведомлений
+	}
+
+	// Получаем все активные токены устройств пользователя
+	var deviceTokens []models.DeviceToken
+	if err := database.DB.Where("user_id = ? AND is_active = ?", userID, true).Find(&deviceTokens).Error; err != nil {
+		log.Printf("⚠️ Ошибка получения токенов устройств для пользователя %s: %v", userID, err)
+		return
+	}
+
+	if len(deviceTokens) == 0 {
+		return // Нет активных токенов
+	}
+
+	// Группируем токены по платформам
+	var fcmTokens []string
+	for _, token := range deviceTokens {
+		if token.Platform == "android" || token.Platform == "web" || token.Platform == "ios" {
+			fcmTokens = append(fcmTokens, token.Token)
+		}
+	}
+
+	if len(fcmTokens) == 0 {
+		return
+	}
+
+	// Отправляем push-уведомление о непрочитанных уведомлениях
+	fcmService := services.GetFCMService()
+	if fcmService != nil {
+		title := "У вас есть непрочитанные уведомления"
+		body := fmt.Sprintf("У вас %d непрочитанных уведомлений", len(unreadNotifications))
+		actionURL := "/admin#dashboard" // Переход на дашборд с уведомлениями
+
+		if err := fcmService.SendPushNotificationToMultiple(fcmTokens, title, body, actionURL); err != nil {
+			log.Printf("❌ Ошибка отправки push-уведомления о непрочитанных уведомлениях: %v", err)
+		} else {
+			log.Printf("✅ Push-уведомление о непрочитанных уведомлениях отправлено пользователю %s", userID)
+		}
+	}
 }
