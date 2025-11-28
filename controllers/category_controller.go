@@ -98,6 +98,11 @@ func (cc *CategoryController) GetCategoryProducts(c *gin.Context) {
 	var products []models.Product
 	query := database.DB.Model(&models.Product{}).Where("category_id = ?", categoryID)
 
+	// Фильтрация по полу (gender) - для раздела "Детям": male, female, unisex
+	if gender := c.Query("gender"); gender != "" {
+		query = query.Where("gender = ?", gender)
+	}
+
 	// Фильтрация по доступности
 	if inStock := c.Query("in_stock"); inStock == "true" {
 		query = query.Where("is_available = ?", true)

@@ -38,6 +38,11 @@ func (pc *ProductController) GetProducts(c *gin.Context) {
 		query = query.Where("category = ?", category)
 	}
 
+	// Фильтрация по полу (gender) - для раздела "Детям": male, female, unisex
+	if gender := c.Query("gender"); gender != "" {
+		query = query.Where("gender = ?", gender)
+	}
+
 	// Фильтрация по наличию на складе
 	if inStock := c.Query("in_stock"); inStock == "true" {
 		query = query.Where("in_stock = ?", true)
@@ -427,6 +432,11 @@ func (pc *ProductController) GetAllProducts(c *gin.Context) {
 	// Фильтрация по категории
 	if category := c.Query("category"); category != "" {
 		query = query.Where("category = ?", category)
+	}
+
+	// Фильтрация по полу (gender) - для раздела "Детям": male, female, unisex
+	if gender := c.Query("gender"); gender != "" {
+		query = query.Where("gender = ?", gender)
 	}
 
 	// Фильтрация по наличию на складе

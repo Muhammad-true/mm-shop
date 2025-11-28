@@ -37,6 +37,11 @@ func (pc *ProductController) GetShopProducts(c *gin.Context) {
 		query = query.Where("category_id = ?", category)
 	}
 
+	// Фильтрация по полу (gender) - для раздела "Детям": male, female, unisex
+	if gender := c.Query("gender"); gender != "" {
+		query = query.Where("gender = ?", gender)
+	}
+
 	// Поиск по названию
 	if search := c.Query("search"); search != "" {
 		query = query.Where("name ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")
