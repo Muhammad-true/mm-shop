@@ -2367,8 +2367,31 @@ code {
     
     .main-content {
         margin-left: 0;
-        padding: 15px;
+        padding: 0;
         margin-bottom: 80px;
+        background: #f2f2f7;
+        min-height: 100vh;
+    }
+    
+    /* iOS-стиль для контента */
+    .tab-content {
+        background: #f2f2f7;
+        padding: 16px 0;
+    }
+    
+    .content-header {
+        padding: 16px;
+        background: #ffffff;
+        margin-bottom: 16px;
+        border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
+    }
+    
+    .content-header h2 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #000000;
+        letter-spacing: -0.5px;
+        margin: 0;
     }
     
     .content-header {
@@ -2384,22 +2407,34 @@ code {
     }
     
     .table-container {
-        padding: 15px;
-        border-radius: 15px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        padding: 0;
+        border-radius: 0;
+        margin-bottom: 0;
+        box-shadow: none;
+        background: transparent;
     }
     
     .table-container h3 {
-        font-size: 20px;
-        margin-bottom: 20px;
-        color: #f7f8f9;
+        font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        margin-top: 0;
+        padding: 0 16px;
+        color: #000000;
+        letter-spacing: -0.3px;
     }
     
+    /* Контейнер для карточек */
+    .table-responsive {
+        padding: 0 16px 16px;
+    }
+    
+    /* iOS-стиль карточек для таблиц */
     .data-table {
         display: block;
         width: 100%;
         border-collapse: collapse;
+        background: transparent;
     }
     
     .data-table thead {
@@ -2408,98 +2443,154 @@ code {
     
     .data-table tbody {
         display: block;
+        padding: 0;
     }
     
     .data-table tr {
         display: block;
-        margin-bottom: 20px;
-        border: 1px solid #e1e5e9;
-        border-radius: 15px;
-        background: white;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        padding: 20px;
+        margin-bottom: 12px;
+        border: none;
+        border-radius: 16px;
+        background: #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+        padding: 0;
         position: relative;
-        transition: all 0.3s ease;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .data-table tr:active {
+        transform: scale(0.98);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
     }
     
     .data-table td {
-        display: block;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         text-align: left;
-        padding: 12px 0;
+        padding: 16px 20px;
         border: none;
+        border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
         position: relative;
-        padding-left: 130px;
-        min-height: 45px;
-        font-size: 14px;
+        min-height: 52px;
+        font-size: 15px;
+        line-height: 1.4;
+        background: transparent;
+    }
+    
+    .data-table td:last-child {
+        border-bottom: none;
     }
     
     .data-table td:before {
-        content: attr(data-label) ": ";
-        font-weight: 600;
-        color: #667eea;
-        position: absolute;
-        left: 0;
-        top: 12px;
-        width: 120px;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        content: attr(data-label);
+        font-weight: 500;
+        color: #8e8e93;
+        font-size: 13px;
+        position: static;
+        flex-shrink: 0;
+        margin-right: 12px;
+        min-width: 100px;
+        text-transform: none;
+        letter-spacing: -0.1px;
     }
     
+    .data-table td > *:not(:first-child) {
+        flex: 1;
+        text-align: right;
+        color: #000000;
+        font-weight: 400;
+    }
+    
+    /* Специальные стили для разных типов данных */
     .data-table td[data-label="Товар"]:before,
     .data-table td[data-label="Название"]:before {
-        content: "📦 " attr(data-label) ": ";
+        content: attr(data-label);
     }
     
     .data-table td[data-label="Бренд"]:before {
-        content: "🏷️ " attr(data-label) ": ";
+        content: attr(data-label);
     }
     
     .data-table td[data-label="Пол"]:before {
-        content: "👤 " attr(data-label) ": ";
+        content: attr(data-label);
     }
     
     .data-table td[data-label="Вариации"]:before {
-        content: "🎨 " attr(data-label) ": ";
+        content: attr(data-label);
+    }
+    
+    /* Улучшенные карточки для заказов */
+    .data-table tr[data-order-id] {
+        margin-bottom: 16px;
+    }
+    
+    /* Карточки для пользователей */
+    .data-table tr[data-user-id] {
+        margin-bottom: 16px;
     }
     
     .badge {
-        display: inline-block;
-        padding: 6px 12px;
-        font-size: 11px;
-        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        font-size: 12px;
+        border-radius: 12px;
         font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin: 2px;
+        text-transform: none;
+        letter-spacing: -0.1px;
+        margin: 0;
+        line-height: 1.3;
     }
     
     .btn-sm {
-        padding: 8px 12px;
-        font-size: 11px;
-        border-radius: 8px;
-        margin: 2px;
-        min-width: 60px;
+        padding: 10px 16px;
+        font-size: 14px;
+        border-radius: 10px;
+        margin: 0 4px 0 0;
+        min-width: 44px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 500;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .btn-sm:active {
+        opacity: 0.7;
+        transform: scale(0.95);
     }
     
     .btn-sm i {
-        margin-right: 4px;
+        margin-right: 6px;
+        font-size: 14px;
+    }
+    
+    /* Группировка кнопок действий */
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
     }
     
     .data-table tr {
-        animation: slideInUp 0.3s ease;
+        animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
-    .data-table tr:nth-child(1) { animation-delay: 0.1s; }
-    .data-table tr:nth-child(2) { animation-delay: 0.2s; }
-    .data-table tr:nth-child(3) { animation-delay: 0.3s; }
-    .data-table tr:nth-child(4) { animation-delay: 0.4s; }
-    .data-table tr:nth-child(5) { animation-delay: 0.5s; }
+    .data-table tr:nth-child(1) { animation-delay: 0.05s; }
+    .data-table tr:nth-child(2) { animation-delay: 0.1s; }
+    .data-table tr:nth-child(3) { animation-delay: 0.15s; }
+    .data-table tr:nth-child(4) { animation-delay: 0.2s; }
+    .data-table tr:nth-child(5) { animation-delay: 0.25s; }
     
     @keyframes slideInUp {
         from {
             opacity: 0;
-            transform: translateY(30px);
+            transform: translateY(20px);
         }
         to {
             opacity: 1;
@@ -2606,18 +2697,34 @@ code {
     
     .filters {
         flex-direction: column;
-        gap: 15px;
+        gap: 12px;
+        padding: 0 16px 16px;
+        background: #ffffff;
+        margin-bottom: 16px;
     }
     
     .filter-group {
         width: 100%;
     }
     
-    .filter-input {
+    .filter-input,
+    .search-input,
+    .filter-select {
         width: 100%;
-        padding: 12px 15px;
+        padding: 12px 16px;
         font-size: 16px;
-        border-radius: 10px;
+        border-radius: 12px;
+        border: none;
+        background: #f2f2f7;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    
+    .filter-input:focus,
+    .search-input:focus,
+    .filter-select:focus {
+        outline: none;
+        background: #e5e5ea;
     }
 }
 

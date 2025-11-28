@@ -76,7 +76,7 @@ function displayCategories(categories) {
             
             let html = `
                 <tr style="animation-delay: ${index * 0.1}s;" data-category-id="${category.id}">
-                    <td>
+                    <td data-label="Категория">
                         <div style="display: flex; align-items: center; gap: 12px; padding-left: ${indent}px;">
                             ${renderCategoryIcon(category)}
                             <div>
@@ -88,18 +88,18 @@ function displayCategories(categories) {
                             </div>
                         </div>
                     </td>
-                    <td>${category.description || 'Нет описания'}</td>
-                    <td>
+                    <td data-label="Описание">${category.description || 'Нет описания'}</td>
+                    <td data-label="Родительская">
                         ${category.parent?.name ? 
                             `<span class="badge" style="background: #6c757d; color: white;">${category.parent.name}</span>` : 
                             '<span style="color: #999;">Корневая</span>'}
                     </td>
-                    <td>
+                    <td data-label="Порядок">
                         <span class="badge" style="background: linear-gradient(135deg, #45b7d1, #96ceb4); color: white;">
                             ${category.sortOrder || 0}
                         </span>
                     </td>
-                    <td>
+                    <td data-label="Дата создания">
                         <div>
                             <div>${category.createdAt ? new Date(category.createdAt).toLocaleDateString('ru-RU') : 'N/A'}</div>
                             <div style="font-size: 11px; color: #7f8c8d;">
@@ -107,7 +107,7 @@ function displayCategories(categories) {
                             </div>
                         </div>
                     </td>
-                    <td>
+                    <td data-label="Действия">
                         <div style="display: flex; gap: 8px;">
                             <button class="btn-sm btn-primary" onclick="window.categories.editCategory('${category.id}')" title="Редактировать">
                                 <i class="fas fa-edit"></i>

@@ -54,7 +54,7 @@ function displayUsers(users) {
         row.style.animationDelay = `${index * 0.1}s`;
         
         const rowHtml = `
-            <td>
+            <td data-label="Имя">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 45px; height: 45px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">
                         ${user.name ? user.name.charAt(0).toUpperCase() : 'U'}
@@ -65,31 +65,31 @@ function displayUsers(users) {
                     </div>
                 </div>
             </td>
-            <td>
+            <td data-label="Email">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-envelope" style="color: #667eea;"></i>
                     <span>${user.email || 'N/A'}</span>
                 </div>
             </td>
-            <td>
+            <td data-label="Телефон">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <i class="fas fa-phone" style="color: #4ecdc4;"></i>
                     <span>${user.phone || 'Не указан'}</span>
                 </div>
             </td>
-            <td>
+            <td data-label="Роль">
                 <span class="badge role-${user.role?.name || 'user'}">
                     <i class="fas fa-user-shield"></i>
                     ${user.role?.displayName || 'Пользователь'}
                 </span>
             </td>
-            <td>
+            <td data-label="Статус">
                 <span class="badge ${user.isActive ? 'role-user' : 'role-admin'}" style="background: ${user.isActive ? 'linear-gradient(135deg, #4ecdc4, #44a08d)' : 'linear-gradient(135deg, #ff6b6b, #ee5a24)'};">
                     <i class="fas ${user.isActive ? 'fa-check-circle' : 'fa-times-circle'}"></i>
                     ${user.isActive ? 'Активен' : 'Неактивен'}
                 </span>
             </td>
-            <td>
+            <td data-label="Дата регистрации">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <i class="fas fa-calendar" style="color: #f093fb;"></i>
                     <span style="font-size: 13px; color: #666;">
@@ -97,7 +97,7 @@ function displayUsers(users) {
                     </span>
                 </div>
             </td>
-            <td>
+            <td data-label="Действия">
                 <div style="display: flex; gap: 6px;">
                     <button class="btn-sm btn-primary" onclick="window.users.viewUser('${user.id}')" title="Просмотр">
                         <i class="fas fa-eye"></i>
@@ -112,6 +112,7 @@ function displayUsers(users) {
             </td>
         `;
         
+        row.setAttribute('data-user-id', user.id);
         row.innerHTML = rowHtml;
         tbody.appendChild(row);
     });

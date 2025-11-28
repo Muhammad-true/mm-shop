@@ -32,9 +32,9 @@ docker-compose -f docker-compose.release.yml up -d --build admin
 ```bash
 cd /root/mm-shop
 git pull origin main
-docker-compose -f docker-compose.release.yml down
-docker-compose -f docker-compose.release.yml build --no-cache
-docker-compose -f docker-compose.release.yml up -d
+docker compose -f docker-compose.release.yml down
+docker compose -f docker-compose.release.yml build --no-cache
+docker compose -f docker-compose.release.yml up -d
 ```
 
 ---

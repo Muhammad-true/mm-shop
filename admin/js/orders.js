@@ -132,30 +132,30 @@ function displayOrders(orders, pagination = {}, stats = {}) {
                 </thead>
                 <tbody>
                     ${orders.map(order => `
-                        <tr>
-                            <td><strong>${order.order_number || order.id?.substring(0, 8)}</strong></td>
-                            <td>
+                        <tr data-order-id="${order.id}">
+                            <td data-label="№ Заказа"><strong>${order.order_number || order.id?.substring(0, 8)}</strong></td>
+                            <td data-label="Клиент">
                                 <div>
                                     <div><strong>${order.recipient_name || order.user?.name || 'N/A'}</strong></div>
                                     ${order.user?.is_guest ? '<small style="color: #999;">🎭 Гость</small>' : ''}
                                 </div>
                             </td>
-                            <td><a href="tel:${order.phone}" style="color: #667eea;">${order.phone}</a></td>
-                            <td>
+                            <td data-label="Телефон"><a href="tel:${order.phone}" style="color: #667eea; text-decoration: none;">${order.phone}</a></td>
+                            <td data-label="Магазин">
                                 <div>
                                     <div><strong>${order.shop_owner?.name || 'N/A'}</strong></div>
                                     <small style="color: #999;">${order.shop_owner?.phone || ''}</small>
                                 </div>
                             </td>
-                            <td>${order.order_items?.length || 0} шт.</td>
-                            <td><strong>${order.total_amount || 0} ${order.currency || 'TJS'}</strong></td>
-                            <td>
+                            <td data-label="Товары">${order.order_items?.length || 0} шт.</td>
+                            <td data-label="Сумма"><strong>${order.total_amount || 0} ${order.currency || 'TJS'}</strong></td>
+                            <td data-label="Статус">
                                 <span class="status-badge ${order.status}" style="padding: 5px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">
                                     ${statusLabels[order.status] || order.status}
                                 </span>
                             </td>
-                            <td>${new Date(order.created_at).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</td>
-                            <td>
+                            <td data-label="Дата">${new Date(order.created_at).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'})}</td>
+                            <td data-label="Действия">
                                 <div class="action-buttons" style="display: flex; gap: 5px;">
                                     <button class="action-btn view" onclick="viewOrderDetails('${order.id}')" title="Просмотр">
                                         <i class="fas fa-eye"></i>
