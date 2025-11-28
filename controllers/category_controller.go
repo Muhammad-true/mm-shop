@@ -143,8 +143,8 @@ func (cc *CategoryController) GetCategoryProducts(c *gin.Context) {
 	var total int64
 	query.Count(&total)
 
-	// Получаем продукты
-	if err := query.Offset(offset).Limit(limit).Find(&products).Error; err != nil {
+	// Получаем продукты с загрузкой Owner.Role для информации о магазине
+	if err := query.Offset(offset).Limit(limit).Preload("Variations").Preload("Category").Preload("Owner.Role").Find(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
 			models.ErrInternalError,
 			"Failed to fetch products",
