@@ -710,6 +710,11 @@ function renderVariations() {
                     <input type="text" value="${variation.sku||''}" placeholder="SKU" oninput="window.products.updateVariation(${index}, 'sku', this.value)">
                 </div>
                 <div class="variation-field">
+                    <label><i class="fas fa-barcode"></i> Штрих-код</label>
+                    <input type="text" value="${variation.barcode||''}" placeholder="EAN-13, UPC, Code128" oninput="window.products.updateVariation(${index}, 'barcode', this.value)" maxlength="50">
+                    <small style="color: #666; font-size: 11px; display: block; margin-top: 4px;">Введите штрих-код (EAN-13, UPC, Code128 и т.д.)</small>
+                </div>
+                <div class="variation-field">
                     <label>Фото вариации (несколько)</label>
                     <input type="file" accept="image/*" multiple onchange="window.products.uploadVariationImages(${index}, this)">
                     ${variation.imageUrls && variation.imageUrls.length ? `
