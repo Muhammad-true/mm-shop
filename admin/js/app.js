@@ -66,6 +66,8 @@ async function initializeApp() {
                     // Загружаем данные
                     setTimeout(() => {
                         loadInitialData(userRole);
+                        // Обрабатываем deep link из push-уведомления (если есть)
+                        handleDeepLink();
                     }, 100);
                 } else {
                     console.log('❌ Токен невалиден, очищаем...');
