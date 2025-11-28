@@ -39,6 +39,7 @@ type ProductVariation struct {
 	StockQuantity int       `json:"stockQuantity" gorm:"default:0"`
 	IsAvailable   bool      `json:"isAvailable" gorm:"default:true"`
 	SKU           string    `json:"sku"`
+	Barcode       string    `json:"barcode" gorm:"index"` // Штрих-код (EAN-13, UPC, Code128 и т.д.)
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 
@@ -83,6 +84,7 @@ type ProductVariationRequest struct {
 	ImageURLs     []string `json:"imageUrls"`                        // Множественные фото
 	StockQuantity int      `json:"stockQuantity" binding:"gte=0"`
 	SKU           string   `json:"sku"`
+	Barcode       string   `json:"barcode"` // Штрих-код (EAN-13, UPC, Code128 и т.д.)
 }
 
 // ProductResponse представляет ответ с информацией о продукте
@@ -115,6 +117,7 @@ type ProductVariationResponse struct {
 	StockQuantity int       `json:"stockQuantity"`
 	IsAvailable   bool      `json:"isAvailable"`
 	SKU           string    `json:"sku"`
+	Barcode       string    `json:"barcode"` // Штрих-код
 }
 
 // ToResponse преобразует ProductVariation в ProductVariationResponse
@@ -130,6 +133,7 @@ func (pv *ProductVariation) ToResponse() ProductVariationResponse {
 		StockQuantity: pv.StockQuantity,
 		IsAvailable:   pv.IsAvailable,
 		SKU:           pv.SKU,
+		Barcode:       pv.Barcode,
 	}
 }
 
@@ -148,6 +152,7 @@ func (p *Product) ToResponse() ProductResponse {
 			StockQuantity: v.StockQuantity,
 			IsAvailable:   v.IsAvailable,
 			SKU:           v.SKU,
+			Barcode:       v.Barcode,
 		}
 	}
 

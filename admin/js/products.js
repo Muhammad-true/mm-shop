@@ -258,9 +258,16 @@ function displayProducts(products) {
                                 </td>
                                 <td data-label="Категория">${product.category?.name || 'Без категории'}</td>
                                 <td data-label="Вариации">
-                                    <span class="badge" style="background: linear-gradient(135deg, #45b7d1, #96ceb4); color: white; font-size: 12px; padding: 8px 12px;">
-                                        ${product.variations?.length || 0} вариаций
-                                    </span>
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <span class="badge" style="background: linear-gradient(135deg, #45b7d1, #96ceb4); color: white; font-size: 12px; padding: 8px 12px;">
+                                            ${product.variations?.length || 0} вариаций
+                                        </span>
+                                        ${product.variations?.some(v => v.barcode) ? `
+                                            <span style="font-size: 11px; color: #666;">
+                                                <i class="fas fa-barcode"></i> Есть штрих-коды
+                                            </span>
+                                        ` : ''}
+                                    </div>
                                 </td>
                                 <td data-label="Дата создания">${product.createdAt ? new Date(product.createdAt).toLocaleDateString('ru-RU') : 'N/A'}</td>
                                 <td data-label="Действия">
@@ -319,8 +326,12 @@ async function loadProductData(id) {
         document.getElementById('product-category').value = product.categoryId;
         document.getElementById('product-brand').value = product.brand;
         
-        // Загружаем вариации
-        setVariations(product.variations || []);
+        // Загружаем вариации (убеждаемся, что barcode есть)
+        const variations = (product.variations || []).map(v => ({
+            ...v,
+            barcode: v.barcode || ''
+        }));
+        setVariations(variations);
         renderVariations();
         document.getElementById('product-modal').style.display = 'block';
     } catch (error) {
@@ -524,6 +535,13 @@ async function viewProductVariations(id) {
                                     </div>
                                 ` : ''}
                                 
+                                ${variation.barcode ? `
+                                    <div style="margin-bottom: 15px;">
+                                        <strong style="color: #495057; font-size: 13px;"><i class="fas fa-barcode"></i> Штрих-код:</strong>
+                                        <span style="font-family: monospace; background: #e3f2fd; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: #1976d2;">${variation.barcode}</span>
+                                    </div>
+                                ` : ''}
+                                
                                 ${(variation.imageUrls && variation.imageUrls.length > 0) ? `
                                     <div style="margin-bottom: 15px;">
                                         <strong style="color: #495057; font-size: 13px;"><i class="fas fa-images"></i> Фотографии (${variation.imageUrls.length}):</strong>
@@ -597,6 +615,7 @@ function addVariation() {
         discount: 0,
         stockQuantity: 0,
         sku: '',
+        barcode: '',
         imageUrls: []
     };
     

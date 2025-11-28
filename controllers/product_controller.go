@@ -249,6 +249,7 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 			StockQuantity: variationReq.StockQuantity,
 			IsAvailable:   variationReq.StockQuantity > 0,
 			SKU:           variationReq.SKU,
+			Barcode:       variationReq.Barcode,
 		}
 
 		log.Printf("🎨 Вариация %d: %+v", i+1, variation)
@@ -383,6 +384,7 @@ func (pc *ProductController) UpdateProduct(c *gin.Context) {
 			StockQuantity: variationReq.StockQuantity,
 			IsAvailable:   variationReq.StockQuantity > 0,
 			SKU:           variationReq.SKU,
+			Barcode:       variationReq.Barcode,
 		}
 
 		if err := tx.Create(&variation).Error; err != nil {
