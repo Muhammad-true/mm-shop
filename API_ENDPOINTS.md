@@ -212,17 +212,65 @@ Authorization: Bearer <token>
 #### `GET /categories/:id`
 Получить категорию по ID
 
-**Ответ:**
+**Особенность:** Если категория является листовой (последней, без дочерних категорий), автоматически возвращаются товары этой категории.
+
+**Параметры запроса (для листовых категорий):**
+- `gender` (string) - фильтр по полу: "boy", "girl", "unisex"
+- `in_stock` (bool) - только товары в наличии
+- `search` (string) - поиск по названию/описанию
+- `sort_by` (string) - сортировка: "name", "price", "rating", "created_at"
+- `sort_order` (string) - порядок: "asc", "desc"
+- `page` (int) - номер страницы
+- `limit` (int) - количество на странице
+
+**Ответ для категории с дочерними категориями:**
 ```json
 {
   "success": true,
   "data": {
-    "id": "uuid",
-    "name": "Одежда",
-    "description": "Описание",
-    "imageUrl": "/images/categories/...",
-    "parentId": null,
-    "createdAt": "2024-01-01T00:00:00Z"
+    "category": {
+      "id": "uuid",
+      "name": "Одежда",
+      "description": "Описание",
+      "iconUrl": "/images/categories/...",
+      "parentId": null,
+      "subcategories": [ ... ],
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    "isLeafCategory": false
+  }
+}
+```
+
+**Ответ для листовой категории (с товарами):**
+```json
+{
+  "success": true,
+  "data": {
+    "category": {
+      "id": "uuid",
+      "name": "Футболки",
+      "description": "Описание",
+      "iconUrl": "/images/categories/...",
+      "parentId": "uuid",
+      "subcategories": [],
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    "products": [
+      {
+        "id": "uuid",
+        "name": "Товар",
+        "shop": { ... },
+        "variations": [ ... ]
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 50,
+      "totalPages": 3
+    },
+    "isLeafCategory": true
   }
 }
 ```
