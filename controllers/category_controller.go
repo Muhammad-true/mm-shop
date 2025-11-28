@@ -36,6 +36,7 @@ func (cc *CategoryController) GetCategories(c *gin.Context) {
 }
 
 // GetCategory возвращает категорию по ID
+// Если категория является последней (листовой, без дочерних категорий), автоматически возвращает товары
 func (cc *CategoryController) GetCategory(c *gin.Context) {
 	id := c.Param("id")
 	categoryID, err := uuid.Parse(id)
@@ -63,7 +64,103 @@ func (cc *CategoryController) GetCategory(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(category.ToResponse()))
+	// Преобразуем в response
+	categoryResponse := category.ToResponse()
+
+	// Если это последняя категория (нет дочерних категорий), загружаем товары
+	if len(category.Subcategories) == 0 {
+		var products []models.Product
+		query := database.DB.Model(&models.Product{}).Where("category_id = ?", categoryID)
+
+		// Фильтрация по полу (gender)
+		if gender := c.Query("gender"); gender != "" {
+			query = query.Where("gender = ?", gender)
+		}
+
+		// Фильтрация по доступности
+		if inStock := c.Query("in_stock"); inStock == "true" {
+			query = query.Where("is_available = ?", true)
+		}
+
+		// Поиск
+		if search := c.Query("search"); search != "" {
+			query = query.Where("name ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")
+		}
+
+		// Сортировка
+		sortBy := c.DefaultQuery("sort_by", "created_at")
+		sortOrder := c.DefaultQuery("sort_order", "desc")
+		allowedSorts := map[string]bool{
+			"name":       true,
+			"price":      true,
+			"rating":     true,
+			"created_at": true,
+		}
+
+		if allowedSorts[sortBy] {
+			if sortOrder == "asc" {
+				query = query.Order(sortBy + " ASC")
+			} else {
+				query = query.Order(sortBy + " DESC")
+			}
+		}
+
+		// Пагинация
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 100 {
+			limit = 20
+		}
+
+		offset := (page - 1) * limit
+
+		// Получаем общее количество
+		var total int64
+		query.Count(&total)
+
+		// Получаем продукты с загрузкой Owner.Role для информации о магазине
+		if err := query.Offset(offset).Limit(limit).Preload("Variations").Preload("Category").Preload("Owner.Role").Find(&products).Error; err == nil {
+			// Преобразуем в response
+			productResponses := make([]models.ProductResponse, len(products))
+			for i, product := range products {
+				productResponses[i] = product.ToResponse()
+			}
+
+			// Вычисляем пагинацию
+			totalPages := (int(total) + limit - 1) / limit
+			pagination := models.PaginationInfo{
+				Page:       page,
+				Limit:      limit,
+				Total:      int(total),
+				TotalPages: totalPages,
+			}
+
+			// Возвращаем категорию с товарами
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"data": gin.H{
+					"category": categoryResponse,
+					"products": productResponses,
+					"pagination": pagination,
+					"isLeafCategory": true, // Флаг, что это листовая категория
+				},
+			})
+			return
+		}
+	}
+
+	// Если есть дочерние категории или ошибка загрузки товаров, возвращаем только категорию
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"category": categoryResponse,
+			"isLeafCategory": len(category.Subcategories) == 0,
+		},
+	})
 }
 
 // GetCategoryProducts возвращает товары в категории
