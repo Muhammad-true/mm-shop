@@ -144,6 +144,7 @@ func runMigrations() error {
 		&models.OrderItem{},
 		&models.Notification{},
 		&models.UserSettings{},
+		&models.ShopSubscription{},
 	)
 }
 

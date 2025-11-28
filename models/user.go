@@ -18,6 +18,7 @@ type User struct {
 	Avatar          string     `json:"avatar"` // URL аватара
 	DateOfBirth     *time.Time `json:"dateOfBirth"`
 	Gender          string     `json:"gender"` // male/female/other
+	INN             string     `json:"inn" gorm:"index"` // ИНН магазина (для shop_owner)
 	IsEmailVerified bool       `json:"isEmailVerified" gorm:"default:false"`
 	IsPhoneVerified bool       `json:"isPhoneVerified" gorm:"default:false"`
 	IsActive        bool       `json:"isActive" gorm:"default:true"`
@@ -97,6 +98,7 @@ type UserResponse struct {
 	Avatar          string            `json:"avatar"`
 	DateOfBirth     *time.Time        `json:"dateOfBirth"`
 	Gender          string            `json:"gender"`
+	INN             string            `json:"inn"` // ИНН магазина
 	IsEmailVerified bool              `json:"isEmailVerified"`
 	IsPhoneVerified bool              `json:"isPhoneVerified"`
 	IsActive        bool              `json:"isActive"`
@@ -128,6 +130,7 @@ func (u *User) ToResponse() UserResponse {
 		Avatar:          u.Avatar,
 		DateOfBirth:     u.DateOfBirth,
 		Gender:          u.Gender,
+		INN:             u.INN,
 		IsEmailVerified: u.IsEmailVerified,
 		IsPhoneVerified: u.IsPhoneVerified,
 		IsActive:        u.IsActive,

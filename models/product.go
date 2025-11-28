@@ -87,6 +87,13 @@ type ProductVariationRequest struct {
 	Barcode       string   `json:"barcode"` // Штрих-код (EAN-13, UPC, Code128 и т.д.)
 }
 
+// ShopInfo представляет информацию о магазине
+type ShopInfo struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	INN  string    `json:"inn"`
+}
+
 // ProductResponse представляет ответ с информацией о продукте
 type ProductResponse struct {
 	ID          uuid.UUID                  `json:"id"`
@@ -100,6 +107,7 @@ type ProductResponse struct {
 	IsAvailable bool                       `json:"isAvailable"`
 	OwnerID     *uuid.UUID                 `json:"ownerId"`
 	Owner       *UserResponse              `json:"owner,omitempty"`
+	Shop        *ShopInfo                  `json:"shop,omitempty"` // Информация о магазине (имя и ИНН)
 	Variations  []ProductVariationResponse `json:"variations"`
 	CreatedAt   time.Time                  `json:"createdAt"`
 	UpdatedAt   time.Time                  `json:"updatedAt"`
@@ -181,6 +189,15 @@ func (p *Product) ToResponse() ProductResponse {
 	if p.Owner != nil && p.Owner.ID != uuid.Nil {
 		ownerResponse := p.Owner.ToResponse()
 		response.Owner = &ownerResponse
+		
+		// Добавляем информацию о магазине (имя и ИНН) если владелец - магазин
+		if p.Owner.Role != nil && p.Owner.Role.Name == "shop_owner" {
+			response.Shop = &ShopInfo{
+				ID:   p.Owner.ID,
+				Name: p.Owner.Name,
+				INN:  p.Owner.INN,
+			}
+		}
 	}
 
 	return response

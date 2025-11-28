@@ -77,7 +77,7 @@ func (pc *ProductController) GetShopProducts(c *gin.Context) {
 	query.Count(&total)
 
 	// Получаем продукты с предзагрузкой связей
-	if err := query.Offset(offset).Limit(limit).Preload("Variations").Preload("Category").Find(&products).Error; err != nil {
+	if err := query.Offset(offset).Limit(limit).Preload("Variations").Preload("Category").Preload("Owner.Role").Find(&products).Error; err != nil {
 		log.Printf("❌ Ошибка получения товаров владельца магазина: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to fetch shop products",

@@ -87,8 +87,8 @@ func (pc *ProductController) GetProducts(c *gin.Context) {
 		return tx.Find(&[]models.Product{})
 	}))
 
-	// Получаем продукты
-	if err := query.Offset(offset).Limit(limit).Preload("Variations").Preload("Category").Find(&products).Error; err != nil {
+	// Получаем продукты с загрузкой Owner и Role для информации о магазине
+	if err := query.Offset(offset).Limit(limit).Preload("Variations").Preload("Category").Preload("Owner.Role").Find(&products).Error; err != nil {
 		log.Printf("❌ Ошибка получения товаров: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to fetch products",
@@ -134,7 +134,7 @@ func (pc *ProductController) GetProduct(c *gin.Context) {
 	}
 
 	var product models.Product
-	query := database.DB.Preload("Variations").Preload("Category").Where("id = ?", productID)
+	query := database.DB.Preload("Variations").Preload("Category").Preload("Owner.Role").Where("id = ?", productID)
 
 	// Получаем текущего пользователя из контекста
 	currentUser, exists := c.Get("user")
@@ -281,7 +281,7 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 
 	// Загружаем продукт с вариациями для ответа
 	var productWithVariations models.Product
-	err := database.DB.Preload("Variations").First(&productWithVariations, product.ID).Error
+	err := database.DB.Preload("Variations").Preload("Category").Preload("Owner.Role").First(&productWithVariations, product.ID).Error
 	if err != nil {
 		log.Printf("❌ Ошибка загрузки созданного товара: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -406,7 +406,7 @@ func (pc *ProductController) UpdateProduct(c *gin.Context) {
 
 	// Загружаем обновленный продукт с вариациями
 	var updatedProduct models.Product
-	if err := database.DB.Preload("Variations").First(&updatedProduct, productID).Error; err != nil {
+	if err := database.DB.Preload("Variations").Preload("Category").Preload("Owner.Role").First(&updatedProduct, productID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to load updated product",
 		})
@@ -474,7 +474,7 @@ func (pc *ProductController) GetAllProducts(c *gin.Context) {
 	query.Count(&total)
 
 	// Получаем продукты (все, без фильтрации по пользователю)
-	if err := query.Offset(offset).Limit(limit).Preload("Variations").Preload("Category").Preload("Owner").Find(&products).Error; err != nil {
+	if err := query.Offset(offset).Limit(limit).Preload("Variations").Preload("Category").Preload("Owner.Role").Find(&products).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to fetch products",
 		})
@@ -595,7 +595,7 @@ func (pc *ProductController) GetProductAdmin(c *gin.Context) {
 	}
 
 	var product models.Product
-	if err := database.DB.Preload("Variations").Preload("Category").Preload("Owner").First(&product, "id = ?", productID).Error; err != nil {
+	if err := database.DB.Preload("Variations").Preload("Category").Preload("Owner.Role").First(&product, "id = ?", productID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Product not found",
