@@ -2253,7 +2253,39 @@ code {
 .gradient-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 .gradient-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
 .gradient-3 { background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); }
-.gradient-4 { background: linear-gradient(135deg, #45b7d1 0%, #96ceb4 100%); } 
+.gradient-4 { background: linear-gradient(135deg, #45b7d1 0%, #96ceb4 100%); }
+
+/* Стили для уведомлений в дашборде */
+.notification-item {
+    transition: all 0.3s ease;
+}
+
+.notification-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 16px;
+    margin-bottom: 5px;
+}
+
+.empty-state small {
+    font-size: 13px;
+    color: #bbb;
+} 
 
 /* ===== МОБИЛЬНЫЙ ТАПБАР ===== */
 /* Мобильная кнопка навигации */
