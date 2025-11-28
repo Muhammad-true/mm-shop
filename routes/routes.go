@@ -313,7 +313,7 @@ func SetupRoutes() *gin.Engine {
 		c.JSON(200, gin.H{
 			"status":  "ok",
 			"message": "MM API is running",
-			"version": "1.3.1",
+			"version": "1.3.2",
 		})
 	}
 	r.GET("/health", healthHandler)
@@ -321,17 +321,17 @@ func SetupRoutes() *gin.Engine {
 
 	r.GET("/version", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"version": "1.3.1",
+			"version": "1.3.2",
 			"name":    "MM API",
 			"build":   "development",
-			"changes": "Added notifications in dashboard, device tokens for push notifications, improved shop owner dashboard",
+			"changes": "Added FCM integration for push notifications, auto-send push on login for unread notifications, deep linking support",
 		})
 	})
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "Welcome to MM API",
-			"version": "1.3.1",
+			"version": "1.3.2",
 			"docs":    "/api/v1/docs",
 			"health":  "/health",
 		})

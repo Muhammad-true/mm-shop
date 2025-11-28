@@ -518,6 +518,29 @@ function applyOrderFilters() {
     loadOrders(1, filters);
 }
 
+// Инициализация при загрузке страницы
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initOrders);
+} else {
+    initOrders();
+}
+
+function initOrders() {
+    // Проверяем наличие параметра orderId в URL (deep link из push-уведомления)
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('orderId');
+    
+    const filters = {};
+    loadOrders(1, filters);
+    
+    // Если есть orderId, открываем детали заказа
+    if (orderId) {
+        setTimeout(() => {
+            viewOrderDetails(orderId);
+        }, 1000); // Задержка для загрузки списка заказов
+    }
+}
+
 // Глобальная функция для обратной совместимости
 window.loadOrders = loadOrders;
 
