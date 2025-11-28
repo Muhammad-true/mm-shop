@@ -68,6 +68,10 @@ async function initializeApp() {
                         loadInitialData(userRole);
                         // Обрабатываем deep link из push-уведомления (если есть)
                         handleDeepLink();
+                        // Регистрируем FCM токен для push-уведомлений
+                        if (window.fcm && window.fcm.checkAndRegisterFCMToken) {
+                            window.fcm.checkAndRegisterFCMToken();
+                        }
                     }, 100);
                 } else {
                     console.log('❌ Токен невалиден, очищаем...');
