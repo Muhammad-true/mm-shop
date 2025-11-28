@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -202,11 +203,56 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 
 	log.Printf("✅ Заказ успешно загружен с %d позициями", len(orderItems))
 
+	// Создаем уведомления для владельцев магазинов
+	go oc.notifyShopOwnersAboutNewOrder(createdOrder, orderItems)
+
 	c.JSON(http.StatusOK, models.StandardResponse{
 		Success: true,
 		Data:    createdOrder.ToResponse(),
 		Message: "Заказ создан успешно",
 	})
+}
+
+// notifyShopOwnersAboutNewOrder создает уведомления для владельцев магазинов о новом заказе
+func (oc *OrderController) notifyShopOwnersAboutNewOrder(order models.Order, orderItems []models.OrderItem) {
+	// Собираем уникальные ID владельцев магазинов
+	shopOwnerIDs := make(map[uuid.UUID]bool)
+	for _, item := range orderItems {
+		if item.ShopOwnerID != nil {
+			shopOwnerIDs[*item.ShopOwnerID] = true
+		}
+	}
+
+	// Создаем уведомление для каждого владельца магазина
+	for shopOwnerID := range shopOwnerIDs {
+		// Проверяем, что владелец магазина существует и имеет роль shop_owner
+		var shopOwner models.User
+		if err := database.DB.Preload("Role").First(&shopOwner, "id = ?", shopOwnerID).Error; err != nil {
+			log.Printf("⚠️ Владелец магазина %s не найден: %v", shopOwnerID, err)
+			continue
+		}
+
+		// Проверяем роль
+		if shopOwner.Role == nil || shopOwner.Role.Name != "shop_owner" {
+			log.Printf("⚠️ Пользователь %s не является владельцем магазина", shopOwnerID)
+			continue
+		}
+
+		// Создаем уведомление
+		notification := models.Notification{
+			UserID:    shopOwnerID,
+			Title:     "Новый заказ",
+			Body:      fmt.Sprintf("Получен новый заказ №%s на сумму ₽%.2f", order.ID.String()[:8], order.TotalAmount),
+			Type:      models.NotificationTypeOrder,
+			ActionURL: fmt.Sprintf("/admin/orders/%s", order.ID.String()),
+		}
+
+		if err := database.DB.Create(&notification).Error; err != nil {
+			log.Printf("❌ Ошибка создания уведомления для владельца магазина %s: %v", shopOwnerID, err)
+		} else {
+			log.Printf("✅ Уведомление создано для владельца магазина %s о заказе %s", shopOwnerID, order.ID)
+		}
+	}
 }
 
 // GetMyOrders - список заказов текущего пользователя
