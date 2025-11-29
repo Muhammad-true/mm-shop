@@ -4,9 +4,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
+	"github.com/mm-api/mm-api/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -288,12 +290,23 @@ func (sc *ShopController) SubscribeToShop(c *gin.Context) {
 		ShopID: shopID,
 	}
 
+	log.Printf("📝 [SubscribeToShop] Создаем подписку: userID=%s, shopID=%s", user.ID, shopID)
 	if err := database.DB.Create(&subscription).Error; err != nil {
-		log.Printf("❌ Ошибка создания подписки: %v", err)
+		log.Printf("❌ [SubscribeToShop] Ошибка создания подписки: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create subscription",
 		})
 		return
+	}
+
+	log.Printf("✅ [SubscribeToShop] Подписка успешно создана: subscriptionID=%s", subscription.ID)
+
+	// Проверяем, что подписка действительно сохранилась
+	var verifySubscription models.ShopSubscription
+	if err := database.DB.Where("user_id = ? AND shop_id = ?", user.ID, shopID).First(&verifySubscription).Error; err != nil {
+		log.Printf("⚠️ [SubscribeToShop] Предупреждение: не удалось проверить сохранение подписки: %v", err)
+	} else {
+		log.Printf("✅ [SubscribeToShop] Подписка подтверждена в БД: ID=%s", verifySubscription.ID)
 	}
 
 	// Загружаем информацию о магазине
@@ -442,9 +455,43 @@ func (sc *ShopController) CheckSubscription(c *gin.Context) {
 		return
 	}
 
-	// Получаем текущего пользователя
+	var userID uuid.UUID
+	var userFound bool
+
+	// Пробуем получить пользователя из контекста (если был middleware)
 	currentUser, exists := c.Get("user")
-	if !exists {
+	if exists {
+		user := currentUser.(models.User)
+		userID = user.ID
+		userFound = true
+		log.Printf("🔍 [CheckSubscription] Пользователь найден через middleware: %s", userID)
+	} else {
+		// Если пользователя нет в контексте, пробуем опционально проверить токен
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			if tokenString != authHeader {
+				// Валидируем токен
+				claims, err := utils.ValidateJWT(tokenString)
+				if err == nil {
+					parsedUserID, err := uuid.Parse(claims.UserID)
+					if err == nil {
+						// Проверяем, что пользователь существует и активен
+						var user models.User
+						if err := database.DB.Preload("Role").First(&user, "id = ? AND is_active = ?", parsedUserID, true).Error; err == nil {
+							userID = user.ID
+							userFound = true
+							log.Printf("🔍 [CheckSubscription] Пользователь найден через токен: %s", userID)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Если пользователь не найден, возвращаем false
+	if !userFound {
+		log.Printf("🔍 [CheckSubscription] Пользователь не найден, возвращаем false")
 		c.JSON(http.StatusOK, gin.H{
 			"success":      true,
 			"isSubscribed": false,
@@ -452,10 +499,10 @@ func (sc *ShopController) CheckSubscription(c *gin.Context) {
 		return
 	}
 
-	user := currentUser.(models.User)
-
+	// Проверяем подписку
 	var subscription models.ShopSubscription
-	isSubscribed := database.DB.Where("user_id = ? AND shop_id = ?", user.ID, shopID).First(&subscription).Error == nil
+	isSubscribed := database.DB.Where("user_id = ? AND shop_id = ?", userID, shopID).First(&subscription).Error == nil
+	log.Printf("🔍 [CheckSubscription] Проверка подписки: userID=%s, shopID=%s, isSubscribed=%v", userID, shopID, isSubscribed)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":      true,
