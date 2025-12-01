@@ -22,13 +22,13 @@ async function loadOrders(page = 1, filters = {}) {
         
         let endpoint;
         if (userRole === 'super_admin' || userRole === 'admin') {
-            endpoint = '/api/v1/admin/orders';
+            endpoint = '/api/v1/admin/orders/'; // Добавлен trailing slash
             console.log('👑 Используем админский эндпоинт для заказов');
         } else if (userRole === 'shop_owner') {
             endpoint = '/api/v1/shop/orders/';
             console.log('🏪 Используем эндпоинт владельца магазина для заказов');
         } else {
-            endpoint = '/api/v1/admin/orders';
+            endpoint = '/api/v1/admin/orders/'; // Добавлен trailing slash
         }
         
         // Добавляем параметры фильтрации
