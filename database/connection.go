@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/google/uuid"
 	"github.com/mm-api/mm-api/config"
 	"github.com/mm-api/mm-api/models"
 	"golang.org/x/crypto/bcrypt"
@@ -68,6 +69,13 @@ func Connect() error {
 	}
 
 	log.Println("✅ Database ping successful")
+
+	// Обновляем данные в shop_subscriptions перед миграцией (если есть старые данные)
+	log.Println("🔄 Preparing shop_subscriptions data before migration...")
+	if err := prepareShopSubscriptionsForMigration(); err != nil {
+		log.Printf("⚠️ Warning: Failed to prepare shop_subscriptions: %v", err)
+		// Не прерываем работу, но логируем предупреждение
+	}
 
 	// Выполнение миграций
 	log.Println("🔄 Running database migrations...")
@@ -456,6 +464,103 @@ func createDefaultShopOwner() error {
 	return nil
 }
 
+// prepareShopSubscriptionsForMigration обновляет shop_id в shop_subscriptions перед миграцией
+// Это нужно, чтобы внешний ключ мог быть добавлен успешно
+func prepareShopSubscriptionsForMigration() error {
+	// Проверяем, есть ли таблица shop_subscriptions
+	var tableExists bool
+	if err := DB.Raw("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA() AND table_name = 'shop_subscriptions')").Scan(&tableExists).Error; err != nil {
+		return fmt.Errorf("failed to check shop_subscriptions table: %w", err)
+	}
+
+	if !tableExists {
+		log.Println("ℹ️ shop_subscriptions table doesn't exist yet, skipping preparation")
+		return nil
+	}
+
+	// Проверяем, есть ли таблица shops
+	var shopsTableExists bool
+	if err := DB.Raw("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA() AND table_name = 'shops')").Scan(&shopsTableExists).Error; err != nil {
+		return fmt.Errorf("failed to check shops table: %w", err)
+	}
+
+	if !shopsTableExists {
+		log.Println("ℹ️ shops table doesn't exist yet, skipping preparation")
+		return nil
+	}
+
+	// Находим все shop_subscriptions, где shop_id не существует в shops
+	// и обновляем их, создавая shops из users если нужно
+	var subscriptions []struct {
+		ShopID uuid.UUID
+		UserID uuid.UUID
+	}
+
+	// Находим подписки, где shop_id не существует в shops
+	if err := DB.Raw(`
+		SELECT ss.shop_id, ss.user_id 
+		FROM shop_subscriptions ss
+		WHERE NOT EXISTS (
+			SELECT 1 FROM shops s WHERE s.id = ss.shop_id
+		)
+	`).Scan(&subscriptions).Error; err != nil {
+		return fmt.Errorf("failed to find invalid shop_subscriptions: %w", err)
+	}
+
+	if len(subscriptions) == 0 {
+		log.Println("✅ All shop_subscriptions are valid")
+		return nil
+	}
+
+	log.Printf("🔄 Found %d shop_subscriptions with invalid shop_id, fixing...", len(subscriptions))
+
+	// Для каждой подписки создаем shop из user, если его нет
+	for _, sub := range subscriptions {
+		// Проверяем, существует ли shop с таким ID
+		var shop models.Shop
+		if err := DB.Where("id = ?", sub.ShopID).First(&shop).Error; err == nil {
+			// Shop уже существует, пропускаем
+			continue
+		}
+
+		// Проверяем, существует ли user с таким ID и является ли он shop_owner
+		var user models.User
+		if err := DB.Preload("Role").Where("id = ?", sub.ShopID).First(&user).Error; err != nil {
+			log.Printf("⚠️ User %s not found for shop_subscription, skipping", sub.ShopID)
+			continue
+		}
+
+		// Проверяем, является ли пользователь shop_owner
+		if user.Role == nil || user.Role.Name != "shop_owner" {
+			log.Printf("⚠️ User %s is not a shop_owner, skipping", sub.ShopID)
+			continue
+		}
+
+		// Создаем shop из user
+		shop = models.Shop{
+			ID:        user.ID, // Используем тот же ID
+			Name:      user.Name,
+			INN:       user.INN,
+			Email:     user.Email,
+			Phone:     user.Phone,
+			Logo:      user.Avatar,
+			IsActive:  user.IsActive,
+			OwnerID:   user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+		}
+
+		if err := DB.Create(&shop).Error; err != nil {
+			log.Printf("⚠️ Failed to create shop for user %s: %v", user.ID, err)
+			continue
+		}
+
+		log.Printf("✅ Created shop %s for user %s (from shop_subscription)", shop.ID, user.ID)
+	}
+
+	return nil
+}
+
 // createDefaultCities создает города по умолчанию
 func createDefaultCities() error {
 	// Список городов Таджикистана с координатами
@@ -558,6 +663,16 @@ func migrateShopsFromUsers() error {
 			log.Printf("⚠️ Failed to update order items for shop %s: %v", shop.ID, result.Error)
 		} else {
 			log.Printf("✅ Updated %d order items for shop %s", result.RowsAffected, shop.ID)
+		}
+
+		// Обновляем shop_subscriptions: shop_id должен ссылаться на shops, а не users
+		result = DB.Model(&models.ShopSubscription{}).
+			Where("shop_id = ?", owner.ID).
+			Update("shop_id", shop.ID)
+		if result.Error != nil {
+			log.Printf("⚠️ Failed to update shop_subscriptions for shop %s: %v", shop.ID, result.Error)
+		} else {
+			log.Printf("✅ Updated %d shop_subscriptions for shop %s", result.RowsAffected, shop.ID)
 		}
 	}
 
