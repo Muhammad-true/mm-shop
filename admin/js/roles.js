@@ -6,16 +6,20 @@ async function loadRoles() {
     try {
         const response = await window.api.fetchData('/api/v1/admin/roles/');
         console.log('📡 Ответ API для ролей:', response);
-        if (response.success) {
-            console.log('✅ Роли загружены успешно:', response.data.roles);
-            displayRoles(response.data.roles);
+        if (response.success && response.data) {
+            const roles = response.data.roles || [];
+            console.log('✅ Роли загружены успешно:', roles.length, 'ролей');
+            displayRoles(roles);
         } else {
             console.error('❌ Ошибка в ответе API для ролей:', response);
+            if (window.ui && window.ui.showMessage) {
+                window.ui.showMessage('Ошибка загрузки ролей: ' + (response.message || 'Неизвестная ошибка'), 'error');
+            }
         }
     } catch (error) {
         console.error('❌ Ошибка загрузки ролей:', error);
         if (window.ui && window.ui.showMessage) {
-            window.ui.showMessage('Ошибка загрузки ролей', 'error');
+            window.ui.showMessage('Ошибка загрузки ролей: ' + error.message, 'error');
         }
     }
 }

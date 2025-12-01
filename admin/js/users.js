@@ -6,16 +6,20 @@ async function loadUsers() {
     try {
         const response = await window.api.fetchData('/api/v1/admin/users/');
         console.log('📡 Ответ API для пользователей:', response);
-        if (response.success) {
-            console.log('✅ Пользователи загружены успешно:', response.data.users);
-            displayUsers(response.data.users);
+        if (response.success && response.data) {
+            const users = response.data.users || [];
+            console.log('✅ Пользователи загружены успешно:', users.length, 'пользователей');
+            displayUsers(users);
         } else {
             console.error('❌ Ошибка в ответе API для пользователей:', response);
+            if (window.ui && window.ui.showMessage) {
+                window.ui.showMessage('Ошибка загрузки пользователей: ' + (response.message || 'Неизвестная ошибка'), 'error');
+            }
         }
     } catch (error) {
         console.error('❌ Ошибка загрузки пользователей:', error);
         if (window.ui && window.ui.showMessage) {
-            window.ui.showMessage('Ошибка загрузки пользователей', 'error');
+            window.ui.showMessage('Ошибка загрузки пользователей: ' + error.message, 'error');
         }
     }
 }

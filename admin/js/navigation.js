@@ -108,13 +108,27 @@ function showTab(tabName, userRole = 'admin') {
                     if (window.categories && window.categories.loadCategories) window.categories.loadCategories();
                     break;
                 case 'users':
-                    if (roleName === 'super_admin' || roleName === 'admin') {
-                        if (window.users && window.users.loadUsers) window.users.loadUsers();
+                    console.log('👥 Загрузка пользователей, роль:', roleName);
+                    if (window.users && window.users.loadUsers) {
+                        console.log('✅ Вызываем window.users.loadUsers()');
+                        window.users.loadUsers();
+                    } else {
+                        console.error('❌ window.users.loadUsers не найден!', {
+                            hasUsers: !!window.users,
+                            hasLoadUsers: !!(window.users && window.users.loadUsers)
+                        });
                     }
                     break;
                 case 'roles':
-                    if (roleName === 'super_admin') {
-                        if (window.roles && window.roles.loadRoles) window.roles.loadRoles();
+                    console.log('🛡️ Загрузка ролей, роль:', roleName);
+                    if (window.roles && window.roles.loadRoles) {
+                        console.log('✅ Вызываем window.roles.loadRoles()');
+                        window.roles.loadRoles();
+                    } else {
+                        console.error('❌ window.roles.loadRoles не найден!', {
+                            hasRoles: !!window.roles,
+                            hasLoadRoles: !!(window.roles && window.roles.loadRoles)
+                        });
                     }
                     break;
                 case 'orders':
