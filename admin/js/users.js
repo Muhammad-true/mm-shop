@@ -1,7 +1,7 @@
 // ===== USERS.JS - Управление пользователями =====
 
 // Загрузка пользователей
-async function loadUsers() {
+window.loadUsers = async function loadUsers() {
     console.log('🔄 Загружаем пользователей...');
     try {
         const response = await window.api.fetchData('/api/v1/admin/users/');
@@ -22,7 +22,7 @@ async function loadUsers() {
             window.ui.showMessage('Ошибка загрузки пользователей: ' + error.message, 'error');
         }
     }
-}
+};
 
 // Отображение пользователей
 function displayUsers(users) {

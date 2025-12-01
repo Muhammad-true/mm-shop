@@ -1,7 +1,7 @@
 // ===== ROLES.JS - Управление ролями =====
 
 // Загрузка ролей
-async function loadRoles() {
+window.loadRoles = async function loadRoles() {
     console.log('🔄 Загружаем роли...');
     try {
         const response = await window.api.fetchData('/api/v1/admin/roles/');
@@ -22,7 +22,7 @@ async function loadRoles() {
             window.ui.showMessage('Ошибка загрузки ролей: ' + error.message, 'error');
         }
     }
-}
+};
 
 // Отображение ролей
 function displayRoles(roles) {

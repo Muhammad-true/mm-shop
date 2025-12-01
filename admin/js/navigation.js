@@ -109,25 +109,35 @@ function showTab(tabName, userRole = 'admin') {
                     break;
                 case 'users':
                     console.log('👥 Загрузка пользователей, роль:', roleName);
-                    if (window.users && window.users.loadUsers) {
+                    // Пробуем разные способы вызова
+                    if (window.loadUsers && typeof window.loadUsers === 'function') {
+                        console.log('✅ Вызываем window.loadUsers()');
+                        window.loadUsers();
+                    } else if (window.users && window.users.loadUsers) {
                         console.log('✅ Вызываем window.users.loadUsers()');
                         window.users.loadUsers();
                     } else {
-                        console.error('❌ window.users.loadUsers не найден!', {
+                        console.error('❌ loadUsers не найден!', {
+                            hasLoadUsers: !!window.loadUsers,
                             hasUsers: !!window.users,
-                            hasLoadUsers: !!(window.users && window.users.loadUsers)
+                            hasUsersLoadUsers: !!(window.users && window.users.loadUsers)
                         });
                     }
                     break;
                 case 'roles':
                     console.log('🛡️ Загрузка ролей, роль:', roleName);
-                    if (window.roles && window.roles.loadRoles) {
+                    // Пробуем разные способы вызова
+                    if (window.loadRoles && typeof window.loadRoles === 'function') {
+                        console.log('✅ Вызываем window.loadRoles()');
+                        window.loadRoles();
+                    } else if (window.roles && window.roles.loadRoles) {
                         console.log('✅ Вызываем window.roles.loadRoles()');
                         window.roles.loadRoles();
                     } else {
-                        console.error('❌ window.roles.loadRoles не найден!', {
+                        console.error('❌ loadRoles не найден!', {
+                            hasLoadRoles: !!window.loadRoles,
                             hasRoles: !!window.roles,
-                            hasLoadRoles: !!(window.roles && window.roles.loadRoles)
+                            hasRolesLoadRoles: !!(window.roles && window.roles.loadRoles)
                         });
                     }
                     break;
