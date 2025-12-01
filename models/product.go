@@ -16,13 +16,15 @@ type Product struct {
 	CategoryID  uuid.UUID  `json:"categoryId" gorm:"type:uuid;not null"`
 	Brand       string     `json:"brand"`
 	IsAvailable bool       `json:"isAvailable" gorm:"default:true"`
-	OwnerID     *uuid.UUID `json:"ownerId" gorm:"type:uuid"` // Владелец товара (магазина) - временно nullable
+	OwnerID     *uuid.UUID `json:"ownerId" gorm:"type:uuid"` // DEPRECATED: Используйте ShopID. Оставлено для обратной совместимости
+	ShopID      *uuid.UUID `json:"shopId" gorm:"type:uuid;index"` // ID магазина
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
 
 	// Связи
 	Category   *Category          `json:"category,omitempty" gorm:"foreignKey:CategoryID"`
-	Owner      *User              `json:"owner,omitempty" gorm:"foreignKey:OwnerID"`
+	Owner      *User              `json:"owner,omitempty" gorm:"foreignKey:OwnerID"` // DEPRECATED
+	Shop       *Shop              `json:"shop,omitempty" gorm:"foreignKey:ShopID"`
 	Variations []ProductVariation `json:"variations,omitempty" gorm:"foreignKey:ProductID"`
 }
 
@@ -185,13 +187,22 @@ func (p *Product) ToResponse() ProductResponse {
 		response.Category = &categoryResponse
 	}
 
-	// Добавляем данные владельца, если они загружены
+	// Добавляем данные владельца (для обратной совместимости)
 	if p.Owner != nil && p.Owner.ID != uuid.Nil {
 		ownerResponse := p.Owner.ToResponse()
 		response.Owner = &ownerResponse
-		
-		// Добавляем информацию о магазине (id, имя и ИНН) всегда, если есть владелец
-		// Это позволяет пользователю видеть магазин и перейти к нему
+	}
+
+	// Добавляем информацию о магазине (приоритет Shop, затем Owner для обратной совместимости)
+	if p.Shop != nil && p.Shop.ID != uuid.Nil {
+		// Используем новую таблицу Shop
+		response.Shop = &ShopInfo{
+			ID:   p.Shop.ID,
+			Name: p.Shop.Name,
+			INN:  p.Shop.INN,
+		}
+	} else if p.Owner != nil && p.Owner.ID != uuid.Nil {
+		// Обратная совместимость: используем Owner если Shop не загружен
 		response.Shop = &ShopInfo{
 			ID:   p.Owner.ID,
 			Name: p.Owner.Name,

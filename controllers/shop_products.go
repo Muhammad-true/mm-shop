@@ -29,8 +29,18 @@ func (pc *ProductController) GetShopProducts(c *gin.Context) {
 	user := currentUser.(models.User)
 	log.Printf("🏪 Владелец магазина %s (ID: %s, email: %s) запрашивает свои товары", user.Name, user.ID, user.Email)
 
-	// Фильтруем товары только по OwnerID пользователя
-	query = query.Where("owner_id = ?", user.ID)
+	// Фильтруем товары по ShopID или OwnerID (обратная совместимость)
+	// Сначала пробуем найти shop для этого пользователя
+	var shop models.Shop
+	if err := database.DB.Where("owner_id = ?", user.ID).First(&shop).Error; err == nil {
+		// Пользователь владеет shop - фильтруем по shop_id
+		query = query.Where("shop_id = ? OR owner_id = ?", shop.ID, user.ID)
+		log.Printf("🔍 Фильтруем товары по ShopID: %s", shop.ID)
+	} else {
+		// Обратная совместимость: фильтруем по owner_id
+		query = query.Where("owner_id = ?", user.ID)
+		log.Printf("🔍 Фильтруем товары по OwnerID: %s", user.ID)
+	}
 
 	// Фильтрация по категории
 	if category := c.Query("category"); category != "" {

@@ -296,6 +296,11 @@ function openUserModal() {
 function closeUserModal() {
     document.getElementById('user-modal').style.display = 'none';
     document.getElementById('user-form').reset();
+    // Скрываем поля магазина при закрытии
+    const shopFields = document.getElementById('shop-fields');
+    if (shopFields) {
+        shopFields.style.display = 'none';
+    }
 }
 
 // Загрузка ролей для селекта
@@ -310,10 +315,14 @@ async function loadRolesForSelect() {
             if (roleSelect) {
                 roleSelect.innerHTML = '<option value="">Выберите роль</option>';
                 
+                // Сохраняем роли для проверки shop_owner
+                window.availableRoles = response.data.roles;
+                
                 response.data.roles.forEach(role => {
                     const option = document.createElement('option');
                     option.value = role.id;
                     option.textContent = role.displayName || role.name;
+                    option.dataset.roleName = role.name; // Сохраняем имя роли для проверки
                     roleSelect.appendChild(option);
                 });
                 
@@ -322,6 +331,38 @@ async function loadRolesForSelect() {
         }
     } catch (error) {
         console.error('❌ Ошибка загрузки ролей для селекта:', error);
+    }
+}
+
+// Обработка изменения роли - показываем/скрываем поля магазина
+function handleRoleChange() {
+    const roleSelect = document.getElementById('modal-user-role');
+    const shopFields = document.getElementById('shop-fields');
+    const selectedOption = roleSelect.options[roleSelect.selectedIndex];
+    const roleName = selectedOption ? selectedOption.dataset.roleName : '';
+    
+    if (roleName === 'shop_owner') {
+        shopFields.style.display = 'block';
+        // Делаем ИНН обязательным
+        document.getElementById('modal-shop-inn').required = true;
+        // Автозаполняем название магазина из имени пользователя, если пусто
+        const shopNameInput = document.getElementById('modal-shop-name');
+        const userNameInput = document.getElementById('modal-user-name');
+        if (!shopNameInput.value && userNameInput.value) {
+            shopNameInput.value = userNameInput.value;
+        }
+        // Название магазина не обязательное - будет использовано имя пользователя, если не указано
+        shopNameInput.required = false;
+    } else {
+        shopFields.style.display = 'none';
+        // Убираем обязательность полей
+        document.getElementById('modal-shop-name').required = false;
+        document.getElementById('modal-shop-inn').required = false;
+        // Очищаем поля
+        document.getElementById('modal-shop-name').value = '';
+        document.getElementById('modal-shop-inn').value = '';
+        document.getElementById('modal-shop-description').value = '';
+        document.getElementById('modal-shop-address').value = '';
     }
 }
 
@@ -338,8 +379,24 @@ async function handleUserSubmit(e) {
     };
     
     const roleId = document.getElementById('modal-user-role').value;
+    const roleSelect = document.getElementById('modal-user-role');
+    const selectedOption = roleSelect.options[roleSelect.selectedIndex];
+    const roleName = selectedOption ? selectedOption.dataset.roleName : '';
+    
     if (roleId) {
         formData.roleId = roleId;
+    }
+    
+    // Если выбрана роль shop_owner, добавляем данные магазина
+    if (roleName === 'shop_owner') {
+        formData.shop = {
+            name: document.getElementById('modal-shop-name').value,
+            inn: document.getElementById('modal-shop-inn').value,
+            description: document.getElementById('modal-shop-description').value,
+            address: document.getElementById('modal-shop-address').value,
+            email: document.getElementById('modal-user-email').value, // Используем email пользователя
+            phone: document.getElementById('modal-user-phone').value  // Используем телефон пользователя
+        };
     }
     
     try {
@@ -385,8 +442,12 @@ window.users = {
     openUserModal,
     closeUserModal,
     loadRolesForSelect,
-    handleUserSubmit
+    handleUserSubmit,
+    handleRoleChange
 };
+
+// Экспортируем handleRoleChange глобально для использования в HTML
+window.handleRoleChange = handleRoleChange;
 
 // Глобальные функции для обратной совместимости
 window.openUserModal = openUserModal;

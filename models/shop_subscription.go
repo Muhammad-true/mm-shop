@@ -11,13 +11,13 @@ import (
 type ShopSubscription struct {
 	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
 	UserID    uuid.UUID `json:"userId" gorm:"type:uuid;not null;index"`
-	ShopID    uuid.UUID `json:"shopId" gorm:"type:uuid;not null;index"` // ID пользователя с ролью shop_owner
+	ShopID    uuid.UUID `json:"shopId" gorm:"type:uuid;not null;index"` // ID магазина из таблицы shops
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
 	// Связи
 	User User `json:"user,omitempty" gorm:"foreignKey:UserID"`
-	Shop User `json:"shop,omitempty" gorm:"foreignKey:ShopID"`
+	Shop Shop `json:"shop,omitempty" gorm:"foreignKey:ShopID"` // Изменено с User на Shop
 }
 
 // BeforeCreate устанавливает UUID перед созданием
@@ -48,11 +48,8 @@ func (ss *ShopSubscription) ToResponse() ShopSubscriptionResponse {
 	
 	// Добавляем информацию о магазине, если она загружена
 	if ss.Shop.ID != uuid.Nil {
-		response.Shop = &ShopInfo{
-			ID:   ss.Shop.ID,
-			Name: ss.Shop.Name,
-			INN:  ss.Shop.INN,
-		}
+		shopInfo := ss.Shop.ToShopInfo()
+		response.Shop = &shopInfo
 	}
 	
 	return response

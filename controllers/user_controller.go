@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -201,6 +202,14 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 		Phone    string  `json:"phone"`
 		RoleID   *string `json:"roleId"`
 		IsActive bool    `json:"isActive"`
+		Shop     *struct {
+			Name        string `json:"name"`
+			INN         string `json:"inn"`
+			Description string `json:"description"`
+			Address     string `json:"address"`
+			Email       string `json:"email"`
+			Phone       string `json:"phone"`
+		} `json:"shop"` // Данные магазина (если роль shop_owner)
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -240,6 +249,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 	}
 
 	// Устанавливаем роль, если указана
+	var roleName string
 	if req.RoleID != nil {
 		roleID, err := uuid.Parse(*req.RoleID)
 		if err != nil {
@@ -250,6 +260,12 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 			return
 		}
 		user.RoleID = &roleID
+		
+		// Получаем имя роли для проверки shop_owner
+		var role models.Role
+		if err := database.DB.Where("id = ?", roleID).First(&role).Error; err == nil {
+			roleName = role.Name
+		}
 	}
 
 	// Сохраняем в базу данных
@@ -259,6 +275,41 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 			"Ошибка при создании пользователя",
 		))
 		return
+	}
+
+	// Если роль shop_owner и переданы данные магазина, создаем магазин
+	if roleName == "shop_owner" && req.Shop != nil {
+		shopName := req.Shop.Name
+		if shopName == "" {
+			shopName = user.Name // Используем имя пользователя, если название магазина не указано
+		}
+		
+		shop := models.Shop{
+			ID:          user.ID, // Используем тот же ID для обратной совместимости
+			Name:        shopName,
+			INN:         req.Shop.INN,
+			Description: req.Shop.Description,
+			Address:     req.Shop.Address,
+			Email:       req.Shop.Email,
+			Phone:       req.Shop.Phone,
+			IsActive:    user.IsActive,
+			OwnerID:     user.ID,
+		}
+		
+		// Если email/phone не указаны для магазина, используем из пользователя
+		if shop.Email == "" {
+			shop.Email = user.Email
+		}
+		if shop.Phone == "" {
+			shop.Phone = user.Phone
+		}
+		
+		if err := database.DB.Create(&shop).Error; err != nil {
+			log.Printf("⚠️ Ошибка создания магазина для пользователя %s: %v", user.ID, err)
+			// Не прерываем создание пользователя, но логируем ошибку
+		} else {
+			log.Printf("✅ Магазин создан для пользователя %s: %s", user.ID, shop.ID)
+		}
 	}
 
 	// Загружаем связанные данные для ответа

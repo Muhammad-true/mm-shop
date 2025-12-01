@@ -63,7 +63,8 @@ type OrderItem struct {
 	ID          uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;"`
 	OrderID     uuid.UUID  `json:"order_id" gorm:"type:uuid;not null"`
 	VariationID uuid.UUID  `json:"variation_id" gorm:"type:uuid;not null"`
-	ShopOwnerID *uuid.UUID `json:"shop_owner_id" gorm:"type:uuid"` // ID владельца магазина
+	ShopOwnerID *uuid.UUID `json:"shop_owner_id" gorm:"type:uuid"` // DEPRECATED: Используйте ShopID. Оставлено для обратной совместимости
+	ShopID      *uuid.UUID `json:"shop_id" gorm:"type:uuid;index"` // ID магазина из таблицы shops
 	Quantity    int        `json:"quantity" gorm:"not null"`
 	Price       float64    `json:"price" gorm:"not null"` // Цена на момент заказа
 	Size        string     `json:"size"`
@@ -77,7 +78,8 @@ type OrderItem struct {
 	// Связи
 	Order     Order            `json:"order,omitempty" gorm:"foreignKey:OrderID"`
 	Variation ProductVariation `json:"variation,omitempty" gorm:"foreignKey:VariationID"`
-	ShopOwner *User            `json:"shop_owner,omitempty" gorm:"foreignKey:ShopOwnerID"`
+	ShopOwner *User            `json:"shop_owner,omitempty" gorm:"foreignKey:ShopOwnerID"` // DEPRECATED
+	Shop      *Shop            `json:"shop,omitempty" gorm:"foreignKey:ShopID"`
 }
 
 // BeforeCreate устанавливает UUID перед созданием

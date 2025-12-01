@@ -28,12 +28,13 @@ type User struct {
 	UpdatedAt       time.Time  `json:"updatedAt"`
 
 	// Связи
-	Role          *Role          `json:"role,omitempty" gorm:"foreignKey:RoleID"`
-	Addresses     []Address      `json:"addresses,omitempty" gorm:"foreignKey:UserID"`
-	Orders        []Order        `json:"orders,omitempty" gorm:"foreignKey:UserID"`
-	CartItems     []CartItem     `json:"cartItems,omitempty" gorm:"foreignKey:UserID"`
-	Favorites     []Favorite     `json:"favorites,omitempty" gorm:"foreignKey:UserID"`
-	Notifications []Notification `json:"notifications,omitempty" gorm:"foreignKey:UserID"`
+	Role          *Role            `json:"role,omitempty" gorm:"foreignKey:RoleID"`
+	Addresses     []Address        `json:"addresses,omitempty" gorm:"foreignKey:UserID"`
+	Orders        []Order          `json:"orders,omitempty" gorm:"foreignKey:UserID"`
+	CartItems     []CartItem       `json:"cartItems,omitempty" gorm:"foreignKey:UserID"`
+	Favorites     []Favorite       `json:"favorites,omitempty" gorm:"foreignKey:UserID"`
+	Notifications []Notification   `json:"notifications,omitempty" gorm:"foreignKey:UserID"`
+	Shops         []Shop           `json:"shops,omitempty" gorm:"foreignKey:OwnerID"` // Магазины, которыми владеет пользователь
 	// Settings      *UserSettings  `json:"settings,omitempty" gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
 

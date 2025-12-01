@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
@@ -29,56 +30,82 @@ func (sc *ShopController) GetShopInfo(c *gin.Context) {
 		return
 	}
 
-	var shop models.User
-	// Загружаем пользователя с ролью shop_owner
-	if err := database.DB.Preload("Role").Where("id = ? AND role_id IN (SELECT id FROM roles WHERE name = 'shop_owner')", shopID).First(&shop).Error; err != nil {
+	var shop models.Shop
+	var shopUser models.User // Для обратной совместимости
+	var useLegacyMode bool
+
+	// Пробуем найти в новой таблице shops
+	if err := database.DB.Preload("Owner.Role").Where("id = ?", shopID).First(&shop).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "Shop not found",
-			})
+			// Обратная совместимость: пробуем найти в старой таблице users
+			if err := database.DB.Preload("Role").Where("id = ? AND role_id IN (SELECT id FROM roles WHERE name = 'shop_owner')", shopID).First(&shopUser).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Shop not found",
+				})
+				return
+			}
+			if shopUser.Role == nil || shopUser.Role.Name != "shop_owner" {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Shop not found",
+				})
+				return
+			}
+			useLegacyMode = true
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Database error",
 			})
+			return
 		}
-		return
 	}
 
-	// Проверяем, что это действительно магазин
-	if shop.Role == nil || shop.Role.Name != "shop_owner" {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Shop not found",
-		})
-		return
-	}
-
-	shopInfo := models.ShopInfo{
-		ID:   shop.ID,
-		Name: shop.Name,
-		INN:  shop.INN,
-	}
-
-	// Подсчитываем количество товаров
 	var productsCount int64
-	database.DB.Model(&models.Product{}).Where("owner_id = ?", shop.ID).Count(&productsCount)
-
-	// Подсчитываем количество подписчиков
 	var subscribersCount int64
-	database.DB.Model(&models.ShopSubscription{}).Where("shop_id = ?", shop.ID).Count(&subscribersCount)
+	var shopInfo models.ShopInfo
+	var email, phone, avatar string
+	var createdAt time.Time
+
+	if useLegacyMode {
+		// Обратная совместимость: используем данные из User
+		shopInfo = models.ShopInfo{
+			ID:   shopUser.ID,
+			Name: shopUser.Name,
+			INN:  shopUser.INN,
+		}
+		email = shopUser.Email
+		phone = shopUser.Phone
+		avatar = shopUser.Avatar
+		createdAt = shopUser.CreatedAt
+		// Подсчитываем количество товаров (старый способ)
+		database.DB.Model(&models.Product{}).Where("owner_id = ?", shopUser.ID).Count(&productsCount)
+		// Подсчитываем количество подписчиков (старый способ - shop_id = user_id)
+		database.DB.Model(&models.ShopSubscription{}).Where("shop_id = ?", shopUser.ID).Count(&subscribersCount)
+	} else {
+		// Новый способ: используем Shop
+		shopInfo = shop.ToShopInfo()
+		email = shop.Email
+		phone = shop.Phone
+		avatar = shop.Logo
+		createdAt = shop.CreatedAt
+		// Подсчитываем количество товаров (новый способ)
+		database.DB.Model(&models.Product{}).Where("shop_id = ? OR owner_id = ?", shop.ID, shop.OwnerID).Count(&productsCount)
+		// Подсчитываем количество подписчиков
+		database.DB.Model(&models.ShopSubscription{}).Where("shop_id = ?", shop.ID).Count(&subscribersCount)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
 			"shop": gin.H{
-				"id":            shopInfo.ID,
-				"name":          shopInfo.Name,
-				"inn":           shopInfo.INN,
-				"email":         shop.Email,
-				"phone":         shop.Phone,
-				"avatar":        shop.Avatar,
-				"productsCount": productsCount,
+				"id":              shopInfo.ID,
+				"name":            shopInfo.Name,
+				"inn":             shopInfo.INN,
+				"email":           email,
+				"phone":           phone,
+				"avatar":          avatar,
+				"productsCount":   productsCount,
 				"subscribersCount": subscribersCount,
-				"createdAt":     shop.CreatedAt,
+				"createdAt":       createdAt,
 			},
 		},
 	})
@@ -95,30 +122,53 @@ func (sc *ShopController) GetShopProducts(c *gin.Context) {
 		return
 	}
 
-	// Проверяем, что магазин существует и является shop_owner
-	var shop models.User
-	if err := database.DB.Preload("Role").Where("id = ?", shopID).First(&shop).Error; err != nil {
+	var shop models.Shop
+	var shopUser models.User // Для обратной совместимости
+	var useLegacyMode bool
+	var shopInfo models.ShopInfo
+
+	// Пробуем найти в новой таблице shops
+	if err := database.DB.Preload("Owner.Role").Where("id = ?", shopID).First(&shop).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "Shop not found",
-			})
+			// Обратная совместимость: пробуем найти в старой таблице users
+			if err := database.DB.Preload("Role").Where("id = ? AND role_id IN (SELECT id FROM roles WHERE name = 'shop_owner')", shopID).First(&shopUser).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Shop not found",
+				})
+				return
+			}
+			if shopUser.Role == nil || shopUser.Role.Name != "shop_owner" {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Shop not found",
+				})
+				return
+			}
+			useLegacyMode = true
+			shopInfo = models.ShopInfo{
+				ID:   shopUser.ID,
+				Name: shopUser.Name,
+				INN:  shopUser.INN,
+			}
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Database error",
 			})
+			return
 		}
-		return
-	}
-
-	if shop.Role == nil || shop.Role.Name != "shop_owner" {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Shop not found",
-		})
-		return
+	} else {
+		shopInfo = shop.ToShopInfo()
 	}
 
 	var products []models.Product
-	query := database.DB.Model(&models.Product{}).Where("owner_id = ?", shopID)
+	var query *gorm.DB
+
+	if useLegacyMode {
+		// Обратная совместимость: используем owner_id
+		query = database.DB.Model(&models.Product{}).Where("owner_id = ?", shopID)
+	} else {
+		// Новый способ: используем shop_id (или owner_id для обратной совместимости)
+		query = database.DB.Model(&models.Product{}).Where("shop_id = ? OR owner_id = ?", shopID, shop.OwnerID)
+	}
 
 	// Фильтрация по категории
 	if categoryID := c.Query("category"); categoryID != "" {
@@ -184,11 +234,17 @@ func (sc *ShopController) GetShopProducts(c *gin.Context) {
 	query.Count(&total)
 
 	// Получаем продукты с загрузкой связей
-	if err := query.Offset(offset).Limit(limit).
+	preloadQuery := query.Offset(offset).Limit(limit).
 		Preload("Variations").
-		Preload("Category").
-		Preload("Owner.Role").
-		Find(&products).Error; err != nil {
+		Preload("Category")
+	
+	if useLegacyMode {
+		preloadQuery = preloadQuery.Preload("Owner.Role")
+	} else {
+		preloadQuery = preloadQuery.Preload("Shop").Preload("Owner.Role")
+	}
+
+	if err := preloadQuery.Find(&products).Error; err != nil {
 		log.Printf("❌ Ошибка получения товаров магазина: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to fetch shop products",
@@ -206,11 +262,7 @@ func (sc *ShopController) GetShopProducts(c *gin.Context) {
 		"success": true,
 		"data": gin.H{
 			"products": productResponses,
-			"shop": models.ShopInfo{
-				ID:   shop.ID,
-				Name: shop.Name,
-				INN:  shop.INN,
-			},
+			"shop":     shopInfo,
 			"pagination": gin.H{
 				"page":  page,
 				"limit": limit,
@@ -243,34 +295,51 @@ func (sc *ShopController) SubscribeToShop(c *gin.Context) {
 
 	user := currentUser.(models.User)
 
-	// Проверяем, что магазин существует и является shop_owner
-	var shop models.User
-	if err := database.DB.Preload("Role").Where("id = ?", shopID).First(&shop).Error; err != nil {
+	// Проверяем, что магазин существует
+	var shop models.Shop
+	var shopUser models.User // Для обратной совместимости
+	var useLegacyMode bool
+
+	// Пробуем найти в новой таблице shops
+	if err := database.DB.Preload("Owner.Role").Where("id = ?", shopID).First(&shop).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "Shop not found",
-			})
+			// Обратная совместимость: пробуем найти в старой таблице users
+			if err := database.DB.Preload("Role").Where("id = ? AND role_id IN (SELECT id FROM roles WHERE name = 'shop_owner')", shopID).First(&shopUser).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Shop not found",
+				})
+				return
+			}
+			if shopUser.Role == nil || shopUser.Role.Name != "shop_owner" {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Shop not found",
+				})
+				return
+			}
+			useLegacyMode = true
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Database error",
 			})
+			return
 		}
-		return
 	}
 
-	if shop.Role == nil || shop.Role.Name != "shop_owner" {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Shop not found",
-		})
-		return
-	}
-
-	// Проверяем, что пользователь не подписывается сам на себя
-	if user.ID == shopID {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Cannot subscribe to your own shop",
-		})
-		return
+	// Проверяем, что пользователь не подписывается сам на свой магазин
+	if useLegacyMode {
+		if user.ID == shopID {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Cannot subscribe to your own shop",
+			})
+			return
+		}
+	} else {
+		if user.ID == shop.OwnerID {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Cannot subscribe to your own shop",
+			})
+			return
+		}
 	}
 
 	// Проверяем, не подписан ли уже
@@ -318,7 +387,19 @@ func (sc *ShopController) SubscribeToShop(c *gin.Context) {
 	}
 
 	// Загружаем информацию о магазине
-	database.DB.Preload("Role").First(&subscription.Shop, "id = ?", shopID)
+	if useLegacyMode {
+		// Обратная совместимость: загружаем User как Shop
+		var shopUserForSub models.User
+		database.DB.Preload("Role").First(&shopUserForSub, "id = ?", shopID)
+		// Создаем временный Shop из User для совместимости
+		subscription.Shop = models.Shop{
+			ID:   shopUserForSub.ID,
+			Name: shopUserForSub.Name,
+			INN:  shopUserForSub.INN,
+		}
+	} else {
+		database.DB.First(&subscription.Shop, "id = ?", shopID)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -394,8 +475,45 @@ func (sc *ShopController) GetShopSubscribers(c *gin.Context) {
 
 	user := currentUser.(models.User)
 
+	// Проверяем, что магазин существует
+	var shop models.Shop
+	var shopUser models.User // Для обратной совместимости
+	var useLegacyMode bool
+
+	// Пробуем найти в новой таблице shops
+	if err := database.DB.Preload("Owner.Role").Where("id = ?", shopID).First(&shop).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Обратная совместимость: пробуем найти в старой таблице users
+			if err := database.DB.Preload("Role").Where("id = ? AND role_id IN (SELECT id FROM roles WHERE name = 'shop_owner')", shopID).First(&shopUser).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Shop not found",
+				})
+				return
+			}
+			if shopUser.Role == nil || shopUser.Role.Name != "shop_owner" {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Shop not found",
+				})
+				return
+			}
+			useLegacyMode = true
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Database error",
+			})
+			return
+		}
+	}
+
 	// Проверяем, что текущий пользователь - владелец магазина или админ
-	if user.ID != shopID && (user.Role == nil || (user.Role.Name != "admin" && user.Role.Name != "super_admin")) {
+	isOwner := false
+	if useLegacyMode {
+		isOwner = user.ID == shopID
+	} else {
+		isOwner = user.ID == shop.OwnerID
+	}
+
+	if !isOwner && (user.Role == nil || (user.Role.Name != "admin" && user.Role.Name != "super_admin")) {
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "Access denied",
 		})

@@ -471,9 +471,34 @@
                 
                 <div class="form-group">
                     <label>Роль</label>
-                    <select id="modal-user-role" class="form-input">
+                    <select id="modal-user-role" class="form-input" onchange="handleRoleChange()">
                         <option value="">Выберите роль</option>
                     </select>
+                </div>
+                
+                <!-- Поля для магазина (показываются только для роли shop_owner) -->
+                <div id="shop-fields" style="display: none; border-top: 1px solid #ddd; padding-top: 15px; margin-top: 15px;">
+                    <h4 style="margin-bottom: 15px; color: #333;">Информация о магазине</h4>
+                    
+                    <div class="form-group">
+                        <label>Название магазина</label>
+                        <input type="text" id="modal-shop-name" class="form-input" placeholder="Название магазина">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>ИНН магазина</label>
+                        <input type="text" id="modal-shop-inn" class="form-input" placeholder="123456789">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Описание магазина</label>
+                        <textarea id="modal-shop-description" class="form-input" rows="3" placeholder="Описание магазина"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Адрес магазина</label>
+                        <input type="text" id="modal-shop-address" class="form-input" placeholder="Адрес магазина">
+                    </div>
                 </div>
                 
                 <div class="form-group">

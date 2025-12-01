@@ -139,17 +139,27 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 				return err
 			}
 
-			// Получаем variation с продуктом, чтобы узнать owner_id
+			// Получаем variation с продуктом, чтобы узнать shop_id
 			var variation models.ProductVariation
-			if err := tx.Preload("Product").First(&variation, "id = ?", vid).Error; err != nil {
+			if err := tx.Preload("Product.Shop").Preload("Product").First(&variation, "id = ?", vid).Error; err != nil {
 				log.Printf("⚠️ Не удалось загрузить вариацию %s: %v", vid, err)
-				// Продолжаем без owner_id, но логируем ошибку
+				// Продолжаем без shop_id, но логируем ошибку
+			}
+
+			var shopID *uuid.UUID
+			var shopOwnerID *uuid.UUID
+			if variation.Product.ShopID != nil {
+				shopID = variation.Product.ShopID
+			} else if variation.Product.OwnerID != nil {
+				// Обратная совместимость: используем owner_id
+				shopOwnerID = variation.Product.OwnerID
 			}
 
 			item := models.OrderItem{
 				OrderID:     order.ID,
 				VariationID: vid,
-				ShopOwnerID: variation.Product.OwnerID, // Устанавливаем владельца магазина
+				ShopID:      shopID,      // Новый способ
+				ShopOwnerID: shopOwnerID, // Обратная совместимость
 				Quantity:    it.Quantity,
 				Price:       it.Price,
 				Size:        it.Size,
@@ -216,10 +226,17 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 
 // notifyShopOwnersAboutNewOrder создает уведомления для владельцев магазинов о новом заказе
 func (oc *OrderController) notifyShopOwnersAboutNewOrder(order models.Order, orderItems []models.OrderItem) {
-	// Собираем уникальные ID владельцев магазинов
+	// Собираем уникальные ID владельцев магазинов (из shop_id или shop_owner_id для обратной совместимости)
 	shopOwnerIDs := make(map[uuid.UUID]bool)
 	for _, item := range orderItems {
-		if item.ShopOwnerID != nil {
+		if item.ShopID != nil {
+			// Находим owner_id магазина
+			var shop models.Shop
+			if err := database.DB.Where("id = ?", item.ShopID).First(&shop).Error; err == nil {
+				shopOwnerIDs[shop.OwnerID] = true
+			}
+		} else if item.ShopOwnerID != nil {
+			// Обратная совместимость
 			shopOwnerIDs[*item.ShopOwnerID] = true
 		}
 	}
@@ -704,17 +721,27 @@ func (oc *OrderController) CreateGuestOrder(c *gin.Context) {
 				return err
 			}
 
-			// Получаем variation с продуктом, чтобы узнать owner_id
+			// Получаем variation с продуктом, чтобы узнать shop_id
 			var variation models.ProductVariation
-			if err := tx.Preload("Product").First(&variation, "id = ?", vid).Error; err != nil {
+			if err := tx.Preload("Product.Shop").Preload("Product").First(&variation, "id = ?", vid).Error; err != nil {
 				log.Printf("⚠️ Не удалось загрузить вариацию %s: %v", vid, err)
-				// Продолжаем без owner_id, но логируем ошибку
+				// Продолжаем без shop_id, но логируем ошибку
+			}
+
+			var shopID *uuid.UUID
+			var shopOwnerID *uuid.UUID
+			if variation.Product.ShopID != nil {
+				shopID = variation.Product.ShopID
+			} else if variation.Product.OwnerID != nil {
+				// Обратная совместимость: используем owner_id
+				shopOwnerID = variation.Product.OwnerID
 			}
 
 			item := models.OrderItem{
 				OrderID:     order.ID,
 				VariationID: vid,
-				ShopOwnerID: variation.Product.OwnerID, // Устанавливаем владельца магазина
+				ShopID:      shopID,      // Новый способ
+				ShopOwnerID: shopOwnerID, // Обратная совместимость
 				Quantity:    it.Quantity,
 				Price:       it.Price,
 				Size:        it.Size,
@@ -867,12 +894,16 @@ func (oc *OrderController) GetAdminOrders(c *gin.Context) {
 		)
 	}
 
-	// Фильтр по владельцу магазина
+	// Фильтр по владельцу магазина (shop_id или owner_id для обратной совместимости)
 	if shopOwnerID != "" {
-		query = query.Joins("JOIN order_items ON orders.id = order_items.order_id").
-			Joins("JOIN product_variations ON order_items.variation_id = product_variations.id").
-			Joins("JOIN products ON product_variations.product_id = products.id").
-			Where("products.owner_id = ?", shopOwnerID)
+		shopOwnerUUID, err := uuid.Parse(shopOwnerID)
+		if err == nil {
+			query = query.Joins("JOIN order_items ON orders.id = order_items.order_id").
+				Joins("JOIN product_variations ON order_items.variation_id = product_variations.id").
+				Joins("JOIN products ON product_variations.product_id = products.id").
+				Where("products.shop_id = ? OR products.owner_id = ? OR order_items.shop_id = ? OR order_items.shop_owner_id = ?", 
+					shopOwnerUUID, shopOwnerUUID, shopOwnerUUID, shopOwnerUUID)
+		}
 	}
 
 	// Фильтр по дате создания
@@ -1199,10 +1230,20 @@ func (oc *OrderController) GetShopOrders(c *gin.Context) {
 	if currentUser.Role != nil && currentUser.Role.Name == "shop_owner" {
 		// Для владельца магазина показываем только заказы, где есть его товары
 		// Используем DISTINCT, чтобы не дублировать заказы при нескольких товарах
-		log.Printf("🏪 Фильтруем заказы по shop_owner_id: %s", currentUser.ID)
-		query = query.Distinct().
-			Joins("JOIN order_items ON orders.id = order_items.order_id").
-			Where("order_items.shop_owner_id = ?", currentUser.ID)
+		// Пробуем найти shop для этого пользователя
+		var shop models.Shop
+		if err := database.DB.Where("owner_id = ?", currentUser.ID).First(&shop).Error; err == nil {
+			log.Printf("🏪 Фильтруем заказы по shop_id: %s", shop.ID)
+			query = query.Distinct().
+				Joins("JOIN order_items ON orders.id = order_items.order_id").
+				Where("order_items.shop_id = ? OR order_items.shop_owner_id = ?", shop.ID, currentUser.ID)
+		} else {
+			// Обратная совместимость
+			log.Printf("🏪 Фильтруем заказы по shop_owner_id: %s", currentUser.ID)
+			query = query.Distinct().
+				Joins("JOIN order_items ON orders.id = order_items.order_id").
+				Where("order_items.shop_owner_id = ?", currentUser.ID)
+		}
 	} else {
 		log.Printf("👑 Админ/супер-админ - показываем все заказы")
 	}
@@ -1216,8 +1257,16 @@ func (oc *OrderController) GetShopOrders(c *gin.Context) {
 
 	// Для владельца магазина загружаем только его товары в заказах
 	if currentUser.Role != nil && currentUser.Role.Name == "shop_owner" {
-		log.Printf("📦 Загружаем OrderItems только для shop_owner_id: %s", currentUser.ID)
-		preloadQuery = preloadQuery.Preload("OrderItems", "shop_owner_id = ?", currentUser.ID)
+		// Пробуем найти shop для этого пользователя
+		var shop models.Shop
+		if err := database.DB.Where("owner_id = ?", currentUser.ID).First(&shop).Error; err == nil {
+			log.Printf("📦 Загружаем OrderItems только для shop_id: %s", shop.ID)
+			preloadQuery = preloadQuery.Preload("OrderItems", "shop_id = ? OR shop_owner_id = ?", shop.ID, currentUser.ID)
+		} else {
+			// Обратная совместимость
+			log.Printf("📦 Загружаем OrderItems только для shop_owner_id: %s", currentUser.ID)
+			preloadQuery = preloadQuery.Preload("OrderItems", "shop_owner_id = ?", currentUser.ID)
+		}
 	} else {
 		log.Printf("📦 Загружаем все OrderItems")
 		preloadQuery = preloadQuery.Preload("OrderItems")

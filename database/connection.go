@@ -105,6 +105,15 @@ func Connect() error {
 
 	log.Println("✅ Default shop owner checked/created")
 
+	// Миграция данных: создание shops из существующих shop_owners
+	log.Println("🔄 Migrating shop owners to shops table...")
+	if err := migrateShopsFromUsers(); err != nil {
+		log.Printf("⚠️ Warning: Failed to migrate shops from users: %v", err)
+		// Не прерываем работу при ошибке миграции
+	} else {
+		log.Println("✅ Shops migration completed")
+	}
+
 	// Создание тестовых данных только в режиме разработки
 	if cfg.IsDevelopment() {
 		log.Println("🔄 Creating sample data (development mode)...")
@@ -134,6 +143,7 @@ func runMigrations() error {
 	return DB.AutoMigrate(
 		&models.Role{},
 		&models.User{},
+		&models.Shop{}, // Новая таблица магазинов
 		&models.Category{},
 		&models.Product{},
 		&models.ProductVariation{},
@@ -431,6 +441,69 @@ func createDefaultShopOwner() error {
 		}
 	} else {
 		log.Printf("✅ Default shop owner user already exists: %s", shopOwnerUser.Email)
+	}
+
+	return nil
+}
+
+// migrateShopsFromUsers мигрирует данные из users (shop_owner) в shops
+func migrateShopsFromUsers() error {
+	// Получаем всех пользователей с ролью shop_owner
+	var shopOwners []models.User
+	if err := DB.Preload("Role").Where("role_id IN (SELECT id FROM roles WHERE name = 'shop_owner')").Find(&shopOwners).Error; err != nil {
+		return fmt.Errorf("failed to find shop owners: %w", err)
+	}
+
+	log.Printf("📦 Found %d shop owners to migrate", len(shopOwners))
+
+	for _, owner := range shopOwners {
+		// Проверяем, существует ли уже shop для этого owner
+		var existingShop models.Shop
+		if err := DB.Where("owner_id = ?", owner.ID).First(&existingShop).Error; err == nil {
+			log.Printf("✅ Shop already exists for owner %s (%s), skipping", owner.ID, owner.Email)
+			continue
+		}
+
+		// Создаем shop из данных owner
+		shop := models.Shop{
+			ID:        owner.ID, // Используем тот же ID для обратной совместимости
+			Name:      owner.Name,
+			INN:       owner.INN,
+			Email:     owner.Email,
+			Phone:     owner.Phone,
+			Logo:      owner.Avatar, // Avatar -> Logo
+			IsActive:  owner.IsActive,
+			OwnerID:   owner.ID,
+			CreatedAt: owner.CreatedAt,
+			UpdatedAt: owner.UpdatedAt,
+		}
+
+		if err := DB.Create(&shop).Error; err != nil {
+			log.Printf("❌ Failed to create shop for owner %s: %v", owner.ID, err)
+			continue
+		}
+
+		log.Printf("✅ Created shop %s for owner %s", shop.ID, owner.ID)
+
+		// Обновляем продукты: owner_id -> shop_id
+		result := DB.Model(&models.Product{}).
+			Where("owner_id = ? AND shop_id IS NULL", owner.ID).
+			Update("shop_id", shop.ID)
+		if result.Error != nil {
+			log.Printf("⚠️ Failed to update products for shop %s: %v", shop.ID, result.Error)
+		} else {
+			log.Printf("✅ Updated %d products for shop %s", result.RowsAffected, shop.ID)
+		}
+
+		// Обновляем order_items: shop_owner_id -> shop_id
+		result = DB.Model(&models.OrderItem{}).
+			Where("shop_owner_id = ? AND shop_id IS NULL", owner.ID).
+			Update("shop_id", shop.ID)
+		if result.Error != nil {
+			log.Printf("⚠️ Failed to update order items for shop %s: %v", shop.ID, result.Error)
+		} else {
+			log.Printf("✅ Updated %d order items for shop %s", result.RowsAffected, shop.ID)
+		}
 	}
 
 	return nil

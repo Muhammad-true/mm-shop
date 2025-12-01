@@ -26,9 +26,18 @@ func (pc *ProductController) GetProducts(c *gin.Context) {
 	currentUser, exists := c.Get("user")
 	if exists {
 		user := currentUser.(models.User)
-		// Фильтруем товары по OwnerID пользователя
-		query = query.Where("owner_id = ?", user.ID)
-		log.Printf("🔍 Фильтруем товары по OwnerID пользователя: %s (email: %s, role: %s)", user.ID, user.Email, user.Role)
+		// Фильтруем товары по ShopID или OwnerID пользователя (обратная совместимость)
+		// Сначала пробуем найти shop для этого пользователя
+		var shop models.Shop
+		if err := database.DB.Where("owner_id = ?", user.ID).First(&shop).Error; err == nil {
+			// Пользователь владеет shop - фильтруем по shop_id
+			query = query.Where("shop_id = ? OR owner_id = ?", shop.ID, user.ID)
+			log.Printf("🔍 Фильтруем товары по ShopID: %s (email: %s, role: %s)", shop.ID, user.Email, user.Role)
+		} else {
+			// Обратная совместимость: фильтруем по owner_id
+			query = query.Where("owner_id = ?", user.ID)
+			log.Printf("🔍 Фильтруем товары по OwnerID пользователя: %s (email: %s, role: %s)", user.ID, user.Email, user.Role)
+		}
 	} else {
 		log.Printf("⚠️ Пользователь не найден в контексте!")
 	}
@@ -139,15 +148,21 @@ func (pc *ProductController) GetProduct(c *gin.Context) {
 	}
 
 	var product models.Product
-	query := database.DB.Preload("Variations").Preload("Category").Preload("Owner.Role").Where("id = ?", productID)
+	query := database.DB.Preload("Variations").Preload("Category").Preload("Shop").Preload("Owner.Role").Where("id = ?", productID)
 
 	// Получаем текущего пользователя из контекста
 	currentUser, exists := c.Get("user")
 	if exists {
 		user := currentUser.(models.User)
-		// Фильтруем товар по OwnerID пользователя
-		query = query.Where("owner_id = ?", user.ID)
-		log.Printf("🔍 Фильтруем товар по OwnerID пользователя: %s", user.ID)
+		// Фильтруем товар по ShopID или OwnerID (обратная совместимость)
+		var shop models.Shop
+		if err := database.DB.Where("owner_id = ?", user.ID).First(&shop).Error; err == nil {
+			query = query.Where("shop_id = ? OR owner_id = ?", shop.ID, user.ID)
+			log.Printf("🔍 Фильтруем товар по ShopID: %s", shop.ID)
+		} else {
+			query = query.Where("owner_id = ?", user.ID)
+			log.Printf("🔍 Фильтруем товар по OwnerID пользователя: %s", user.ID)
+		}
 	}
 
 	if err := query.First(&product).Error; err != nil {
@@ -208,6 +223,16 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 	user := currentUser.(models.User)
 	log.Printf("👤 Создает товар пользователь: %s (ID: %s)", user.Name, user.ID)
 
+	// Ищем shop для этого пользователя
+	var shop models.Shop
+	var shopID *uuid.UUID
+	if err := database.DB.Where("owner_id = ?", user.ID).First(&shop).Error; err == nil {
+		shopID = &shop.ID
+		log.Printf("🏪 Найден shop для пользователя: %s", shop.ID)
+	} else {
+		log.Printf("⚠️ Shop не найден для пользователя, используем owner_id для обратной совместимости")
+	}
+
 	// Создаем продукт
 	product := models.Product{
 		Name:        req.Name,
@@ -216,7 +241,8 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 		CategoryID:  req.CategoryID,
 		Brand:       req.Brand,
 		IsAvailable: true,
-		OwnerID:     &user.ID, // Привязываем товар к текущему пользователю
+		OwnerID:     &user.ID, // Обратная совместимость
+		ShopID:      shopID,   // Новый способ
 
 	}
 
@@ -331,9 +357,15 @@ func (pc *ProductController) UpdateProduct(c *gin.Context) {
 	currentUser, exists := c.Get("user")
 	if exists {
 		user := currentUser.(models.User)
-		// Проверяем, что товар принадлежит текущему пользователю
-		query = query.Where("owner_id = ?", user.ID)
-		log.Printf("🔍 Проверяем права на обновление товара по OwnerID: %s", user.ID)
+		// Проверяем права по ShopID или OwnerID (обратная совместимость)
+		var shop models.Shop
+		if err := database.DB.Where("owner_id = ?", user.ID).First(&shop).Error; err == nil {
+			query = query.Where("shop_id = ? OR owner_id = ?", shop.ID, user.ID)
+			log.Printf("🔍 Проверяем права на обновление товара по ShopID: %s", shop.ID)
+		} else {
+			query = query.Where("owner_id = ?", user.ID)
+			log.Printf("🔍 Проверяем права на обновление товара по OwnerID: %s", user.ID)
+		}
 	}
 
 	if err := query.First(&product).Error; err != nil {
@@ -536,7 +568,15 @@ func (pc *ProductController) DeleteProduct(c *gin.Context) {
 	query := tx.Where("id = ?", productID)
 	if exists {
 		user := currentUser.(models.User)
-		query = query.Where("owner_id = ?", user.ID)
+		// Проверяем права по ShopID или OwnerID (обратная совместимость)
+		var shop models.Shop
+		if err := database.DB.Where("owner_id = ?", user.ID).First(&shop).Error; err == nil {
+			query = query.Where("shop_id = ? OR owner_id = ?", shop.ID, user.ID)
+			log.Printf("🔍 Проверяем права на удаление товара по ShopID: %s", shop.ID)
+		} else {
+			query = query.Where("owner_id = ?", user.ID)
+			log.Printf("🔍 Проверяем права на удаление товара по OwnerID: %s", user.ID)
+		}
 	}
 
 	if err := query.First(&product).Error; err != nil {
