@@ -410,8 +410,19 @@ async function handleUserSubmit(e) {
     }
     
     try {
-        const adminToken = window.storage ? window.storage.getAdminToken() : adminToken;
+        const adminToken = window.storage ? window.storage.getAdminToken() : null;
         
+        if (!adminToken) {
+            console.error('❌ Токен админа не найден!');
+            if (window.ui && window.ui.showMessage) {
+                window.ui.showMessage('Токен авторизации не найден. Пожалуйста, войдите заново.', 'error');
+            }
+            return;
+        }
+        
+        console.log('📤 Отправляем данные для создания пользователя:', formData);
+        
+        const API_BASE_URL = window.getApiUrl ? window.getApiUrl('') : (CONFIG && CONFIG.API && CONFIG.API.BASE_URL ? CONFIG.API.BASE_URL : '');
         const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/`, {
             method: 'POST',
             headers: {
@@ -421,23 +432,32 @@ async function handleUserSubmit(e) {
             body: JSON.stringify(formData)
         });
         
+        console.log('📡 Ответ сервера:', response.status, response.statusText);
+        
         const data = await response.json();
+        console.log('📦 Данные ответа:', data);
         
         if (response.ok && data.success) {
             if (window.ui && window.ui.showMessage) {
                 window.ui.showMessage('Пользователь создан успешно!', 'success');
             }
             closeUserModal();
-            loadUsers();
+            if (window.loadUsers) {
+                window.loadUsers();
+            } else if (window.users && window.users.loadUsers) {
+                window.users.loadUsers();
+            }
         } else {
+            const errorMessage = data.message || data.error || 'Ошибка создания пользователя';
+            console.error('❌ Ошибка создания пользователя:', errorMessage, data);
             if (window.ui && window.ui.showMessage) {
-                window.ui.showMessage(data.message || 'Ошибка создания пользователя', 'error');
+                window.ui.showMessage(errorMessage, 'error');
             }
         }
     } catch (error) {
-        console.error('Ошибка создания пользователя:', error);
+        console.error('❌ Ошибка создания пользователя:', error);
         if (window.ui && window.ui.showMessage) {
-            window.ui.showMessage('Ошибка создания пользователя', 'error');
+            window.ui.showMessage('Ошибка создания пользователя: ' + error.message, 'error');
         }
     }
 }
