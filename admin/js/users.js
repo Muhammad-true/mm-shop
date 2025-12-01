@@ -372,6 +372,47 @@ function handleRoleChange() {
     }
 }
 
+// Загрузка городов для селекта
+window.loadCitiesForSelect = async function loadCitiesForSelect() {
+    try {
+        console.log('🔄 Загружаем города для селекта...');
+        const citySelect = document.getElementById('modal-shop-city');
+        
+        if (!citySelect) {
+            console.error('❌ Элемент modal-shop-city не найден!');
+            return;
+        }
+        
+        const response = await window.api.fetchData('/api/v1/cities/');
+        console.log('📡 Ответ API для городов:', response);
+        
+        if (response.success && response.data && response.data.cities) {
+            citySelect.innerHTML = '<option value="">Выберите город</option>';
+            
+            const cities = response.data.cities || [];
+            console.log(`📋 Найдено ${cities.length} городов`);
+            
+            cities.forEach(city => {
+                const option = document.createElement('option');
+                option.value = city.id;
+                option.textContent = city.name;
+                citySelect.appendChild(option);
+            });
+            
+            console.log(`✅ Загружено ${cities.length} городов в селект`);
+        } else {
+            console.error('❌ Ошибка в ответе API для городов:', response);
+            citySelect.innerHTML = '<option value="">Города не загружены</option>';
+        }
+    } catch (error) {
+        console.error('❌ Ошибка загрузки городов для селекта:', error);
+        const citySelect = document.getElementById('modal-shop-city');
+        if (citySelect) {
+            citySelect.innerHTML = '<option value="">Ошибка загрузки городов</option>';
+        }
+    }
+};
+
 // Обработка создания пользователя
 async function handleUserSubmit(e) {
     e.preventDefault();
