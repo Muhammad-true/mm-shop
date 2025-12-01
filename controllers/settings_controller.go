@@ -26,7 +26,7 @@ func (sc *SettingsController) GetSettings(c *gin.Context) {
 	}
 
 	var settings models.UserSettings
-	err := database.DB.Where("user_id = ?", user.ID).First(&settings).Error
+	err := database.DB.Preload("City").Where("user_id = ?", user.ID).First(&settings).Error
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -56,6 +56,11 @@ func (sc *SettingsController) GetSettings(c *gin.Context) {
 		}
 	}
 
+	// Загружаем City если настройки были только что созданы
+	if settings.City == nil && settings.SelectedCityID != nil {
+		database.DB.Preload("City").First(&settings, settings.ID)
+	}
+
 	c.JSON(http.StatusOK, models.SuccessResponse(settings.ToResponse()))
 }
 
@@ -81,7 +86,7 @@ func (sc *SettingsController) UpdateSettings(c *gin.Context) {
 	}
 
 	var settings models.UserSettings
-	err := database.DB.Where("user_id = ?", user.ID).First(&settings).Error
+	err := database.DB.Preload("City").Where("user_id = ?", user.ID).First(&settings).Error
 
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -117,6 +122,13 @@ func (sc *SettingsController) UpdateSettings(c *gin.Context) {
 
 	if req.PushNotifications != nil {
 		settings.PushNotifications = *req.PushNotifications
+	}
+
+	// Обновляем выбранный город
+	if req.SelectedCityID != nil {
+		if cityUUID, err := uuid.Parse(*req.SelectedCityID); err == nil {
+			settings.SelectedCityID = &cityUUID
+		}
 	}
 
 	// Сохраняем настройки

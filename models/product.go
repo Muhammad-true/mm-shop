@@ -18,6 +18,7 @@ type Product struct {
 	IsAvailable bool       `json:"isAvailable" gorm:"default:true"`
 	OwnerID     *uuid.UUID `json:"ownerId" gorm:"type:uuid"` // DEPRECATED: Используйте ShopID. Оставлено для обратной совместимости
 	ShopID      *uuid.UUID `json:"shopId" gorm:"type:uuid;index"` // ID магазина
+	CityID      *uuid.UUID `json:"cityId" gorm:"type:uuid;index"` // ID города (для быстрой фильтрации)
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
 
@@ -25,6 +26,7 @@ type Product struct {
 	Category   *Category          `json:"category,omitempty" gorm:"foreignKey:CategoryID"`
 	Owner      *User              `json:"owner,omitempty" gorm:"foreignKey:OwnerID"` // DEPRECATED
 	Shop       *Shop              `json:"shop,omitempty" gorm:"foreignKey:ShopID"`
+	City       *City              `json:"city,omitempty" gorm:"foreignKey:CityID"`
 	Variations []ProductVariation `json:"variations,omitempty" gorm:"foreignKey:ProductID"`
 }
 

@@ -105,6 +105,15 @@ func Connect() error {
 
 	log.Println("✅ Default shop owner checked/created")
 
+	// Создание городов по умолчанию
+	log.Println("🔄 Checking and creating default cities...")
+	if err := createDefaultCities(); err != nil {
+		log.Printf("⚠️ Warning: Failed to create default cities: %v", err)
+		// Не прерываем работу при ошибке
+	} else {
+		log.Println("✅ Default cities checked/created")
+	}
+
 	// Миграция данных: создание shops из существующих shop_owners
 	log.Println("🔄 Migrating shop owners to shops table...")
 	if err := migrateShopsFromUsers(); err != nil {
@@ -143,6 +152,7 @@ func runMigrations() error {
 	return DB.AutoMigrate(
 		&models.Role{},
 		&models.User{},
+		&models.City{}, // Таблица городов
 		&models.Shop{}, // Новая таблица магазинов
 		&models.Category{},
 		&models.Product{},
@@ -441,6 +451,51 @@ func createDefaultShopOwner() error {
 		}
 	} else {
 		log.Printf("✅ Default shop owner user already exists: %s", shopOwnerUser.Email)
+	}
+
+	return nil
+}
+
+// createDefaultCities создает города по умолчанию
+func createDefaultCities() error {
+	// Список городов Таджикистана с координатами
+	defaultCities := []struct {
+		name      string
+		latitude  float64
+		longitude float64
+	}{
+		{"Душанбе", 38.5598, 68.7870},
+		{"Худжанд", 40.2833, 69.6167},
+		{"Куляб", 37.9097, 69.7844},
+		{"Бохтар", 37.8364, 68.7803},
+		{"Истаравшан", 39.9108, 69.0064},
+		{"Пенджикент", 39.4953, 67.6094},
+		{"Хорог", 37.4897, 71.5531},
+		{"Исфара", 40.1264, 70.6253},
+		{"Канибадам", 40.2833, 70.4167}, // Канибадам
+	}
+
+	for _, cityData := range defaultCities {
+		var existingCity models.City
+		if err := DB.Where("name = ?", cityData.name).First(&existingCity).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				city := models.City{
+					Name:      cityData.name,
+					Latitude:  cityData.latitude,
+					Longitude: cityData.longitude,
+					IsActive:  true,
+				}
+				if err := DB.Create(&city).Error; err != nil {
+					log.Printf("⚠️ Failed to create city %s: %v", cityData.name, err)
+					continue
+				}
+				log.Printf("✅ City created: %s", cityData.name)
+			} else {
+				log.Printf("⚠️ Error checking city %s: %v", cityData.name, err)
+			}
+		} else {
+			log.Printf("✅ City already exists: %s", cityData.name)
+		}
 	}
 
 	return nil

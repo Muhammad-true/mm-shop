@@ -199,6 +199,14 @@ func (sc *ShopController) GetShopProducts(c *gin.Context) {
 		query = query.Where("brand ILIKE ?", "%"+brand+"%")
 	}
 
+	// Фильтрация по городу
+	if cityID := c.Query("city_id"); cityID != "" {
+		if cityUUID, err := uuid.Parse(cityID); err == nil {
+			// Фильтруем по city_id в продукте или через shop.city_id
+			query = query.Where("city_id = ? OR shop_id IN (SELECT id FROM shops WHERE city_id = ?)", cityUUID, cityUUID)
+		}
+	}
+
 	// Сортировка
 	sortBy := c.DefaultQuery("sort_by", "created_at")
 	sortOrder := c.DefaultQuery("sort_order", "desc")

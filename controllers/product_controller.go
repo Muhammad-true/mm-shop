@@ -226,9 +226,11 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 	// Ищем shop для этого пользователя
 	var shop models.Shop
 	var shopID *uuid.UUID
+	var cityID *uuid.UUID
 	if err := database.DB.Where("owner_id = ?", user.ID).First(&shop).Error; err == nil {
 		shopID = &shop.ID
-		log.Printf("🏪 Найден shop для пользователя: %s", shop.ID)
+		cityID = shop.CityID // Устанавливаем city_id из shop
+		log.Printf("🏪 Найден shop для пользователя: %s, city_id: %v", shop.ID, cityID)
 	} else {
 		log.Printf("⚠️ Shop не найден для пользователя, используем owner_id для обратной совместимости")
 	}
@@ -243,6 +245,7 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 		IsAvailable: true,
 		OwnerID:     &user.ID, // Обратная совместимость
 		ShopID:      shopID,   // Новый способ
+		CityID:      cityID,   // ID города из shop
 
 	}
 

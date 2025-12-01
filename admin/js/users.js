@@ -353,6 +353,8 @@ function handleRoleChange() {
         }
         // Название магазина не обязательное - будет использовано имя пользователя, если не указано
         shopNameInput.required = false;
+        // Загружаем города для выбора
+        loadCitiesForSelect();
     } else {
         shopFields.style.display = 'none';
         // Убираем обязательность полей
@@ -389,13 +391,17 @@ async function handleUserSubmit(e) {
     
     // Если выбрана роль shop_owner, добавляем данные магазина
     if (roleName === 'shop_owner') {
+        const citySelect = document.getElementById('modal-shop-city');
+        const cityId = citySelect ? citySelect.value : null;
+        
         formData.shop = {
             name: document.getElementById('modal-shop-name').value,
             inn: document.getElementById('modal-shop-inn').value,
             description: document.getElementById('modal-shop-description').value,
             address: document.getElementById('modal-shop-address').value,
             email: document.getElementById('modal-user-email').value, // Используем email пользователя
-            phone: document.getElementById('modal-user-phone').value  // Используем телефон пользователя
+            phone: document.getElementById('modal-user-phone').value, // Используем телефон пользователя
+            cityId: cityId || null // ID города
         };
     }
     
@@ -443,7 +449,8 @@ window.users = {
     closeUserModal,
     loadRolesForSelect,
     handleUserSubmit,
-    handleRoleChange
+    handleRoleChange,
+    loadCitiesForSelect
 };
 
 // Экспортируем handleRoleChange глобально для использования в HTML

@@ -35,6 +35,7 @@ func SetupRoutes() *gin.Engine {
 	debugController := &controllers.DebugController{}
 	shopController := &controllers.ShopController{}
 	deviceTokenController := &controllers.DeviceTokenController{}
+	cityController := &controllers.CityController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -78,11 +79,19 @@ func SetupRoutes() *gin.Engine {
 			categories.GET("/:id/products", categoryController.GetCategoryProducts)
 		}
 
+		// Города (публичный доступ)
+		cities := public.Group("cities")
+		{
+			cities.GET("/", cityController.GetCities)                           // Список всех городов
+			cities.GET("/:id", cityController.GetCity)                          // Информация о городе
+			cities.POST("/find-by-location", cityController.FindCityByLocation) // Найти город по координатам
+		}
+
 		// Магазины (публичный доступ для просмотра, аутентификация для подписки)
 		shops := public.Group("shops")
 		{
-			shops.GET("/:id", shopController.GetShopInfo)                    // Информация о магазине
-			shops.GET("/:id/products", shopController.GetShopProducts)       // Товары магазина с фильтрацией
+			shops.GET("/:id", shopController.GetShopInfo)                          // Информация о магазине
+			shops.GET("/:id/products", shopController.GetShopProducts)             // Товары магазина с фильтрацией
 			shops.GET("/:id/subscription/check", shopController.CheckSubscription) // Проверка подписки (требует аутентификации)
 		}
 
@@ -182,9 +191,9 @@ func SetupRoutes() *gin.Engine {
 		// Подписки на магазины
 		shops := protected.Group("shops")
 		{
-			shops.POST("/:id/subscribe", shopController.SubscribeToShop)     // Подписаться на магазин
+			shops.POST("/:id/subscribe", shopController.SubscribeToShop)       // Подписаться на магазин
 			shops.DELETE("/:id/subscribe", shopController.UnsubscribeFromShop) // Отписаться от магазина
-			shops.GET("/:id/subscribers", shopController.GetShopSubscribers)  // Список подписчиков (для владельца)
+			shops.GET("/:id/subscribers", shopController.GetShopSubscribers)   // Список подписчиков (для владельца)
 		}
 	}
 

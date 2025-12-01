@@ -203,12 +203,13 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 		RoleID   *string `json:"roleId"`
 		IsActive bool    `json:"isActive"`
 		Shop     *struct {
-			Name        string `json:"name"`
-			INN         string `json:"inn"`
-			Description string `json:"description"`
-			Address     string `json:"address"`
-			Email       string `json:"email"`
-			Phone       string `json:"phone"`
+			Name        string  `json:"name"`
+			INN         string  `json:"inn"`
+			Description string  `json:"description"`
+			Address     string  `json:"address"`
+			Email       string  `json:"email"`
+			Phone       string  `json:"phone"`
+			CityID      *string `json:"cityId"` // ID города
 		} `json:"shop"` // Данные магазина (если роль shop_owner)
 	}
 
@@ -284,6 +285,13 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 			shopName = user.Name // Используем имя пользователя, если название магазина не указано
 		}
 		
+		var cityID *uuid.UUID
+		if req.Shop.CityID != nil {
+			if parsedCityID, err := uuid.Parse(*req.Shop.CityID); err == nil {
+				cityID = &parsedCityID
+			}
+		}
+
 		shop := models.Shop{
 			ID:          user.ID, // Используем тот же ID для обратной совместимости
 			Name:        shopName,
@@ -294,6 +302,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 			Phone:       req.Shop.Phone,
 			IsActive:    user.IsActive,
 			OwnerID:     user.ID,
+			CityID:      cityID, // ID города
 		}
 		
 		// Если email/phone не указаны для магазина, используем из пользователя

@@ -20,11 +20,13 @@ type Shop struct {
 	Rating      float64    `json:"rating" gorm:"default:0"` // Рейтинг магазина
 	IsActive    bool       `json:"isActive" gorm:"default:true"`
 	OwnerID     uuid.UUID  `json:"ownerId" gorm:"type:uuid;not null;index"` // ID владельца (User с ролью shop_owner)
+	CityID      *uuid.UUID `json:"cityId" gorm:"type:uuid;index"` // ID города
 	CreatedAt   time.Time  `json:"createdAt"`
 	UpdatedAt   time.Time  `json:"updatedAt"`
 
 	// Связи
 	Owner        *User              `json:"owner,omitempty" gorm:"foreignKey:OwnerID"`
+	City         *City              `json:"city,omitempty" gorm:"foreignKey:CityID"`
 	Products     []Product          `json:"products,omitempty" gorm:"foreignKey:ShopID"`
 	Subscriptions []ShopSubscription `json:"subscriptions,omitempty" gorm:"foreignKey:ShopID"`
 }
