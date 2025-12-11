@@ -174,6 +174,8 @@ func runMigrations() error {
 		&models.UserSettings{},
 		&models.ShopSubscription{},
 		&models.DeviceToken{},
+		&models.SubscriptionPlan{}, // Планы подписки
+		&models.License{},          // Лицензии
 	)
 }
 

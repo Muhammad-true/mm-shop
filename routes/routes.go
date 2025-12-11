@@ -36,6 +36,8 @@ func SetupRoutes() *gin.Engine {
 	shopController := &controllers.ShopController{}
 	deviceTokenController := &controllers.DeviceTokenController{}
 	cityController := &controllers.CityController{}
+	licenseController := &controllers.LicenseController{}
+	subscriptionController := &controllers.SubscriptionController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -85,6 +87,20 @@ func SetupRoutes() *gin.Engine {
 			cities.GET("/", cityController.GetCities)                           // Список всех городов
 			cities.GET("/:id", cityController.GetCity)                          // Информация о городе
 			cities.POST("/find-by-location", cityController.FindCityByLocation) // Найти город по координатам
+		}
+
+		// Лицензии (публичный доступ для проверки и активации)
+		licenses := public.Group("licenses")
+		{
+			licenses.POST("/check", licenseController.CheckLicense)       // Проверка статуса лицензии
+			licenses.POST("/activate", licenseController.ActivateLicense) // Активация лицензии
+		}
+
+		// Планы подписки (публичный доступ)
+		subscriptions := public.Group("subscriptions")
+		{
+			subscriptions.GET("/plans", subscriptionController.GetSubscriptionPlans)     // Список планов подписки
+			subscriptions.GET("/plans/:id", subscriptionController.GetSubscriptionPlan)  // Информация о плане
 		}
 
 		// Магазины (публичный доступ для просмотра, аутентификация для подписки)
@@ -253,6 +269,17 @@ func SetupRoutes() *gin.Engine {
 			adminProducts.GET("/", productController.GetAllProducts)
 			// adminProducts.GET("/:id", productController.GetProductAdmin) // Перенесено в публичные маршруты
 		}
+
+		// Управление лицензиями (админы и супер админы)
+		adminLicenses := admin.Group("licenses")
+		{
+			adminLicenses.GET("/", licenseController.GetLicenses)                    // Список всех лицензий
+			adminLicenses.GET("/:id", licenseController.GetLicense)                  // Информация о лицензии
+			adminLicenses.POST("/", licenseController.CreateLicense)                 // Создание лицензии
+			adminLicenses.PUT("/:id", licenseController.UpdateLicense)               // Обновление лицензии
+			adminLicenses.POST("/shops/:shopId/generate", licenseController.GenerateLicenseForShop) // Генерация лицензии для магазина
+		}
+
 		// Диагностика БД для админов
 		admin.GET("/debug/db", debugController.DBInfo)
 	}
@@ -322,7 +349,7 @@ func SetupRoutes() *gin.Engine {
 		c.JSON(200, gin.H{
 			"status":  "ok",
 			"message": "MM API is running",
-			"version": "1.3.3",
+			"version": "1.4.0",
 		})
 	}
 	r.GET("/health", healthHandler)
@@ -330,7 +357,7 @@ func SetupRoutes() *gin.Engine {
 
 	r.GET("/version", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"version": "1.3.3",
+			"version": "1.4.0",
 			"name":    "MM API",
 			"build":   "development",
 			"changes": "Added automatic FCM token registration for web admin panel, Service Worker for push notifications",
