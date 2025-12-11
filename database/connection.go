@@ -122,6 +122,15 @@ func Connect() error {
 		log.Println("✅ Default cities checked/created")
 	}
 
+	// Создание планов подписки по умолчанию
+	log.Println("🔄 Checking and creating default subscription plans...")
+	if err := createDefaultSubscriptionPlans(); err != nil {
+		log.Printf("⚠️ Warning: Failed to create default subscription plans: %v", err)
+		// Не прерываем работу при ошибке
+	} else {
+		log.Println("✅ Default subscription plans checked/created")
+	}
+
 	// Миграция данных: создание shops из существующих shop_owners
 	log.Println("🔄 Migrating shop owners to shops table...")
 	if err := migrateShopsFromUsers(); err != nil {

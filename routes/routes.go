@@ -38,6 +38,7 @@ func SetupRoutes() *gin.Engine {
 	cityController := &controllers.CityController{}
 	licenseController := &controllers.LicenseController{}
 	subscriptionController := &controllers.SubscriptionController{}
+	shopRegistrationController := &controllers.ShopRegistrationController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -93,7 +94,7 @@ func SetupRoutes() *gin.Engine {
 		licenses := public.Group("licenses")
 		{
 			licenses.POST("/check", licenseController.CheckLicense)       // Проверка статуса лицензии
-			licenses.POST("/activate", licenseController.ActivateLicense) // Активация лицензии
+			licenses.POST("/activate", licenseController.ActivateLicense) // Активация лицензии (Flutter: shopId + licenseKey)
 		}
 
 		// Планы подписки (публичный доступ)
@@ -101,6 +102,13 @@ func SetupRoutes() *gin.Engine {
 		{
 			subscriptions.GET("/plans", subscriptionController.GetSubscriptionPlans)     // Список планов подписки
 			subscriptions.GET("/plans/:id", subscriptionController.GetSubscriptionPlan)  // Информация о плане
+		}
+
+		// Регистрация магазина и подписка (публичный доступ для сайта)
+		shopRegistration := public.Group("shop-registration")
+		{
+			shopRegistration.POST("/register", shopRegistrationController.RegisterShop)  // Регистрация магазина
+			shopRegistration.POST("/subscribe", shopRegistrationController.SubscribeShop) // Подписка (создание лицензии после оплаты)
 		}
 
 		// Магазины (публичный доступ для просмотра, аутентификация для подписки)
