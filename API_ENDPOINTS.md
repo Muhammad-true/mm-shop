@@ -262,6 +262,93 @@ Authorization: Bearer <token>
 
 ---
 
+### Города (публичные)
+
+#### `GET /cities`
+Получить список всех активных городов
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": {
+    "cities": [
+      {
+        "id": "uuid",
+        "name": "Душанбе",
+        "latitude": 38.5598,
+        "longitude": 68.7870,
+        "isActive": true,
+        "createdAt": "2024-01-01T00:00:00Z",
+        "updatedAt": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": "uuid",
+        "name": "Канибадам",
+        "latitude": 40.2833,
+        "longitude": 70.4167,
+        "isActive": true,
+        "createdAt": "2024-01-01T00:00:00Z",
+        "updatedAt": "2024-01-01T00:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+#### `GET /cities/:id`
+Получить информацию о городе по ID
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "name": "Душанбе",
+    "latitude": 38.5598,
+    "longitude": 68.7870,
+    "isActive": true,
+    "createdAt": "2024-01-01T00:00:00Z",
+    "updatedAt": "2024-01-01T00:00:00Z"
+  }
+}
+```
+
+#### `POST /cities/find-by-location`
+Найти ближайший город по координатам
+
+**Тело запроса:**
+```json
+{
+  "latitude": 38.5598,
+  "longitude": 68.7870
+}
+```
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": {
+    "city": {
+      "id": "uuid",
+      "name": "Душанбе",
+      "latitude": 38.5598,
+      "longitude": 68.7870,
+      "isActive": true,
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z"
+    },
+    "distance": 0.5
+  }
+}
+```
+
+**Примечание:** `distance` - расстояние в километрах до ближайшего города.
+
+---
+
 ### Магазины (публичные)
 
 #### `GET /shops/:id`
