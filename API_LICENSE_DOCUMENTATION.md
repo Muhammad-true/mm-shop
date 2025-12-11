@@ -233,9 +233,22 @@
 #### Запрос:
 ```json
 {
-  "licenseKey": "XXXX-XXXX-XXXX-XXXX"
+  "licenseKey": "XXXX-XXXX-XXXX-XXXX",
+  "deviceId": "unique-device-id",
+  "deviceInfo": {
+    "platform": "android",
+    "model": "Samsung Galaxy S21",
+    "manufacturer": "Samsung",
+    "osVersion": "Android 12",
+    "appVersion": "1.0.0"
+  }
 }
 ```
+
+**Поля:**
+- `licenseKey` (required) - Ключ лицензии
+- `deviceId` (required) - Уникальный ID устройства (например, Android ID или iOS IdentifierForVendor)
+- `deviceInfo` (optional) - Информация о железе для дополнительной проверки
 
 #### Ответ (200 OK):
 ```json
@@ -247,7 +260,25 @@
     "subscriptionStatus": "active",
     "subscriptionType": "monthly",
     "expiresAt": "2024-02-01T00:00:00Z",
-    "daysRemaining": 30
+    "daysRemaining": 30,
+    "deviceMatch": true
+  }
+}
+```
+
+**Если лицензия активирована на другом устройстве:**
+```json
+{
+  "success": true,
+  "data": {
+    "isValid": false,
+    "isExpired": false,
+    "subscriptionStatus": "active",
+    "subscriptionType": "monthly",
+    "expiresAt": "2024-02-01T00:00:00Z",
+    "daysRemaining": 30,
+    "deviceMatch": false,
+    "error": "License is activated on a different device"
   }
 }
 ```
@@ -269,9 +300,23 @@
 ```json
 {
   "licenseKey": "XXXX-XXXX-XXXX-XXXX",
-  "shopId": "uuid-магазина"
+  "shopId": "uuid-магазина",
+  "deviceId": "unique-device-id",
+  "deviceInfo": {
+    "platform": "android",
+    "model": "Samsung Galaxy S21",
+    "manufacturer": "Samsung",
+    "osVersion": "Android 12",
+    "appVersion": "1.0.0"
+  }
 }
 ```
+
+**Поля:**
+- `licenseKey` (required) - Ключ лицензии
+- `shopId` (required) - UUID магазина
+- `deviceId` (required) - Уникальный ID устройства
+- `deviceInfo` (required) - Информация о железе (платформа, модель, производитель, версия ОС и т.д.)
 
 #### Ответ (200 OK):
 ```json
@@ -300,9 +345,35 @@
 ```
 
 #### Ошибки:
-- `400 Bad Request` - Неверные данные запроса или лицензия уже активирована
+- `400 Bad Request` - Неверные данные запроса
+- `403 Forbidden` - Лицензия уже активирована на другом устройстве
 - `404 Not Found` - Лицензия или магазин не найдены
 - `500 Internal Server Error` - Ошибка сервера
+
+**Если лицензия уже активирована на этом устройстве:**
+```json
+{
+  "success": true,
+  "message": "License already activated on this device",
+  "data": {
+    "id": "uuid",
+    "licenseKey": "XXXX-XXXX-XXXX-XXXX",
+    "deviceId": "unique-device-id",
+    ...
+  }
+}
+```
+
+**Если лицензия активирована на другом устройстве:**
+```json
+{
+  "success": false,
+  "error": "License is already activated on a different device",
+  "data": {
+    "deviceId": "other-device-id"
+  }
+}
+```
 
 ---
 

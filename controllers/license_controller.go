@@ -1,8 +1,14 @@
 package controllers
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/mm-api/mm-api/database"
@@ -44,17 +50,52 @@ func (lc *LicenseController) CheckLicense(c *gin.Context) {
 		return
 	}
 
-	// Возвращаем только публичную информацию
+	// Проверяем, активирована ли лицензия
+	if license.ShopID == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": gin.H{
+				"isValid":           false,
+				"isExpired":         false,
+				"subscriptionStatus": license.SubscriptionStatus,
+				"subscriptionType":  license.SubscriptionType,
+				"isActivated":       false,
+				"message":           "License not activated yet",
+			},
+		})
+		return
+	}
+
+	// Проверяем соответствие устройства
+	deviceMatch := false
+	if license.DeviceID != "" {
+		deviceMatch = license.DeviceID == req.DeviceID
+		if !deviceMatch && req.DeviceInfo != nil {
+			// Дополнительная проверка по fingerprint
+			fingerprint := generateDeviceFingerprint(req.DeviceID, req.DeviceInfo)
+			deviceMatch = license.DeviceFingerprint == fingerprint
+		}
+	}
+
+	// Возвращаем информацию о лицензии
+	response := gin.H{
+		"isValid":           license.IsValid() && deviceMatch,
+		"isExpired":         license.IsExpired(),
+		"subscriptionStatus": license.SubscriptionStatus,
+		"subscriptionType":  license.SubscriptionType,
+		"expiresAt":         license.ExpiresAt,
+		"daysRemaining":     license.ToResponse().DaysRemaining,
+		"deviceMatch":       deviceMatch,
+	}
+
+	if !deviceMatch && license.DeviceID != "" {
+		response["error"] = "License is activated on a different device"
+		response["isValid"] = false
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data": gin.H{
-			"isValid":           license.IsValid(),
-			"isExpired":         license.IsExpired(),
-			"subscriptionStatus": license.SubscriptionStatus,
-			"subscriptionType":  license.SubscriptionType,
-			"expiresAt":         license.ExpiresAt,
-			"daysRemaining":     license.ToResponse().DaysRemaining,
-		},
+		"data":    response,
 	})
 }
 
@@ -116,9 +157,25 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 
 	// Проверяем, не активирована ли уже лицензия
 	if license.ShopID != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		// Проверяем, активирована ли на том же устройстве
+		if license.DeviceID == req.DeviceID {
+			// Лицензия уже активирована на этом устройстве
+			database.DB.Preload("Shop").Preload("User").First(&license, license.ID)
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"message": "License already activated on this device",
+				"data":    license.ToResponse(),
+			})
+			return
+		}
+
+		// Лицензия активирована на другом устройстве
+		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
-			"error":   "License already activated",
+			"error":   "License is already activated on a different device",
+			"data": gin.H{
+				"deviceId": license.DeviceID,
+			},
 		})
 		return
 	}
@@ -140,12 +197,25 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		return
 	}
 
+	// Генерируем fingerprint устройства
+	deviceFingerprint := generateDeviceFingerprint(req.DeviceID, req.DeviceInfo)
+	
+	// Сохраняем информацию об устройстве в JSON
+	deviceInfoJSON, err := json.Marshal(req.DeviceInfo)
+	if err != nil {
+		log.Printf("⚠️ Failed to marshal device info: %v", err)
+		deviceInfoJSON = []byte("{}")
+	}
+
 	// Активируем лицензию
 	now := time.Now()
 	license.ShopID = &shopID
 	license.UserID = &shop.OwnerID
 	license.ActivatedAt = &now
 	license.SubscriptionStatus = models.SubscriptionStatusActive
+	license.DeviceID = req.DeviceID
+	license.DeviceInfo = string(deviceInfoJSON)
+	license.DeviceFingerprint = deviceFingerprint
 
 	// Вычисляем дату окончания
 	if license.ExpiresAt == nil {

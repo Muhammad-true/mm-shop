@@ -54,6 +54,9 @@ type License struct {
 	IsActive              bool              `json:"isActive" gorm:"default:true"`         // Активна ли лицензия
 	AutoRenew             bool              `json:"autoRenew" gorm:"default:false"`       // Автопродление
 	Notes                 string            `json:"notes" gorm:"type:text"`               // Заметки
+	DeviceID              string            `json:"deviceId" gorm:"type:varchar(255);index"` // Уникальный ID устройства
+	DeviceInfo            string            `json:"deviceInfo" gorm:"type:text"`          // JSON с информацией о железе
+	DeviceFingerprint     string            `json:"deviceFingerprint" gorm:"type:varchar(255);index"` // Хеш для быстрой проверки
 	CreatedAt             time.Time         `json:"createdAt"`
 	UpdatedAt             time.Time         `json:"updatedAt"`
 
@@ -139,6 +142,8 @@ type LicenseResponse struct {
 	IsActive              bool              `json:"isActive"`
 	AutoRenew             bool              `json:"autoRenew"`
 	Notes                 string            `json:"notes"`
+	DeviceID              string            `json:"deviceId"`              // ID устройства, на котором активирована лицензия
+	DeviceInfo            string            `json:"deviceInfo"`            // JSON с информацией о железе
 	IsValid               bool              `json:"isValid"`               // Вычисляемое поле
 	IsExpired             bool              `json:"isExpired"`             // Вычисляемое поле
 	DaysRemaining         *int              `json:"daysRemaining"`         // Оставшиеся дни (null для lifetime)
