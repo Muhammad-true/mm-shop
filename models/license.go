@@ -201,12 +201,16 @@ func (l *License) ToResponse() LicenseResponse {
 
 // LicenseActivationRequest запрос на активацию лицензии
 type LicenseActivationRequest struct {
-	LicenseKey string `json:"licenseKey" binding:"required"`
-	ShopID     string `json:"shopId" binding:"required"` // UUID магазина
+	LicenseKey string                 `json:"licenseKey" binding:"required"`
+	ShopID     string                 `json:"shopId" binding:"required"` // UUID магазина
+	DeviceID   string                 `json:"deviceId" binding:"required"` // Уникальный ID устройства
+	DeviceInfo map[string]interface{} `json:"deviceInfo" binding:"required"` // Информация о железе
 }
 
 // LicenseCheckRequest запрос на проверку лицензии
 type LicenseCheckRequest struct {
-	LicenseKey string `json:"licenseKey" binding:"required"`
+	LicenseKey string                 `json:"licenseKey" binding:"required"`
+	DeviceID   string                 `json:"deviceId" binding:"required"` // Уникальный ID устройства
+	DeviceInfo map[string]interface{} `json:"deviceInfo"`                  // Опционально, для проверки
 }
 
