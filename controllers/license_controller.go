@@ -563,3 +563,48 @@ func (lc *LicenseController) UpdateLicense(c *gin.Context) {
 	})
 }
 
+// generateDeviceFingerprint создает уникальный fingerprint устройства на основе DeviceID и DeviceInfo
+func generateDeviceFingerprint(deviceID string, deviceInfo map[string]interface{}) string {
+	// Создаем строку для хеширования
+	var parts []string
+	parts = append(parts, deviceID)
+
+	// Сортируем ключи deviceInfo для консистентности
+	if deviceInfo != nil {
+		keys := make([]string, 0, len(deviceInfo))
+		for k := range deviceInfo {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			v := deviceInfo[k]
+			parts = append(parts, k+":"+toString(v))
+		}
+	}
+
+	// Создаем хеш
+	data := strings.Join(parts, "|")
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:])
+}
+
+// toString преобразует значение в строку
+func toString(v interface{}) string {
+	switch val := v.(type) {
+	case string:
+		return val
+	case int, int32, int64:
+		return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(fmt.Sprintf("%v", val), " ", ""), "\n", ""))
+	case float32, float64:
+		return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(fmt.Sprintf("%.0f", val), " ", ""), "\n", ""))
+	case bool:
+		if val {
+			return "true"
+		}
+		return "false"
+	default:
+		return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(fmt.Sprintf("%v", val), " ", ""), "\n", ""))
+	}
+}
+
