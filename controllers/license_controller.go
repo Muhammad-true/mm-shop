@@ -167,8 +167,8 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		return
 	}
 
-	log.Printf("🔍 Найдена лицензия: ID=%s, ShopID=%v, DeviceID='%s', Status=%s, IsActive=%v",
-		license.ID, license.ShopID, license.DeviceID, license.SubscriptionStatus, license.IsActive)
+	log.Printf("🔍 Найдена лицензия: ID=%s, ShopID=%v, DeviceID='%s', Status=%s, IsActive=%v, SubscriptionType=%s",
+		license.ID, license.ShopID, license.DeviceID, license.SubscriptionStatus, license.IsActive, license.SubscriptionType)
 
 	// Проверяем, не активирована ли уже лицензия
 	if license.ShopID != nil {
@@ -212,6 +212,7 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 
 	// Проверяем валидность лицензии
 	if !license.IsActive {
+		log.Printf("❌ Лицензия неактивна: IsActive=%v", license.IsActive)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "License is not active",
@@ -220,12 +221,19 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 	}
 
 	if license.SubscriptionStatus != models.SubscriptionStatusActive && license.SubscriptionStatus != models.SubscriptionStatusPending {
+		log.Printf("❌ Лицензия недоступна для активации: Status=%s (ожидается: active или pending)", license.SubscriptionStatus)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "License is not available for activation",
+			"details": gin.H{
+				"subscriptionStatus": license.SubscriptionStatus,
+				"expectedStatus":     []string{"active", "pending"},
+			},
 		})
 		return
 	}
+
+	log.Printf("✅ Лицензия прошла проверки, начинаем активацию...")
 
 	// Генерируем fingerprint устройства
 	deviceFingerprint := generateDeviceFingerprint(req.DeviceID, req.DeviceInfo)
@@ -259,21 +267,30 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 	}
 
 	if err := database.DB.Save(&license).Error; err != nil {
-		log.Printf("❌ Ошибка активации лицензии: %v", err)
+		log.Printf("❌ Ошибка сохранения лицензии в БД: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Failed to activate license",
+			"details": err.Error(),
 		})
 		return
 	}
 
+	log.Printf("✅ Лицензия успешно сохранена в БД: ShopID=%v, DeviceID='%s', Status=%s", 
+		license.ShopID, license.DeviceID, license.SubscriptionStatus)
+
 	// Загружаем связанные данные
-	database.DB.Preload("Shop").Preload("User").First(&license, license.ID)
+	if err := database.DB.Preload("Shop").Preload("User").First(&license, license.ID).Error; err != nil {
+		log.Printf("⚠️ Ошибка загрузки связанных данных: %v", err)
+		// Продолжаем, даже если не удалось загрузить связанные данные
+	}
 
 	message := "License activated successfully"
 	if wasAlreadyActivated {
 		message = "License reactivated on new device successfully"
 	}
+
+	log.Printf("✅ Активация завершена успешно: %s", message)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
