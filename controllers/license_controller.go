@@ -148,11 +148,11 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		return
 	}
 
-	// Находим лицензию
+	// Находим лицензию по license_key
 	var license models.License
 	if err := database.DB.Where("license_key = ?", req.LicenseKey).First(&license).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			log.Printf("❌ Лицензия не найдена: %s", req.LicenseKey)
+			log.Printf("❌ Лицензия не найдена по ключу: %s", req.LicenseKey)
 			c.JSON(http.StatusNotFound, gin.H{
 				"success": false,
 				"error":   "License not found",
@@ -170,26 +170,27 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 	log.Printf("🔍 Найдена лицензия: ID=%s, ShopID=%v, DeviceID='%s', Status=%s, IsActive=%v, SubscriptionType=%s",
 		license.ID, license.ShopID, license.DeviceID, license.SubscriptionStatus, license.IsActive, license.SubscriptionType)
 
-	// Проверяем, не активирована ли уже лицензия
-	if license.ShopID != nil {
+	// Если лицензия уже активирована для другого магазина, запрещаем активацию
+	if license.ShopID != nil && *license.ShopID != shopID {
+		log.Printf("❌ Лицензия уже активирована для другого магазина: %v (запрошен: %v)", license.ShopID, shopID)
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "License is already activated for a different shop",
+			"data": gin.H{
+				"shopId": license.ShopID,
+			},
+		})
+		return
+	}
+
+	// Проверяем, не активирована ли уже лицензия для этого магазина
+	if license.ShopID != nil && *license.ShopID == shopID {
+		// Лицензия уже активирована для этого магазина
 		// Очищаем deviceID из БД для сравнения
 		storedDeviceID := strings.TrimSpace(license.DeviceID)
 		
-		log.Printf("🔍 Проверка активации: storedDeviceID='%s', reqDeviceID='%s', storedShopID=%v, reqShopID=%v",
-			storedDeviceID, req.DeviceID, license.ShopID, shopID)
-		
-		// Проверяем, активирована ли на другом магазине
-		if *license.ShopID != shopID {
-			log.Printf("❌ Лицензия уже активирована для другого магазина: %v (запрошен: %v)", license.ShopID, shopID)
-			c.JSON(http.StatusForbidden, gin.H{
-				"success": false,
-				"error":   "License is already activated for a different shop",
-				"data": gin.H{
-					"shopId": license.ShopID,
-				},
-			})
-			return
-		}
+		log.Printf("🔍 Лицензия уже активирована для этого магазина. Проверяем устройство: storedDeviceID='%s', reqDeviceID='%s'",
+			storedDeviceID, req.DeviceID)
 
 		// Проверяем, активирована ли на том же устройстве
 		if storedDeviceID != "" && storedDeviceID == req.DeviceID {
@@ -208,6 +209,9 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		// Разрешаем переактивацию на новом устройстве (обновление компьютера)
 		log.Printf("🔄 Лицензия активирована на другом устройстве для того же магазина. Разрешаем переактивацию.")
 		log.Printf("   Старое устройство: '%s' -> Новое устройство: '%s'", storedDeviceID, req.DeviceID)
+	} else if license.ShopID == nil {
+		// Лицензия еще не активирована - можно активировать
+		log.Printf("✅ Лицензия еще не активирована, можно активировать для магазина %v", shopID)
 	}
 
 	// Проверяем валидность лицензии
