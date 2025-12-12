@@ -59,12 +59,12 @@ func (lc *LicenseController) CheckLicense(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
-				"isValid":           false,
-				"isExpired":         false,
+				"isValid":            false,
+				"isExpired":          false,
 				"subscriptionStatus": license.SubscriptionStatus,
-				"subscriptionType":  license.SubscriptionType,
-				"isActivated":       false,
-				"message":           "License not activated yet",
+				"subscriptionType":   license.SubscriptionType,
+				"isActivated":        false,
+				"message":            "License not activated yet",
 			},
 		})
 		return
@@ -84,13 +84,13 @@ func (lc *LicenseController) CheckLicense(c *gin.Context) {
 
 	// Возвращаем информацию о лицензии
 	response := gin.H{
-		"isValid":           license.IsValid() && deviceMatch,
-		"isExpired":         license.IsExpired(),
+		"isValid":            license.IsValid() && deviceMatch,
+		"isExpired":          license.IsExpired(),
 		"subscriptionStatus": license.SubscriptionStatus,
-		"subscriptionType":  license.SubscriptionType,
-		"expiresAt":         license.ExpiresAt,
-		"daysRemaining":     license.ToResponse().DaysRemaining,
-		"deviceMatch":       deviceMatch,
+		"subscriptionType":   license.SubscriptionType,
+		"expiresAt":          license.ExpiresAt,
+		"daysRemaining":      license.ToResponse().DaysRemaining,
+		"deviceMatch":        deviceMatch,
 	}
 
 	if !deviceMatch && license.DeviceID != "" {
@@ -183,35 +183,28 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		return
 	}
 
-	// Проверяем, не активирована ли уже лицензия для этого магазина
-	if license.ShopID != nil && *license.ShopID == shopID {
-		// Лицензия уже активирована для этого магазина
-		// Очищаем deviceID из БД для сравнения
-		storedDeviceID := strings.TrimSpace(license.DeviceID)
-		
-		log.Printf("🔍 Лицензия уже активирована для этого магазина. Проверяем устройство: storedDeviceID='%s', reqDeviceID='%s'",
-			storedDeviceID, req.DeviceID)
+	// Проверяем device_id
+	storedDeviceID := strings.TrimSpace(license.DeviceID)
+	log.Printf("🔍 Проверка устройства: storedDeviceID='%s', reqDeviceID='%s'", storedDeviceID, req.DeviceID)
 
-		// Проверяем, активирована ли на том же устройстве
-		if storedDeviceID != "" && storedDeviceID == req.DeviceID {
-			// Лицензия уже активирована на этом устройстве
-			log.Printf("✅ Лицензия уже активирована на этом устройстве")
-			database.DB.Preload("Shop").Preload("User").First(&license, license.ID)
-			c.JSON(http.StatusOK, gin.H{
-				"success": true,
-				"message": "License already activated on this device",
-				"data":    license.ToResponse(),
-			})
-			return
-		}
-
-		// Лицензия активирована для того же магазина, но на другом устройстве
-		// Разрешаем переактивацию на новом устройстве (обновление компьютера)
-		log.Printf("🔄 Лицензия активирована на другом устройстве для того же магазина. Разрешаем переактивацию.")
+	// Если device_id пустой - можно активировать (записываем данные)
+	if storedDeviceID == "" {
+		log.Printf("✅ DeviceID пустой - можно активировать лицензию и записать данные устройства")
+	} else if storedDeviceID == req.DeviceID {
+		// Лицензия уже активирована на этом устройстве
+		log.Printf("✅ Лицензия уже активирована на этом устройстве")
+		database.DB.Preload("Shop").Preload("User").First(&license, license.ID)
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "License already activated on this device",
+			"data":    license.ToResponse(),
+		})
+		return
+	} else {
+		// device_id не пустой и не совпадает - это другой компьютер
+		// Разрешаем переактивацию на новом устройстве (обновляем device_id)
+		log.Printf("🔄 DeviceID не совпадает - это другой компьютер. Разрешаем переактивацию.")
 		log.Printf("   Старое устройство: '%s' -> Новое устройство: '%s'", storedDeviceID, req.DeviceID)
-	} else if license.ShopID == nil {
-		// Лицензия еще не активирована - можно активировать
-		log.Printf("✅ Лицензия еще не активирована, можно активировать для магазина %v", shopID)
 	}
 
 	// Проверяем валидность лицензии
@@ -241,7 +234,7 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 
 	// Генерируем fingerprint устройства
 	deviceFingerprint := generateDeviceFingerprint(req.DeviceID, req.DeviceInfo)
-	
+
 	// Сохраняем информацию об устройстве в JSON
 	deviceInfoJSON, err := json.Marshal(req.DeviceInfo)
 	if err != nil {
@@ -252,14 +245,14 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 	// Активируем или переактивируем лицензию
 	now := time.Now()
 	wasAlreadyActivated := license.ShopID != nil
-	
+
 	// Если лицензия уже была активирована, обновляем информацию об устройстве
 	if !wasAlreadyActivated {
 		license.ShopID = &shopID
 		license.UserID = &shop.OwnerID
 		license.ActivatedAt = &now
 	}
-	
+
 	license.SubscriptionStatus = models.SubscriptionStatusActive
 	license.DeviceID = req.DeviceID // Уже обрезан выше
 	license.DeviceInfo = string(deviceInfoJSON)
@@ -280,7 +273,7 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		return
 	}
 
-	log.Printf("✅ Лицензия успешно сохранена в БД: ShopID=%v, DeviceID='%s', Status=%s", 
+	log.Printf("✅ Лицензия успешно сохранена в БД: ShopID=%v, DeviceID='%s', Status=%s",
 		license.ShopID, license.DeviceID, license.SubscriptionStatus)
 
 	// Загружаем связанные данные
@@ -377,15 +370,15 @@ func (lc *LicenseController) GetLicense(c *gin.Context) {
 // CreateLicense создает новую лицензию (админ)
 func (lc *LicenseController) CreateLicense(c *gin.Context) {
 	var req struct {
-		ShopID            *string                `json:"shopId"`
-		SubscriptionType  models.SubscriptionType `json:"subscriptionType" binding:"required"`
-		ActivationType    models.ActivationType   `json:"activationType"`
-		PaymentAmount     float64                 `json:"paymentAmount"`
-		PaymentCurrency   string                  `json:"paymentCurrency"`
-		PaymentProvider   string                  `json:"paymentProvider"`
-		PaymentTransactionID string              `json:"paymentTransactionId"`
-		AutoRenew         bool                    `json:"autoRenew"`
-		Notes             string                  `json:"notes"`
+		ShopID               *string                 `json:"shopId"`
+		SubscriptionType     models.SubscriptionType `json:"subscriptionType" binding:"required"`
+		ActivationType       models.ActivationType   `json:"activationType"`
+		PaymentAmount        float64                 `json:"paymentAmount"`
+		PaymentCurrency      string                  `json:"paymentCurrency"`
+		PaymentProvider      string                  `json:"paymentProvider"`
+		PaymentTransactionID string                  `json:"paymentTransactionId"`
+		AutoRenew            bool                    `json:"autoRenew"`
+		Notes                string                  `json:"notes"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -469,13 +462,13 @@ func (lc *LicenseController) GenerateLicenseForShop(c *gin.Context) {
 	}
 
 	var req struct {
-		SubscriptionType models.SubscriptionType `json:"subscriptionType" binding:"required"`
-		PaymentAmount    float64                 `json:"paymentAmount"`
-		PaymentCurrency  string                  `json:"paymentCurrency"`
-		PaymentProvider  string                  `json:"paymentProvider"`
-		PaymentTransactionID string              `json:"paymentTransactionId"`
-		AutoRenew        bool                    `json:"autoRenew"`
-		Notes            string                  `json:"notes"`
+		SubscriptionType     models.SubscriptionType `json:"subscriptionType" binding:"required"`
+		PaymentAmount        float64                 `json:"paymentAmount"`
+		PaymentCurrency      string                  `json:"paymentCurrency"`
+		PaymentProvider      string                  `json:"paymentProvider"`
+		PaymentTransactionID string                  `json:"paymentTransactionId"`
+		AutoRenew            bool                    `json:"autoRenew"`
+		Notes                string                  `json:"notes"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -507,19 +500,19 @@ func (lc *LicenseController) GenerateLicenseForShop(c *gin.Context) {
 	// Создаем лицензию
 	now := time.Now()
 	license := models.License{
-		ShopID:                &shopID,
-		UserID:                &shop.OwnerID,
-		SubscriptionType:      req.SubscriptionType,
-		ActivationType:        models.ActivationTypePayment,
-		SubscriptionStatus:    models.SubscriptionStatusActive,
-		ActivatedAt:           &now,
-		PaymentAmount:         req.PaymentAmount,
-		PaymentCurrency:       req.PaymentCurrency,
-		PaymentProvider:       req.PaymentProvider,
-		PaymentTransactionID:  req.PaymentTransactionID,
-		AutoRenew:             req.AutoRenew,
-		Notes:                 req.Notes,
-		IsActive:              true,
+		ShopID:               &shopID,
+		UserID:               &shop.OwnerID,
+		SubscriptionType:     req.SubscriptionType,
+		ActivationType:       models.ActivationTypePayment,
+		SubscriptionStatus:   models.SubscriptionStatusActive,
+		ActivatedAt:          &now,
+		PaymentAmount:        req.PaymentAmount,
+		PaymentCurrency:      req.PaymentCurrency,
+		PaymentProvider:      req.PaymentProvider,
+		PaymentTransactionID: req.PaymentTransactionID,
+		AutoRenew:            req.AutoRenew,
+		Notes:                req.Notes,
+		IsActive:             true,
 	}
 
 	// Вычисляем дату окончания
@@ -748,4 +741,3 @@ func toString(v interface{}) string {
 		return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(fmt.Sprintf("%v", val), " ", ""), "\n", ""))
 	}
 }
-
