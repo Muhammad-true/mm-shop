@@ -249,7 +249,7 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 	license.UserID = &shop.OwnerID
 	license.ActivatedAt = &now
 	license.SubscriptionStatus = models.SubscriptionStatusActive
-	license.DeviceID = req.DeviceID
+	license.DeviceID = req.DeviceID // Уже обрезан выше
 	license.DeviceInfo = string(deviceInfoJSON)
 	license.DeviceFingerprint = deviceFingerprint
 

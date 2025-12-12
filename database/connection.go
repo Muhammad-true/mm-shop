@@ -86,6 +86,13 @@ func Connect() error {
 
 	log.Println("✅ Database migrations completed")
 
+	// Очистка лишних пробелов из device_id в лицензиях
+	log.Println("🔄 Cleaning device_id whitespace in licenses...")
+	if err := cleanDeviceIDWhitespace(); err != nil {
+		log.Printf("⚠️ Warning: Failed to clean device_id whitespace: %v", err)
+		// Не прерываем работу, но логируем предупреждение
+	}
+
 	// Проверка и создание ролей
 	log.Println("🔄 Checking and creating default roles...")
 	if err := createDefaultRoles(); err != nil {
@@ -687,5 +694,28 @@ func migrateShopsFromUsers() error {
 		}
 	}
 
+	return nil
+}
+
+// cleanDeviceIDWhitespace очищает лишние пробелы и переносы строк из device_id в таблице licenses
+func cleanDeviceIDWhitespace() error {
+	// Используем raw SQL для обновления всех записей
+	result := DB.Exec(`
+		UPDATE licenses 
+		SET device_id = TRIM(REGEXP_REPLACE(device_id, E'[\\n\\r\\t]+', '', 'g'))
+		WHERE device_id IS NOT NULL 
+		  AND device_id != TRIM(REGEXP_REPLACE(device_id, E'[\\n\\r\\t]+', '', 'g'))
+	`)
+	
+	if result.Error != nil {
+		return result.Error
+	}
+	
+	if result.RowsAffected > 0 {
+		log.Printf("✅ Очищено %d записей с лишними пробелами в device_id", result.RowsAffected)
+	} else {
+		log.Println("✅ Нет записей с лишними пробелами в device_id")
+	}
+	
 	return nil
 }
