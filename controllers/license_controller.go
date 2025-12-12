@@ -204,16 +204,10 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 			return
 		}
 
-		// Лицензия активирована на другом устройстве
-		log.Printf("❌ Лицензия активирована на другом устройстве: stored='%s', requested='%s'", storedDeviceID, req.DeviceID)
-		c.JSON(http.StatusForbidden, gin.H{
-			"success": false,
-			"error":   "License is already activated on a different device",
-			"data": gin.H{
-				"deviceId": license.DeviceID,
-			},
-		})
-		return
+		// Лицензия активирована для того же магазина, но на другом устройстве
+		// Разрешаем переактивацию на новом устройстве (обновление компьютера)
+		log.Printf("🔄 Лицензия активирована на другом устройстве для того же магазина. Разрешаем переактивацию.")
+		log.Printf("   Старое устройство: '%s' -> Новое устройство: '%s'", storedDeviceID, req.DeviceID)
 	}
 
 	// Проверяем валидность лицензии
@@ -243,11 +237,17 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		deviceInfoJSON = []byte("{}")
 	}
 
-	// Активируем лицензию
+	// Активируем или переактивируем лицензию
 	now := time.Now()
-	license.ShopID = &shopID
-	license.UserID = &shop.OwnerID
-	license.ActivatedAt = &now
+	wasAlreadyActivated := license.ShopID != nil
+	
+	// Если лицензия уже была активирована, обновляем информацию об устройстве
+	if !wasAlreadyActivated {
+		license.ShopID = &shopID
+		license.UserID = &shop.OwnerID
+		license.ActivatedAt = &now
+	}
+	
 	license.SubscriptionStatus = models.SubscriptionStatusActive
 	license.DeviceID = req.DeviceID // Уже обрезан выше
 	license.DeviceInfo = string(deviceInfoJSON)
@@ -270,9 +270,14 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 	// Загружаем связанные данные
 	database.DB.Preload("Shop").Preload("User").First(&license, license.ID)
 
+	message := "License activated successfully"
+	if wasAlreadyActivated {
+		message = "License reactivated on new device successfully"
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "License activated successfully",
+		"message": message,
 		"data":    license.ToResponse(),
 	})
 }
@@ -595,6 +600,85 @@ func (lc *LicenseController) UpdateLicense(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "License updated successfully",
+		"data":    license.ToResponse(),
+	})
+}
+
+// DeactivateLicense деактивирует лицензию для магазина (очищает device_id для возможности активации на новом устройстве)
+func (lc *LicenseController) DeactivateLicense(c *gin.Context) {
+	var req struct {
+		LicenseKey string `json:"licenseKey" binding:"required"`
+		ShopID     string `json:"shopId" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Очищаем данные
+	req.LicenseKey = strings.TrimSpace(req.LicenseKey)
+	req.ShopID = strings.TrimSpace(req.ShopID)
+
+	// Парсим ShopID
+	shopID, err := uuid.Parse(req.ShopID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid shop ID",
+		})
+		return
+	}
+
+	// Находим лицензию
+	var license models.License
+	if err := database.DB.Where("license_key = ?", req.LicenseKey).First(&license).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "License not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Database error",
+		})
+		return
+	}
+
+	// Проверяем, что лицензия принадлежит этому магазину
+	if license.ShopID == nil || *license.ShopID != shopID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "License does not belong to this shop",
+		})
+		return
+	}
+
+	// Деактивируем устройство (очищаем device_id, но оставляем shop_id)
+	license.DeviceID = ""
+	license.DeviceInfo = ""
+	license.DeviceFingerprint = ""
+
+	if err := database.DB.Save(&license).Error; err != nil {
+		log.Printf("❌ Ошибка деактивации лицензии: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to deactivate license",
+		})
+		return
+	}
+
+	log.Printf("✅ Лицензия %s деактивирована для магазина %s (устройство очищено)", req.LicenseKey, shopID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "License deactivated successfully. You can now activate it on a new device.",
 		"data":    license.ToResponse(),
 	})
 }

@@ -94,7 +94,8 @@ func SetupRoutes() *gin.Engine {
 		licenses := public.Group("licenses")
 		{
 			licenses.POST("/check", licenseController.CheckLicense)       // Проверка статуса лицензии
-			licenses.POST("/activate", licenseController.ActivateLicense) // Активация лицензии (Flutter: shopId + licenseKey)
+			licenses.POST("/activate", licenseController.ActivateLicense) // Активация/переактивация лицензии (Flutter: shopId + licenseKey)
+			licenses.POST("/deactivate", licenseController.DeactivateLicense) // Деактивация лицензии для смены устройства
 		}
 
 		// Планы подписки (публичный доступ)
