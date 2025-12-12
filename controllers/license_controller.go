@@ -34,6 +34,10 @@ func (lc *LicenseController) CheckLicense(c *gin.Context) {
 		return
 	}
 
+	// Очищаем deviceId от лишних пробелов и переносов строк
+	req.DeviceID = strings.TrimSpace(req.DeviceID)
+	req.LicenseKey = strings.TrimSpace(req.LicenseKey)
+
 	var license models.License
 	if err := database.DB.Where("license_key = ?", req.LicenseKey).First(&license).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -68,8 +72,9 @@ func (lc *LicenseController) CheckLicense(c *gin.Context) {
 
 	// Проверяем соответствие устройства
 	deviceMatch := false
-	if license.DeviceID != "" {
-		deviceMatch = license.DeviceID == req.DeviceID
+	storedDeviceID := strings.TrimSpace(license.DeviceID)
+	if storedDeviceID != "" {
+		deviceMatch = storedDeviceID == req.DeviceID
 		if !deviceMatch && req.DeviceInfo != nil {
 			// Дополнительная проверка по fingerprint
 			fingerprint := generateDeviceFingerprint(req.DeviceID, req.DeviceInfo)
@@ -111,6 +116,11 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		return
 	}
 
+	// Очищаем deviceId от лишних пробелов и переносов строк
+	req.DeviceID = strings.TrimSpace(req.DeviceID)
+	req.LicenseKey = strings.TrimSpace(req.LicenseKey)
+	req.ShopID = strings.TrimSpace(req.ShopID)
+
 	// Парсим ShopID
 	shopID, err := uuid.Parse(req.ShopID)
 	if err != nil {
@@ -142,12 +152,14 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 	var license models.License
 	if err := database.DB.Where("license_key = ?", req.LicenseKey).First(&license).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
+			log.Printf("❌ Лицензия не найдена: %s", req.LicenseKey)
 			c.JSON(http.StatusNotFound, gin.H{
 				"success": false,
 				"error":   "License not found",
 			})
 			return
 		}
+		log.Printf("❌ Ошибка БД при поиске лицензии: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "Database error",
@@ -155,11 +167,34 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		return
 	}
 
+	log.Printf("🔍 Найдена лицензия: ID=%s, ShopID=%v, DeviceID='%s', Status=%s, IsActive=%v",
+		license.ID, license.ShopID, license.DeviceID, license.SubscriptionStatus, license.IsActive)
+
 	// Проверяем, не активирована ли уже лицензия
 	if license.ShopID != nil {
+		// Очищаем deviceID из БД для сравнения
+		storedDeviceID := strings.TrimSpace(license.DeviceID)
+		
+		log.Printf("🔍 Проверка активации: storedDeviceID='%s', reqDeviceID='%s', storedShopID=%v, reqShopID=%v",
+			storedDeviceID, req.DeviceID, license.ShopID, shopID)
+		
+		// Проверяем, активирована ли на другом магазине
+		if *license.ShopID != shopID {
+			log.Printf("❌ Лицензия уже активирована для другого магазина: %v (запрошен: %v)", license.ShopID, shopID)
+			c.JSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"error":   "License is already activated for a different shop",
+				"data": gin.H{
+					"shopId": license.ShopID,
+				},
+			})
+			return
+		}
+
 		// Проверяем, активирована ли на том же устройстве
-		if license.DeviceID == req.DeviceID {
+		if storedDeviceID != "" && storedDeviceID == req.DeviceID {
 			// Лицензия уже активирована на этом устройстве
+			log.Printf("✅ Лицензия уже активирована на этом устройстве")
 			database.DB.Preload("Shop").Preload("User").First(&license, license.ID)
 			c.JSON(http.StatusOK, gin.H{
 				"success": true,
@@ -170,6 +205,7 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		}
 
 		// Лицензия активирована на другом устройстве
+		log.Printf("❌ Лицензия активирована на другом устройстве: stored='%s', requested='%s'", storedDeviceID, req.DeviceID)
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"error":   "License is already activated on a different device",
