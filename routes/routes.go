@@ -93,28 +93,29 @@ func SetupRoutes() *gin.Engine {
 		// Лицензии (публичный доступ для проверки и активации)
 		licenses := public.Group("licenses")
 		{
-			licenses.POST("/check", licenseController.CheckLicense)       // Проверка статуса лицензии
-			licenses.POST("/activate", licenseController.ActivateLicense) // Активация/переактивация лицензии (Flutter: shopId + licenseKey)
+			licenses.POST("/check", licenseController.CheckLicense)           // Проверка статуса лицензии
+			licenses.POST("/activate", licenseController.ActivateLicense)     // Активация/переактивация лицензии (Flutter: shopId + licenseKey)
 			licenses.POST("/deactivate", licenseController.DeactivateLicense) // Деактивация лицензии для смены устройства
 		}
 
 		// Планы подписки (публичный доступ)
 		subscriptions := public.Group("subscriptions")
 		{
-			subscriptions.GET("/plans", subscriptionController.GetSubscriptionPlans)     // Список планов подписки
-			subscriptions.GET("/plans/:id", subscriptionController.GetSubscriptionPlan)  // Информация о плане
+			subscriptions.GET("/plans", subscriptionController.GetSubscriptionPlans)    // Список планов подписки
+			subscriptions.GET("/plans/:id", subscriptionController.GetSubscriptionPlan) // Информация о плане
 		}
 
 		// Регистрация магазина и подписка (публичный доступ для сайта)
 		shopRegistration := public.Group("shop-registration")
 		{
-			shopRegistration.POST("/register", shopRegistrationController.RegisterShop)  // Регистрация магазина
+			shopRegistration.POST("/register", shopRegistrationController.RegisterShop)   // Регистрация магазина
 			shopRegistration.POST("/subscribe", shopRegistrationController.SubscribeShop) // Подписка (создание лицензии после оплаты)
 		}
 
 		// Магазины (публичный доступ для просмотра, аутентификация для подписки)
 		shops := public.Group("shops")
 		{
+			shops.GET("/list", shopController.GetShops)                            // Список всех магазинов с информацией о подписке
 			shops.GET("/:id", shopController.GetShopInfo)                          // Информация о магазине
 			shops.GET("/:id/products", shopController.GetShopProducts)             // Товары магазина с фильтрацией
 			shops.GET("/:id/subscription/check", shopController.CheckSubscription) // Проверка подписки (требует аутентификации)
@@ -216,6 +217,7 @@ func SetupRoutes() *gin.Engine {
 		// Подписки на магазины
 		shops := protected.Group("shops")
 		{
+			shops.GET("/", shopController.GetShops)                            // Список всех магазинов с информацией о подписке пользователя
 			shops.POST("/:id/subscribe", shopController.SubscribeToShop)       // Подписаться на магазин
 			shops.DELETE("/:id/subscribe", shopController.UnsubscribeFromShop) // Отписаться от магазина
 			shops.GET("/:id/subscribers", shopController.GetShopSubscribers)   // Список подписчиков (для владельца)
@@ -282,10 +284,10 @@ func SetupRoutes() *gin.Engine {
 		// Управление лицензиями (админы и супер админы)
 		adminLicenses := admin.Group("licenses")
 		{
-			adminLicenses.GET("/", licenseController.GetLicenses)                    // Список всех лицензий
-			adminLicenses.GET("/:id", licenseController.GetLicense)                  // Информация о лицензии
-			adminLicenses.POST("/", licenseController.CreateLicense)                 // Создание лицензии
-			adminLicenses.PUT("/:id", licenseController.UpdateLicense)               // Обновление лицензии
+			adminLicenses.GET("/", licenseController.GetLicenses)                                   // Список всех лицензий
+			adminLicenses.GET("/:id", licenseController.GetLicense)                                 // Информация о лицензии
+			adminLicenses.POST("/", licenseController.CreateLicense)                                // Создание лицензии
+			adminLicenses.PUT("/:id", licenseController.UpdateLicense)                              // Обновление лицензии
 			adminLicenses.POST("/shops/:shopId/generate", licenseController.GenerateLicenseForShop) // Генерация лицензии для магазина
 		}
 

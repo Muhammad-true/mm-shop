@@ -688,3 +688,337 @@ func (sc *ShopController) CheckSubscription(c *gin.Context) {
 	})
 }
 
+// GetShops возвращает список всех магазинов с информацией о подписке пользователя
+func (sc *ShopController) GetShops(c *gin.Context) {
+	log.Printf("🛍️ [GetShops] Начало получения списка магазинов")
+
+	var userID *uuid.UUID
+	var userFound bool
+
+	// Пробуем получить пользователя из контекста (если был middleware)
+	currentUser, exists := c.Get("user")
+	if exists {
+		user := currentUser.(models.User)
+		userID = &user.ID
+		userFound = true
+		log.Printf("✅ [GetShops] Пользователь найден через middleware: userID=%s", user.ID)
+	} else {
+		// Если пользователя нет в контексте, пробуем опционально проверить токен
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			if tokenString != authHeader {
+				claims, err := utils.ValidateJWT(tokenString)
+				if err == nil {
+					parsedUserID, err := uuid.Parse(claims.UserID)
+					if err == nil {
+						var user models.User
+						if err := database.DB.Preload("Role").First(&user, "id = ? AND is_active = ?", parsedUserID, true).Error; err == nil {
+							userID = &user.ID
+							userFound = true
+							log.Printf("✅ [GetShops] Пользователь найден через токен: userID=%s", user.ID)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Получаем список подписок пользователя (если пользователь найден)
+	var subscribedShopIDs map[uuid.UUID]bool
+	if userFound && userID != nil {
+		var subscriptions []models.ShopSubscription
+		if err := database.DB.Where("user_id = ?", *userID).Find(&subscriptions).Error; err == nil {
+			subscribedShopIDs = make(map[uuid.UUID]bool)
+			for _, sub := range subscriptions {
+				subscribedShopIDs[sub.ShopID] = true
+			}
+			log.Printf("📋 [GetShops] Найдено подписок: %d", len(subscribedShopIDs))
+		}
+	}
+
+	// Пагинация
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	offset := (page - 1) * limit
+
+	// Получаем магазины из новой таблицы shops
+	var shops []models.Shop
+	var total int64
+
+	query := database.DB.Model(&models.Shop{}).Where("is_active = ?", true)
+
+	// Фильтрация по городу
+	if cityID := c.Query("city_id"); cityID != "" {
+		if cityUUID, err := uuid.Parse(cityID); err == nil {
+			query = query.Where("city_id = ?", cityUUID)
+		}
+	}
+
+	// Поиск по названию
+	if search := c.Query("search"); search != "" {
+		query = query.Where("name ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	// Подсчитываем общее количество
+	query.Count(&total)
+
+	// Получаем магазины с загрузкой связей
+	if err := query.Preload("Owner.Role").
+		Preload("City").
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&shops).Error; err != nil {
+		log.Printf("❌ [GetShops] Ошибка получения магазинов: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to fetch shops",
+		})
+		return
+	}
+
+	// Также получаем магазины из legacy таблицы users (shop_owner)
+	var legacyShops []models.User
+	var legacyTotal int64
+
+	legacyQuery := database.DB.Model(&models.User{}).
+		Joins("JOIN roles ON users.role_id = roles.id").
+		Where("roles.name = ? AND users.is_active = ?", "shop_owner", true)
+
+	// Применяем те же фильтры
+	if search := c.Query("search"); search != "" {
+		legacyQuery = legacyQuery.Where("users.name ILIKE ?", "%"+search+"%")
+	}
+
+	legacyQuery.Count(&legacyTotal)
+
+	if err := legacyQuery.Preload("Role").
+		Order("users.created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&legacyShops).Error; err == nil {
+		log.Printf("📋 [GetShops] Найдено legacy магазинов: %d", len(legacyShops))
+	}
+
+	// Формируем ответ
+	shopResponses := make([]gin.H, 0)
+
+	// Обрабатываем новые магазины
+	for _, shop := range shops {
+		var productsCount int64
+		var subscribersCount int64
+
+		database.DB.Model(&models.Product{}).Where("shop_id = ? OR owner_id = ?", shop.ID, shop.OwnerID).Count(&productsCount)
+		database.DB.Model(&models.ShopSubscription{}).Where("shop_id = ?", shop.ID).Count(&subscribersCount)
+
+		isSubscribed := false
+		if subscribedShopIDs != nil {
+			isSubscribed = subscribedShopIDs[shop.ID]
+		}
+
+		// Получаем информацию о лицензии магазина (подписке магазина на платформу)
+		var license models.License
+		var licenseInfo gin.H
+		if err := database.DB.Where("shop_id = ? AND is_active = ?", shop.ID, true).
+			Order("created_at DESC").
+			First(&license).Error; err == nil {
+			// Вычисляем оставшиеся дни
+			var daysRemaining *int
+			if license.ExpiresAt != nil {
+				days := int(time.Until(*license.ExpiresAt).Hours() / 24)
+				if days > 0 {
+					daysRemaining = &days
+				} else {
+					zero := 0
+					daysRemaining = &zero
+				}
+			}
+
+			// Получаем план подписки для отображения цены
+			var subscriptionPlan models.SubscriptionPlan
+			planPrice := license.PaymentAmount
+			planCurrency := license.PaymentCurrency
+			if license.SubscriptionType != "" {
+				if err := database.DB.Where("subscription_type = ? AND is_active = ?", license.SubscriptionType, true).
+					Order("sort_order ASC").
+					First(&subscriptionPlan).Error; err == nil {
+					// Используем цену из плана, если она есть
+					if subscriptionPlan.Price > 0 {
+						planPrice = subscriptionPlan.Price
+						planCurrency = subscriptionPlan.Currency
+					}
+				}
+			}
+
+			licenseInfo = gin.H{
+				"activatedAt":   license.ActivatedAt,
+				"expiresAt":     license.ExpiresAt,
+				"daysRemaining": daysRemaining,
+				"price":         planPrice,
+				"currency":      planCurrency,
+				"subscriptionType": license.SubscriptionType,
+				"subscriptionStatus": license.SubscriptionStatus,
+				"isValid":       license.IsValid(),
+				"isExpired":     license.IsExpired(),
+			}
+		}
+
+		shopResponse := gin.H{
+			"id":               shop.ID,
+			"name":             shop.Name,
+			"inn":              shop.INN,
+			"description":      shop.Description,
+			"logo":             shop.Logo,
+			"email":            shop.Email,
+			"phone":            shop.Phone,
+			"address":          shop.Address,
+			"rating":           shop.Rating,
+			"isActive":         shop.IsActive,
+			"ownerId":          shop.OwnerID,
+			"productsCount":    productsCount,
+			"subscribersCount": subscribersCount,
+			"isSubscribed":     isSubscribed,
+			"createdAt":        shop.CreatedAt,
+		}
+
+		// Добавляем информацию о лицензии, если она есть
+		if licenseInfo != nil {
+			shopResponse["license"] = licenseInfo
+		}
+
+		if shop.City != nil {
+			shopResponse["city"] = gin.H{
+				"id":   shop.City.ID,
+				"name": shop.City.Name,
+			}
+		}
+
+		shopResponses = append(shopResponses, shopResponse)
+	}
+
+	// Обрабатываем legacy магазины
+	for _, shopUser := range legacyShops {
+		// Проверяем, не добавлен ли уже этот магазин (может быть дубликат)
+		isDuplicate := false
+		for _, shop := range shops {
+			if shop.OwnerID == shopUser.ID {
+				isDuplicate = true
+				break
+			}
+		}
+
+		if isDuplicate {
+			continue
+		}
+
+		var productsCount int64
+		var subscribersCount int64
+
+		database.DB.Model(&models.Product{}).Where("owner_id = ?", shopUser.ID).Count(&productsCount)
+		database.DB.Model(&models.ShopSubscription{}).Where("shop_id = ?", shopUser.ID).Count(&subscribersCount)
+
+		isSubscribed := false
+		if subscribedShopIDs != nil {
+			isSubscribed = subscribedShopIDs[shopUser.ID]
+		}
+
+		// Получаем информацию о лицензии магазина (для legacy магазинов shop_id = user_id)
+		var license models.License
+		var licenseInfo gin.H
+		if err := database.DB.Where("shop_id = ? AND is_active = ?", shopUser.ID, true).
+			Order("created_at DESC").
+			First(&license).Error; err == nil {
+			// Вычисляем оставшиеся дни
+			var daysRemaining *int
+			if license.ExpiresAt != nil {
+				days := int(time.Until(*license.ExpiresAt).Hours() / 24)
+				if days > 0 {
+					daysRemaining = &days
+				} else {
+					zero := 0
+					daysRemaining = &zero
+				}
+			}
+
+			// Получаем план подписки для отображения цены
+			var subscriptionPlan models.SubscriptionPlan
+			planPrice := license.PaymentAmount
+			planCurrency := license.PaymentCurrency
+			if license.SubscriptionType != "" {
+				if err := database.DB.Where("subscription_type = ? AND is_active = ?", license.SubscriptionType, true).
+					Order("sort_order ASC").
+					First(&subscriptionPlan).Error; err == nil {
+					// Используем цену из плана, если она есть
+					if subscriptionPlan.Price > 0 {
+						planPrice = subscriptionPlan.Price
+						planCurrency = subscriptionPlan.Currency
+					}
+				}
+			}
+
+			licenseInfo = gin.H{
+				"activatedAt":   license.ActivatedAt,
+				"expiresAt":     license.ExpiresAt,
+				"daysRemaining": daysRemaining,
+				"price":         planPrice,
+				"currency":      planCurrency,
+				"subscriptionType": license.SubscriptionType,
+				"subscriptionStatus": license.SubscriptionStatus,
+				"isValid":       license.IsValid(),
+				"isExpired":     license.IsExpired(),
+			}
+		}
+
+		shopResponse := gin.H{
+			"id":               shopUser.ID,
+			"name":             shopUser.Name,
+			"inn":              shopUser.INN,
+			"description":      "",
+			"logo":             shopUser.Avatar,
+			"email":            shopUser.Email,
+			"phone":            shopUser.Phone,
+			"address":          "",
+			"rating":           0,
+			"isActive":         shopUser.IsActive,
+			"ownerId":          shopUser.ID,
+			"productsCount":    productsCount,
+			"subscribersCount": subscribersCount,
+			"isSubscribed":     isSubscribed,
+			"createdAt":        shopUser.CreatedAt,
+		}
+
+		// Добавляем информацию о лицензии, если она есть
+		if licenseInfo != nil {
+			shopResponse["license"] = licenseInfo
+		}
+
+		shopResponses = append(shopResponses, shopResponse)
+	}
+
+	// Обновляем total с учетом legacy магазинов
+	total = total + legacyTotal
+
+	log.Printf("✅ [GetShops] Возвращаем %d магазинов (страница %d, лимит %d)", len(shopResponses), page, limit)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"shops": shopResponses,
+			"pagination": gin.H{
+				"page":  page,
+				"limit": limit,
+				"total": total,
+				"pages": (total + int64(limit) - 1) / int64(limit),
+			},
+		},
+	})
+}
+
