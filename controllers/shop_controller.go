@@ -859,15 +859,16 @@ func (sc *ShopController) GetShops(c *gin.Context) {
 			}
 
 			licenseInfo = gin.H{
-				"activatedAt":   license.ActivatedAt,
-				"expiresAt":     license.ExpiresAt,
-				"daysRemaining": daysRemaining,
-				"price":         planPrice,
-				"currency":      planCurrency,
+				"licenseKey":       license.LicenseKey,
+				"activatedAt":      license.ActivatedAt,
+				"expiresAt":        license.ExpiresAt,
+				"daysRemaining":    daysRemaining,
+				"price":            planPrice,
+				"currency":         planCurrency,
 				"subscriptionType": license.SubscriptionType,
 				"subscriptionStatus": license.SubscriptionStatus,
-				"isValid":       license.IsValid(),
-				"isExpired":     license.IsExpired(),
+				"isValid":          license.IsValid(),
+				"isExpired":        license.IsExpired(),
 			}
 		}
 
@@ -965,15 +966,16 @@ func (sc *ShopController) GetShops(c *gin.Context) {
 			}
 
 			licenseInfo = gin.H{
-				"activatedAt":   license.ActivatedAt,
-				"expiresAt":     license.ExpiresAt,
-				"daysRemaining": daysRemaining,
-				"price":         planPrice,
-				"currency":      planCurrency,
+				"licenseKey":       license.LicenseKey,
+				"activatedAt":      license.ActivatedAt,
+				"expiresAt":        license.ExpiresAt,
+				"daysRemaining":    daysRemaining,
+				"price":            planPrice,
+				"currency":         planCurrency,
 				"subscriptionType": license.SubscriptionType,
 				"subscriptionStatus": license.SubscriptionStatus,
-				"isValid":       license.IsValid(),
-				"isExpired":     license.IsExpired(),
+				"isValid":          license.IsValid(),
+				"isExpired":        license.IsExpired(),
 			}
 		}
 
