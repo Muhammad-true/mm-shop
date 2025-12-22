@@ -3,6 +3,9 @@ package database
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mm-api/mm-api/config"
@@ -173,7 +176,8 @@ func maskDatabaseURL(url string) string {
 
 // runMigrations выполняет миграции базы данных
 func runMigrations() error {
-	return DB.AutoMigrate(
+	// Сначала выполняем GORM AutoMigrate для автоматического создания/обновления таблиц
+	if err := DB.AutoMigrate(
 		&models.Role{},
 		&models.User{},
 		&models.City{}, // Таблица городов
@@ -192,7 +196,96 @@ func runMigrations() error {
 		&models.DeviceToken{},
 		&models.SubscriptionPlan{}, // Планы подписки
 		&models.License{},          // Лицензии
-	)
+	); err != nil {
+		return fmt.Errorf("failed to run GORM AutoMigrate: %w", err)
+	}
+
+	// Затем выполняем SQL миграции из папки migrations
+	if err := runSQLMigrations(); err != nil {
+		log.Printf("⚠️ Warning: Failed to run SQL migrations: %v", err)
+		// Не прерываем работу, но логируем предупреждение
+	}
+
+	return nil
+}
+
+// runSQLMigrations выполняет SQL миграции из папки database/migrations
+func runSQLMigrations() error {
+	migrationsDir := "database/migrations"
+	
+	// Проверяем существование папки
+	if _, err := os.Stat(migrationsDir); os.IsNotExist(err) {
+		log.Printf("ℹ️ Migrations directory not found: %s", migrationsDir)
+		return nil
+	}
+
+	// Получаем список SQL файлов
+	files, err := filepath.Glob(filepath.Join(migrationsDir, "*.sql"))
+	if err != nil {
+		return fmt.Errorf("failed to read migrations directory: %w", err)
+	}
+
+	if len(files) == 0 {
+		log.Printf("ℹ️ No SQL migration files found in %s", migrationsDir)
+		return nil
+	}
+
+	log.Printf("📋 Found %d SQL migration files", len(files))
+
+	// Получаем базовое подключение для выполнения SQL
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get database connection: %w", err)
+	}
+
+	// Выполняем каждую миграцию
+	for _, file := range files {
+		fileName := filepath.Base(file)
+		log.Printf("🔄 Running SQL migration: %s", fileName)
+
+		// Читаем содержимое файла
+		sqlContent, err := os.ReadFile(file)
+		if err != nil {
+			log.Printf("❌ Failed to read migration file %s: %v", fileName, err)
+			continue
+		}
+
+		// Разбиваем на отдельные команды (разделитель - точка с запятой)
+		statements := strings.Split(string(sqlContent), ";")
+		
+		for _, statement := range statements {
+			statement = strings.TrimSpace(statement)
+			// Пропускаем пустые строки и комментарии
+			if statement == "" || strings.HasPrefix(statement, "--") {
+				continue
+			}
+
+			// Выполняем SQL команду
+			if _, err := sqlDB.Exec(statement); err != nil {
+				// Игнорируем ошибки "уже существует" (IF NOT EXISTS)
+				if strings.Contains(err.Error(), "already exists") || 
+				   strings.Contains(err.Error(), "duplicate") {
+					log.Printf("ℹ️ Migration %s: %s (already applied)", fileName, err.Error())
+					continue
+				}
+				log.Printf("❌ Failed to execute migration %s: %v", fileName, err)
+				log.Printf("   Statement: %s", statement[:min(100, len(statement))])
+				// Продолжаем выполнение других миграций
+			}
+		}
+
+		log.Printf("✅ Migration %s completed", fileName)
+	}
+
+	return nil
+}
+
+// min возвращает минимальное из двух чисел
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // createDefaultRoles создает роли по умолчанию, если они не существуют

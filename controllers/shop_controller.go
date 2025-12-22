@@ -825,11 +825,15 @@ func (sc *ShopController) GetShops(c *gin.Context) {
 		}
 
 		// Получаем информацию о лицензии магазина (подписке магазина на платформу)
+		// Ищем последнюю лицензию для магазина (даже если она неактивна или истекла)
 		var license models.License
 		var licenseInfo gin.H
-		if err := database.DB.Where("shop_id = ? AND is_active = ?", shop.ID, true).
+		err := database.DB.Where("shop_id = ?", shop.ID).
 			Order("created_at DESC").
-			First(&license).Error; err == nil {
+			First(&license).Error
+		
+		if err == nil {
+			log.Printf("✅ [GetShops] Найдена лицензия для магазина %s: licenseKey=%s, status=%s", shop.ID, license.LicenseKey, license.SubscriptionStatus)
 			// Вычисляем оставшиеся дни
 			var daysRemaining *int
 			if license.ExpiresAt != nil {
@@ -934,7 +938,7 @@ func (sc *ShopController) GetShops(c *gin.Context) {
 		// Получаем информацию о лицензии магазина (для legacy магазинов shop_id = user_id)
 		var license models.License
 		var licenseInfo gin.H
-		if err := database.DB.Where("shop_id = ? AND is_active = ?", shopUser.ID, true).
+		if err := database.DB.Where("shop_id = ?", shopUser.ID).
 			Order("created_at DESC").
 			First(&license).Error; err == nil {
 			// Вычисляем оставшиеся дни

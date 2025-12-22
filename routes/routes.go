@@ -108,8 +108,9 @@ func SetupRoutes() *gin.Engine {
 		// Регистрация магазина и подписка (публичный доступ для сайта)
 		shopRegistration := public.Group("shop-registration")
 		{
-			shopRegistration.POST("/register", shopRegistrationController.RegisterShop)   // Регистрация магазина
-			shopRegistration.POST("/subscribe", shopRegistrationController.SubscribeShop) // Подписка (создание лицензии после оплаты)
+			shopRegistration.POST("/register", shopRegistrationController.RegisterShop)                          // Регистрация магазина
+			shopRegistration.POST("/subscribe", shopRegistrationController.SubscribeShop)                        // Подписка (создание лицензии после оплаты)
+			shopRegistration.POST("/webhook/lemonsqueezy", shopRegistrationController.HandleLemonSqueezyWebhook) // Webhook от Lemon Squeezy
 		}
 
 		// Магазины (публичный доступ для просмотра, аутентификация для подписки)

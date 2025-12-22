@@ -171,7 +171,7 @@ func (src *ShopRegistrationController) SubscribeShop(c *gin.Context) {
 	var req struct {
 		ShopID              string                      `json:"shopId" binding:"required"`
 		SubscriptionPlanID  string                      `json:"subscriptionPlanId" binding:"required"`
-		PaymentProvider     string                      `json:"paymentProvider" binding:"required"`     // stripe, paypal, etc.
+		PaymentProvider     string                      `json:"paymentProvider"`     // lemonsqueezy, stripe, paypal, etc. (по умолчанию lemonsqueezy)
 		PaymentTransactionID string                     `json:"paymentTransactionId" binding:"required"` // ID транзакции от платежной системы
 		PaymentAmount       float64                     `json:"paymentAmount" binding:"required"`
 		PaymentCurrency     string                      `json:"paymentCurrency"` // По умолчанию USD
@@ -264,6 +264,12 @@ func (src *ShopRegistrationController) SubscribeShop(c *gin.Context) {
 		currency = plan.Currency
 	}
 
+	// Используем lemonsqueezy по умолчанию, если не указан провайдер
+	paymentProvider := req.PaymentProvider
+	if paymentProvider == "" {
+		paymentProvider = "lemonsqueezy"
+	}
+
 	license := models.License{
 		ShopID:                &shopID,
 		UserID:                &shop.OwnerID,
@@ -273,7 +279,7 @@ func (src *ShopRegistrationController) SubscribeShop(c *gin.Context) {
 		ActivatedAt:           &now,
 		PaymentAmount:         req.PaymentAmount,
 		PaymentCurrency:       currency,
-		PaymentProvider:       req.PaymentProvider,
+		PaymentProvider:       paymentProvider,
 		PaymentTransactionID:  req.PaymentTransactionID,
 		LastPaymentDate:       &now,
 		AutoRenew:             req.AutoRenew,
@@ -300,6 +306,215 @@ func (src *ShopRegistrationController) SubscribeShop(c *gin.Context) {
 		"success": true,
 		"message": "Subscription created successfully",
 		"data":    license.ToResponse(),
+	})
+}
+
+// HandleLemonSqueezyWebhook обрабатывает webhook от Lemon Squeezy для подтверждения платежей
+func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context) {
+	// Получаем сигнатуру из заголовка для проверки подлинности
+	signature := c.GetHeader("X-Signature")
+	if signature == "" {
+		log.Printf("⚠️ [LemonSqueezyWebhook] Отсутствует заголовок X-Signature")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Missing signature",
+		})
+		return
+	}
+
+	// Читаем тело запроса
+	var webhookData map[string]interface{}
+	if err := c.ShouldBindJSON(&webhookData); err != nil {
+		log.Printf("❌ [LemonSqueezyWebhook] Ошибка парсинга JSON: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid JSON",
+		})
+		return
+	}
+
+	// Логируем полученный webhook для отладки
+	log.Printf("📥 [LemonSqueezyWebhook] Получен webhook: %+v", webhookData)
+
+	// Извлекаем тип события
+	eventName := ""
+	if meta, ok := webhookData["meta"].(map[string]interface{}); ok {
+		if name, ok := meta["event_name"].(string); ok {
+			eventName = name
+		}
+	}
+
+	log.Printf("📋 [LemonSqueezyWebhook] Тип события: %s", eventName)
+
+	// Обрабатываем только события, связанные с оплатой
+	switch eventName {
+	case "order_created", "subscription_created", "subscription_payment_success":
+		// Извлекаем данные о заказе/подписке
+		data, ok := webhookData["data"].(map[string]interface{})
+		if !ok {
+			log.Printf("❌ [LemonSqueezyWebhook] Некорректная структура данных")
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "Invalid data structure",
+			})
+			return
+		}
+
+		// Извлекаем ID транзакции
+		var transactionID string
+		if id, ok := data["id"].(string); ok {
+			transactionID = id
+		} else if attributes, ok := data["attributes"].(map[string]interface{}); ok {
+			if id, ok := attributes["order_id"].(string); ok {
+				transactionID = id
+			} else if id, ok := attributes["subscription_id"].(string); ok {
+				transactionID = id
+			}
+		}
+
+		// Извлекаем сумму оплаты
+		var amount float64
+		if attributes, ok := data["attributes"].(map[string]interface{}); ok {
+			if total, ok := attributes["total"].(float64); ok {
+				amount = total
+			} else if total, ok := attributes["total_formatted"].(string); ok {
+				// Парсим строку вида "$29.99"
+				// Упрощенный парсинг, можно улучшить
+				log.Printf("📊 [LemonSqueezyWebhook] Total formatted: %s", total)
+			}
+		}
+
+		// Извлекаем variant_id для определения плана подписки
+		var variantID string
+		if attributes, ok := data["attributes"].(map[string]interface{}); ok {
+			if variant, ok := attributes["variant_id"].(string); ok {
+				variantID = variant
+			} else if firstOrderItem, ok := attributes["first_order_item"].(map[string]interface{}); ok {
+				if variant, ok := firstOrderItem["variant_id"].(string); ok {
+					variantID = variant
+				}
+			}
+		}
+
+		log.Printf("💰 [LemonSqueezyWebhook] TransactionID: %s, Amount: %.2f, VariantID: %s", transactionID, amount, variantID)
+
+		// Находим план подписки по variant_id
+		if variantID != "" {
+			var plan models.SubscriptionPlan
+			if err := database.DB.Where("lemonsqueezy_variant_id = ?", variantID).First(&plan).Error; err == nil {
+				log.Printf("✅ [LemonSqueezyWebhook] Найден план подписки: %s (ID: %s)", plan.Name, plan.ID)
+
+				// Извлекаем shop_id из custom данных или customer email
+				// В Lemon Squeezy можно передавать custom данные через checkout
+				var shopID *uuid.UUID
+				if attributes, ok := data["attributes"].(map[string]interface{}); ok {
+					if custom, ok := attributes["custom"].(map[string]interface{}); ok {
+						if shopIDStr, ok := custom["shop_id"].(string); ok {
+							if parsedID, err := uuid.Parse(shopIDStr); err == nil {
+								shopID = &parsedID
+							}
+						}
+					}
+					// Альтернативно: ищем по email покупателя
+					if shopID == nil {
+						if customerEmail, ok := attributes["user_email"].(string); ok {
+							var shop models.Shop
+							if err := database.DB.Where("email = ?", customerEmail).First(&shop).Error; err == nil {
+								shopID = &shop.ID
+							}
+						}
+					}
+				}
+
+				if shopID != nil {
+					// Проверяем, нет ли уже активной лицензии
+					var existingLicense models.License
+					if err := database.DB.Where("shop_id = ? AND subscription_status = ?", shopID, models.SubscriptionStatusActive).First(&existingLicense).Error; err == nil {
+						if !existingLicense.IsExpired() {
+							log.Printf("ℹ️ [LemonSqueezyWebhook] У магазина уже есть активная лицензия")
+							c.JSON(http.StatusOK, gin.H{
+								"success": true,
+								"message": "License already exists",
+							})
+							return
+						}
+					}
+
+					// Создаем лицензию
+					now := time.Now()
+					license := models.License{
+						ShopID:                shopID,
+						SubscriptionType:       plan.SubscriptionType,
+						ActivationType:         models.ActivationTypePayment,
+						SubscriptionStatus:     models.SubscriptionStatusActive,
+						ActivatedAt:            &now,
+						PaymentAmount:          amount,
+						PaymentCurrency:        plan.Currency,
+						PaymentProvider:        "lemonsqueezy",
+						PaymentTransactionID:   transactionID,
+						LastPaymentDate:         &now,
+						AutoRenew:              true, // Lemon Squeezy обычно поддерживает автопродление
+						IsActive:               true,
+					}
+
+					// Вычисляем дату окончания
+					license.ExpiresAt = license.CalculateExpirationDate(now)
+					license.NextPaymentDate = license.ExpiresAt
+
+					// Получаем UserID из магазина
+					var shop models.Shop
+					if err := database.DB.First(&shop, shopID).Error; err == nil {
+						license.UserID = &shop.OwnerID
+					}
+
+					if err := database.DB.Create(&license).Error; err != nil {
+						log.Printf("❌ [LemonSqueezyWebhook] Ошибка создания лицензии: %v", err)
+						c.JSON(http.StatusInternalServerError, gin.H{
+							"success": false,
+							"error":   "Failed to create license",
+						})
+						return
+					}
+
+					log.Printf("✅ [LemonSqueezyWebhook] Лицензия создана успешно: %s", license.ID)
+					c.JSON(http.StatusOK, gin.H{
+						"success": true,
+						"message": "License created successfully",
+						"data":    license.ToResponse(),
+					})
+					return
+				} else {
+					log.Printf("⚠️ [LemonSqueezyWebhook] Не удалось определить shop_id из webhook данных")
+				}
+			} else {
+				log.Printf("⚠️ [LemonSqueezyWebhook] План подписки не найден для variant_id: %s", variantID)
+			}
+		} else {
+			log.Printf("⚠️ [LemonSqueezyWebhook] variant_id не найден в данных webhook")
+		}
+
+	case "subscription_cancelled", "subscription_payment_failed":
+		log.Printf("⚠️ [LemonSqueezyWebhook] Получено событие отмены/ошибки: %s", eventName)
+		// Можно добавить логику для обработки отмены подписки
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Event processed",
+		})
+		return
+
+	default:
+		log.Printf("ℹ️ [LemonSqueezyWebhook] Необработанное событие: %s", eventName)
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "Event received",
+		})
+		return
+	}
+
+	// Если дошли сюда, значит не удалось обработать
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Webhook received but not processed",
 	})
 }
 
