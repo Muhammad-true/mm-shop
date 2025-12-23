@@ -11,6 +11,12 @@ git checkout .
 # Обновляем код
 git pull origin main
 
+# Создайте .env.production файл (если еще не создан) с переменными окружения:
+# LEMONSQUEEZY_API_KEY=your-api-key
+# LEMONSQUEEZY_STORE_ID=your-store-id
+# JWT_SECRET=your-jwt-secret
+# и другие необходимые переменные
+
 # ОСТАНОВКА и удаление контейнеров для чистого билда
 docker compose -f docker-compose.release.yml stop api admin
 docker compose -f docker-compose.release.yml rm -f api admin
