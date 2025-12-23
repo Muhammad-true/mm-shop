@@ -39,6 +39,7 @@ func SetupRoutes() *gin.Engine {
 	licenseController := &controllers.LicenseController{}
 	subscriptionController := &controllers.SubscriptionController{}
 	shopRegistrationController := &controllers.ShopRegistrationController{}
+	paymentController := &controllers.PaymentController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -111,6 +112,12 @@ func SetupRoutes() *gin.Engine {
 			shopRegistration.POST("/register", shopRegistrationController.RegisterShop)                          // Регистрация магазина
 			shopRegistration.POST("/subscribe", shopRegistrationController.SubscribeShop)                        // Подписка (создание лицензии после оплаты)
 			shopRegistration.POST("/webhook/lemonsqueezy", shopRegistrationController.HandleLemonSqueezyWebhook) // Webhook от Lemon Squeezy
+		}
+
+		// Платежи
+		payments := public.Group("payments")
+		{
+			payments.POST("/lemonsqueezy/checkout", paymentController.CreateLemonSqueezyCheckout) // Создание checkout в Lemon Squeezy
 		}
 
 		// Магазины (публичный доступ для просмотра, аутентификация для подписки)

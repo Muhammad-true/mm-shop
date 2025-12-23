@@ -66,6 +66,10 @@ type Config struct {
 	// Функциональность
 	EnableSwagger bool
 	EnableCORS    bool
+
+	// Lemon Squeezy
+	LemonSqueezyAPIKey string
+	LemonSqueezyStoreID string
 }
 
 var AppConfig *Config
@@ -134,6 +138,10 @@ func Load() *Config {
 		// Функциональность
 		EnableSwagger: getBoolEnv("ENABLE_SWAGGER", true),
 		EnableCORS:    getBoolEnv("ENABLE_CORS", true),
+
+		// Lemon Squeezy
+		LemonSqueezyAPIKey: getEnv("LEMONSQUEEZY_API_KEY", ""),
+		LemonSqueezyStoreID: getEnv("LEMONSQUEEZY_STORE_ID", ""),
 	}
 
 	// Сохраняем глобальную конфигурацию
