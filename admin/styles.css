@@ -450,6 +450,7 @@ body {
 
 .table-container thead {
     background-color: #f8f9fa;
+    border-bottom: 2px solid #e5e5e5;
 }
 
 .table-container th {
@@ -457,8 +458,9 @@ body {
     text-align: left;
     font-weight: 600;
     color: #000000;
-    border-bottom: 2px solid #dee2e6;
+    border-bottom: 2px solid #e5e5e5;
     font-size: 14px;
+    background-color: #f8f9fa;
 }
 
 .table-container td {
@@ -509,6 +511,7 @@ table {
 
 .data-table thead {
     background-color: #f8f9fa;
+    border-bottom: 2px solid #e5e5e5;
 }
 
 .data-table th {
@@ -516,8 +519,9 @@ table {
     text-align: left;
     font-weight: 600;
     color: #000000;
-    border-bottom: 2px solid #dee2e6;
+    border-bottom: 2px solid #e5e5e5;
     font-size: 14px;
+    background-color: #f8f9fa;
 }
 
 .data-table td {
@@ -599,10 +603,11 @@ th, td {
 }
 
 th {
-    background: #f8f9fa;
+    background: #f8f9fa !important;
     font-weight: 600;
     color: #000000;
     font-size: 14px;
+    border-bottom: 2px solid #e5e5e5;
 }
 
 td {
@@ -1934,39 +1939,28 @@ code {
 
 /* Основной контейнер таблицы */
 .table-container {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #ffffff;
     border-radius: 20px;
     padding: 30px;
     margin: 20px 0;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     position: relative;
     overflow: hidden;
+    border: 1px solid #e5e5e5;
 }
 
 .table-container::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
-    animation: rainbow 3s ease-in-out infinite;
-}
-
-@keyframes rainbow {
-    0%, 100% { transform: translateX(0); }
-    50% { transform: translateX(100%); }
+    display: none;
 }
 
 /* Заголовок таблицы */
 .table-container h3 {
-    color: white;
+    color: #000000;
     font-size: 24px;
     font-weight: 700;
     margin-bottom: 25px;
-    text-align: center;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-align: left;
+    text-shadow: none;
     position: relative;
 }
 
@@ -1974,11 +1968,10 @@ code {
     content: '';
     position: absolute;
     bottom: -8px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
     width: 60px;
     height: 3px;
-    background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
+    background: #667eea;
     border-radius: 2px;
 }
 
@@ -1994,19 +1987,21 @@ code {
 
 /* Заголовки таблицы */
 .data-table thead {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #f8f9fa;
+    border-bottom: 2px solid #e5e5e5;
 }
 
 .data-table th {
-    color: white;
+    color: #000000;
     font-weight: 600;
     font-size: 14px;
     padding: 18px 15px;
     text-align: left;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    text-transform: none;
+    letter-spacing: 0;
     border: none;
     position: relative;
+    background: #f8f9fa;
 }
 
 .data-table th:first-child {
@@ -2018,14 +2013,7 @@ code {
 }
 
 .data-table th::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
-    opacity: 0.7;
+    display: none;
 }
 
 /* Строки таблицы */
