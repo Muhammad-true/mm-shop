@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mm-api/mm-api/config"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
 
@@ -293,6 +294,147 @@ func (lc *LicenseController) ActivateLicense(c *gin.Context) {
 		"success": true,
 		"message": message,
 		"data":    license.ToResponse(),
+	})
+}
+
+// GetMyLicenses возвращает список лицензий текущего пользователя
+// Автоматически синхронизирует подписки из Lemon Squeezy, если лицензий нет
+func (lc *LicenseController) GetMyLicenses(c *gin.Context) {
+	// Получаем пользователя из контекста
+	userIDValue, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Unauthorized",
+		})
+		return
+	}
+
+	userID := userIDValue.(uuid.UUID)
+
+	// Получаем пользователя из БД
+	var user models.User
+	if err := database.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "User not found",
+		})
+		return
+	}
+
+	// Получаем все лицензии пользователя
+	var licenses []models.License
+	if err := database.DB.Where("user_id = ?", userID).
+		Preload("Shop").
+		Order("created_at DESC").
+		Find(&licenses).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to fetch licenses",
+		})
+		return
+	}
+
+	// Если лицензий нет, пытаемся синхронизировать из Lemon Squeezy
+	if len(licenses) == 0 {
+		log.Printf("🔄 [GetMyLicenses] Лицензий не найдено, пытаемся синхронизировать из Lemon Squeezy для пользователя: %s", user.Email)
+		
+		// Используем ShopRegistrationController для синхронизации
+		shopRegistrationController := &ShopRegistrationController{}
+		
+		// Вызываем синхронизацию (без создания лицензий, только проверка)
+		// Но лучше просто вызвать метод синхронизации напрямую
+		// Для этого нужно получить подписки и создать лицензии
+		cfg := config.GetConfig()
+		if cfg.LemonSqueezyAPIKey != "" {
+			subscriptions, err := shopRegistrationController.getLemonSqueezySubscriptionsByEmail(user.Email, cfg.LemonSqueezyAPIKey)
+			if err == nil && len(subscriptions) > 0 {
+				log.Printf("✅ [GetMyLicenses] Найдено подписок в Lemon Squeezy: %d, синхронизируем...", len(subscriptions))
+				
+				// Получаем магазины пользователя
+				var shops []models.Shop
+				if err := database.DB.Where("owner_id = ?", user.ID).Find(&shops).Error; err == nil && len(shops) > 0 {
+					// Синхронизируем каждую подписку
+					for _, sub := range subscriptions {
+						variantID := shopRegistrationController.extractVariantIDFromSubscription(sub)
+						if variantID == "" {
+							continue
+						}
+
+						// Находим план подписки
+						var plan models.SubscriptionPlan
+						if err := database.DB.Where("lemonsqueezy_variant_id = ?", variantID).First(&plan).Error; err != nil {
+							continue
+						}
+
+						// Используем первый магазин
+						targetShop := &shops[0]
+
+						// Проверяем, нет ли уже лицензии
+						var existingLicense models.License
+						if err := database.DB.Where("shop_id = ? AND subscription_status = ?", targetShop.ID, models.SubscriptionStatusActive).First(&existingLicense).Error; err == nil {
+							if !existingLicense.IsExpired() {
+								licenses = append(licenses, existingLicense)
+								continue
+							}
+						}
+
+						// Извлекаем данные о подписке
+						var amount float64
+						var transactionID string
+						if attrs, ok := sub["attributes"].(map[string]interface{}); ok {
+							if total, ok := attrs["total"].(float64); ok {
+								amount = total
+							}
+						}
+						if id, ok := sub["id"].(string); ok {
+							transactionID = id
+						}
+
+						// Создаем лицензию
+						now := time.Now()
+						license := models.License{
+							ShopID:              &targetShop.ID,
+							UserID:              &user.ID,
+							SubscriptionType:     plan.SubscriptionType,
+							ActivationType:       models.ActivationTypePayment,
+							SubscriptionStatus:   models.SubscriptionStatusActive,
+							ActivatedAt:          &now,
+							PaymentAmount:        amount,
+							PaymentCurrency:      plan.Currency,
+							PaymentProvider:      "lemonsqueezy",
+							PaymentTransactionID: transactionID,
+							LastPaymentDate:      &now,
+							AutoRenew:            true,
+							IsActive:             true,
+						}
+
+						license.ExpiresAt = license.CalculateExpirationDate(now)
+						license.NextPaymentDate = license.ExpiresAt
+
+						if err := database.DB.Create(&license).Error; err == nil {
+							log.Printf("✅ [GetMyLicenses] Лицензия создана: %s", license.ID)
+							// Загружаем Shop для лицензии
+							database.DB.Preload("Shop").First(&license, license.ID)
+							licenses = append(licenses, license)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Преобразуем в ответы
+	responses := make([]models.LicenseResponse, len(licenses))
+	for i, license := range licenses {
+		responses[i] = license.ToResponse()
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"licenses": responses,
+		},
 	})
 }
 

@@ -231,6 +231,12 @@ func SetupRoutes() *gin.Engine {
 			shops.GET("/:id/subscribers", shopController.GetShopSubscribers)   // Список подписчиков (для владельца)
 		}
 
+		// Лицензии текущего пользователя
+		licenses := protected.Group("licenses")
+		{
+			licenses.GET("/my", licenseController.GetMyLicenses) // Получить лицензии текущего пользователя
+		}
+
 		// Синхронизация подписок из Lemon Squeezy
 		shopRegistration := protected.Group("shop-registration")
 		{
