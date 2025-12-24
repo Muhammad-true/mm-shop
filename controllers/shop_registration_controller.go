@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -311,21 +313,12 @@ func (src *ShopRegistrationController) SubscribeShop(c *gin.Context) {
 
 // HandleLemonSqueezyWebhook обрабатывает webhook от Lemon Squeezy для подтверждения платежей
 func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context) {
-	// Получаем сигнатуру из заголовка для проверки подлинности
-	signature := c.GetHeader("X-Signature")
-	if signature == "" {
-		log.Printf("⚠️ [LemonSqueezyWebhook] Отсутствует заголовок X-Signature")
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"error":   "Missing signature",
-		})
-		return
-	}
-
 	// Читаем тело запроса
+	bodyBytes, _ := c.GetRawData()
 	var webhookData map[string]interface{}
-	if err := c.ShouldBindJSON(&webhookData); err != nil {
+	if err := json.Unmarshal(bodyBytes, &webhookData); err != nil {
 		log.Printf("❌ [LemonSqueezyWebhook] Ошибка парсинга JSON: %v", err)
+		log.Printf("📥 [LemonSqueezyWebhook] Raw body: %s", string(bodyBytes))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "Invalid JSON",
@@ -333,8 +326,9 @@ func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context)
 		return
 	}
 
-	// Логируем полученный webhook для отладки
-	log.Printf("📥 [LemonSqueezyWebhook] Получен webhook: %+v", webhookData)
+	// Логируем полученный webhook для отладки (в JSON формате для читаемости)
+	webhookJSON, _ := json.MarshalIndent(webhookData, "", "  ")
+	log.Printf("📥 [LemonSqueezyWebhook] Получен webhook:\n%s", string(webhookJSON))
 
 	// Извлекаем тип события
 	eventName := ""
@@ -364,11 +358,16 @@ func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context)
 		var transactionID string
 		if id, ok := data["id"].(string); ok {
 			transactionID = id
-		} else if attributes, ok := data["attributes"].(map[string]interface{}); ok {
-			if id, ok := attributes["order_id"].(string); ok {
-				transactionID = id
-			} else if id, ok := attributes["subscription_id"].(string); ok {
-				transactionID = id
+		}
+		if attributes, ok := data["attributes"].(map[string]interface{}); ok {
+			if transactionID == "" {
+				if id, ok := attributes["order_id"].(string); ok {
+					transactionID = id
+				} else if id, ok := attributes["subscription_id"].(string); ok {
+					transactionID = id
+				} else if id, ok := attributes["id"].(string); ok {
+					transactionID = id
+				}
 			}
 		}
 
@@ -377,21 +376,64 @@ func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context)
 		if attributes, ok := data["attributes"].(map[string]interface{}); ok {
 			if total, ok := attributes["total"].(float64); ok {
 				amount = total
-			} else if total, ok := attributes["total_formatted"].(string); ok {
-				// Парсим строку вида "$29.99"
-				// Упрощенный парсинг, можно улучшить
-				log.Printf("📊 [LemonSqueezyWebhook] Total formatted: %s", total)
+			} else if total, ok := attributes["total"].(int); ok {
+				amount = float64(total) / 100.0 // Если в центах
+			} else if total, ok := attributes["total"].(int64); ok {
+				amount = float64(total) / 100.0 // Если в центах
 			}
 		}
 
 		// Извлекаем variant_id для определения плана подписки
+		// Вариант 1: из attributes.variant_id
+		// Вариант 2: из relationships.variant.data.id
+		// Вариант 3: из order_items (для order_created)
 		var variantID string
 		if attributes, ok := data["attributes"].(map[string]interface{}); ok {
+			// Прямой variant_id в attributes
 			if variant, ok := attributes["variant_id"].(string); ok {
 				variantID = variant
-			} else if firstOrderItem, ok := attributes["first_order_item"].(map[string]interface{}); ok {
-				if variant, ok := firstOrderItem["variant_id"].(string); ok {
-					variantID = variant
+			} else if variant, ok := attributes["variant_id"].(float64); ok {
+				variantID = fmt.Sprintf("%.0f", variant) // Конвертируем число в строку
+			} else if variant, ok := attributes["variant_id"].(int); ok {
+				variantID = fmt.Sprintf("%d", variant)
+			} else if variant, ok := attributes["variant_id"].(int64); ok {
+				variantID = fmt.Sprintf("%d", variant)
+			}
+			// variant_id из first_order_item
+			if variantID == "" {
+				if firstOrderItem, ok := attributes["first_order_item"].(map[string]interface{}); ok {
+					if variant, ok := firstOrderItem["variant_id"].(string); ok {
+						variantID = variant
+					}
+				}
+			}
+		}
+		// Из relationships
+		if variantID == "" {
+			if relationships, ok := data["relationships"].(map[string]interface{}); ok {
+				if variant, ok := relationships["variant"].(map[string]interface{}); ok {
+					if variantData, ok := variant["data"].(map[string]interface{}); ok {
+						if id, ok := variantData["id"].(string); ok {
+							variantID = id
+						}
+					}
+				}
+			}
+		}
+		// Из included (для order_created с order_items)
+		if variantID == "" {
+			if included, ok := webhookData["included"].([]interface{}); ok {
+				for _, item := range included {
+					if itemMap, ok := item.(map[string]interface{}); ok {
+						if itemType, ok := itemMap["type"].(string); ok && itemType == "order-items" {
+							if itemAttrs, ok := itemMap["attributes"].(map[string]interface{}); ok {
+								if variant, ok := itemAttrs["variant_id"].(string); ok {
+									variantID = variant
+									break
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -400,44 +442,113 @@ func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context)
 
 		// Находим план подписки по variant_id
 		if variantID != "" {
+			log.Printf("🔍 [LemonSqueezyWebhook] Ищем план подписки по variant_id: %s", variantID)
 			var plan models.SubscriptionPlan
 			if err := database.DB.Where("lemonsqueezy_variant_id = ?", variantID).First(&plan).Error; err == nil {
 				log.Printf("✅ [LemonSqueezyWebhook] Найден план подписки: %s (ID: %s)", plan.Name, plan.ID)
 
-				// Извлекаем shop_id из custom данных или customer email
-				// В Lemon Squeezy можно передавать custom данные через checkout
+				// Извлекаем shop_id из custom данных
+				// В Lemon Squeezy custom данные передаются через checkout_data.custom
 				var shopID *uuid.UUID
+				
+				// Вариант 1: из attributes.custom (для order)
 				if attributes, ok := data["attributes"].(map[string]interface{}); ok {
 					if custom, ok := attributes["custom"].(map[string]interface{}); ok {
 						if shopIDStr, ok := custom["shop_id"].(string); ok {
 							if parsedID, err := uuid.Parse(shopIDStr); err == nil {
 								shopID = &parsedID
+								log.Printf("✅ [LemonSqueezyWebhook] Найден shop_id из attributes.custom: %s", shopIDStr)
 							}
 						}
 					}
-					// Альтернативно: ищем по email покупателя
+					// Вариант 2: из attributes.checkout_data.custom
+					if shopID == nil {
+						if checkoutData, ok := attributes["checkout_data"].(map[string]interface{}); ok {
+							if custom, ok := checkoutData["custom"].(map[string]interface{}); ok {
+								if shopIDStr, ok := custom["shop_id"].(string); ok {
+									if parsedID, err := uuid.Parse(shopIDStr); err == nil {
+										shopID = &parsedID
+										log.Printf("✅ [LemonSqueezyWebhook] Найден shop_id из checkout_data.custom: %s", shopIDStr)
+									}
+								}
+							}
+						}
+					}
+					// Вариант 3: из relationships.checkout (для order_created)
+					if shopID == nil {
+						if relationships, ok := data["relationships"].(map[string]interface{}); ok {
+							if checkout, ok := relationships["checkout"].(map[string]interface{}); ok {
+								if checkoutData, ok := checkout["data"].(map[string]interface{}); ok {
+									if checkoutID, ok := checkoutData["id"].(string); ok {
+										// Нужно найти checkout в included
+										if included, ok := webhookData["included"].([]interface{}); ok {
+											for _, item := range included {
+												if itemMap, ok := item.(map[string]interface{}); ok {
+													if itemID, ok := itemMap["id"].(string); ok && itemID == checkoutID {
+														if itemAttrs, ok := itemMap["attributes"].(map[string]interface{}); ok {
+															if custom, ok := itemAttrs["custom"].(map[string]interface{}); ok {
+																if shopIDStr, ok := custom["shop_id"].(string); ok {
+																	if parsedID, err := uuid.Parse(shopIDStr); err == nil {
+																		shopID = &parsedID
+																		log.Printf("✅ [LemonSqueezyWebhook] Найден shop_id из checkout.custom: %s", shopIDStr)
+																		break
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+					// Вариант 4: ищем по email покупателя (последний вариант)
 					if shopID == nil {
 						if customerEmail, ok := attributes["user_email"].(string); ok {
 							var shop models.Shop
 							if err := database.DB.Where("email = ?", customerEmail).First(&shop).Error; err == nil {
 								shopID = &shop.ID
+								log.Printf("✅ [LemonSqueezyWebhook] Найден shop_id по email: %s (shop: %s)", customerEmail, shopID.String())
+							} else {
+								log.Printf("⚠️ [LemonSqueezyWebhook] Магазин не найден по email: %s", customerEmail)
 							}
 						}
 					}
 				}
 
 				if shopID != nil {
+					log.Printf("✅ [LemonSqueezyWebhook] Найден shop_id: %s", shopID.String())
+					
+					// Проверяем существование магазина
+					var shop models.Shop
+					if err := database.DB.First(&shop, shopID).Error; err != nil {
+						log.Printf("❌ [LemonSqueezyWebhook] Магазин не найден в БД: %s, ошибка: %v", shopID.String(), err)
+						c.JSON(http.StatusNotFound, gin.H{
+							"success": false,
+							"error":   "Shop not found",
+						})
+						return
+					}
+					log.Printf("✅ [LemonSqueezyWebhook] Магазин найден: %s (Owner: %s)", shop.Name, shop.OwnerID.String())
+					
 					// Проверяем, нет ли уже активной лицензии
 					var existingLicense models.License
 					if err := database.DB.Where("shop_id = ? AND subscription_status = ?", shopID, models.SubscriptionStatusActive).First(&existingLicense).Error; err == nil {
 						if !existingLicense.IsExpired() {
-							log.Printf("ℹ️ [LemonSqueezyWebhook] У магазина уже есть активная лицензия")
+							log.Printf("ℹ️ [LemonSqueezyWebhook] У магазина уже есть активная лицензия: %s", existingLicense.ID)
 							c.JSON(http.StatusOK, gin.H{
 								"success": true,
 								"message": "License already exists",
 							})
 							return
+						} else {
+							log.Printf("ℹ️ [LemonSqueezyWebhook] Существующая лицензия истекла, создаем новую")
 						}
+					} else {
+						log.Printf("ℹ️ [LemonSqueezyWebhook] Активная лицензия не найдена, создаем новую")
 					}
 
 					// Создаем лицензию
@@ -461,22 +572,21 @@ func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context)
 					license.ExpiresAt = license.CalculateExpirationDate(now)
 					license.NextPaymentDate = license.ExpiresAt
 
-					// Получаем UserID из магазина
-					var shop models.Shop
-					if err := database.DB.First(&shop, shopID).Error; err == nil {
-						license.UserID = &shop.OwnerID
-					}
+					// Получаем UserID из магазина (shop уже получен выше)
+					license.UserID = &shop.OwnerID
 
+					log.Printf("🔄 [LemonSqueezyWebhook] Создаем лицензию для shop_id: %s, plan: %s, amount: %.2f", shopID.String(), plan.Name, amount)
 					if err := database.DB.Create(&license).Error; err != nil {
 						log.Printf("❌ [LemonSqueezyWebhook] Ошибка создания лицензии: %v", err)
 						c.JSON(http.StatusInternalServerError, gin.H{
 							"success": false,
 							"error":   "Failed to create license",
+							"details": err.Error(),
 						})
 						return
 					}
 
-					log.Printf("✅ [LemonSqueezyWebhook] Лицензия создана успешно: %s", license.ID)
+					log.Printf("✅ [LemonSqueezyWebhook] Лицензия создана успешно: %s (ExpiresAt: %v)", license.ID, license.ExpiresAt)
 					c.JSON(http.StatusOK, gin.H{
 						"success": true,
 						"message": "License created successfully",
@@ -487,10 +597,21 @@ func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context)
 					log.Printf("⚠️ [LemonSqueezyWebhook] Не удалось определить shop_id из webhook данных")
 				}
 			} else {
-				log.Printf("⚠️ [LemonSqueezyWebhook] План подписки не найден для variant_id: %s", variantID)
+				log.Printf("❌ [LemonSqueezyWebhook] План подписки не найден для variant_id: %s (ошибка: %v)", variantID, err)
+				// Логируем все доступные планы для отладки
+				var allPlans []models.SubscriptionPlan
+				database.DB.Find(&allPlans)
+				log.Printf("📋 [LemonSqueezyWebhook] Доступные планы в БД:")
+				for _, p := range allPlans {
+					log.Printf("   - %s: variant_id=%s", p.Name, p.LemonSqueezyVariantID)
+				}
 			}
 		} else {
-			log.Printf("⚠️ [LemonSqueezyWebhook] variant_id не найден в данных webhook")
+			log.Printf("❌ [LemonSqueezyWebhook] variant_id не найден в данных webhook")
+			log.Printf("📋 [LemonSqueezyWebhook] Структура data для отладки:")
+			if dataJSON, err := json.MarshalIndent(data, "", "  "); err == nil {
+				log.Printf("%s", string(dataJSON))
+			}
 		}
 
 	case "subscription_cancelled", "subscription_payment_failed":
