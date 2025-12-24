@@ -10,8 +10,8 @@ import (
 func SetupRoutes() *gin.Engine {
 	r := gin.Default()
 
-	// Отключаем автоматическое перенаправление для API маршрутов
-	r.RedirectTrailingSlash = false
+	// Настройка перенаправления для API маршрутов
+	r.RedirectTrailingSlash = true // Разрешаем перенаправление для совместимости
 	r.RedirectFixedPath = false
 	// Middleware
 	r.Use(middleware.CORS())
@@ -304,7 +304,8 @@ func SetupRoutes() *gin.Engine {
 		// Управление магазинами (админы и супер админы)
 		adminShops := admin.Group("shops")
 		{
-			adminShops.GET("/", shopController.GetShopsWithLicenses) // Список всех магазинов с лицензиями
+			adminShops.GET("", shopController.GetShopsWithLicenses)  // Список всех магазинов с лицензиями (без слеша)
+			adminShops.GET("/", shopController.GetShopsWithLicenses) // Список всех магазинов с лицензиями (со слешем)
 		}
 
 		// Управление лицензиями (админы и супер админы)
