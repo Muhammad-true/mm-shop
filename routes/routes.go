@@ -301,6 +301,12 @@ func SetupRoutes() *gin.Engine {
 			// adminProducts.GET("/:id", productController.GetProductAdmin) // Перенесено в публичные маршруты
 		}
 
+		// Управление магазинами (админы и супер админы)
+		adminShops := admin.Group("shops")
+		{
+			adminShops.GET("/", shopController.GetShopsWithLicenses) // Список всех магазинов с лицензиями
+		}
+
 		// Управление лицензиями (админы и супер админы)
 		adminLicenses := admin.Group("licenses")
 		{
@@ -308,6 +314,8 @@ func SetupRoutes() *gin.Engine {
 			adminLicenses.GET("/:id", licenseController.GetLicense)                                 // Информация о лицензии
 			adminLicenses.POST("/", licenseController.CreateLicense)                                // Создание лицензии
 			adminLicenses.PUT("/:id", licenseController.UpdateLicense)                              // Обновление лицензии
+			adminLicenses.DELETE("/:id", licenseController.DeleteLicense)                           // Удаление лицензии
+			adminLicenses.POST("/:id/extend", licenseController.ExtendLicense)                      // Продление лицензии
 			adminLicenses.POST("/shops/:shopId/generate", licenseController.GenerateLicenseForShop) // Генерация лицензии для магазина
 		}
 

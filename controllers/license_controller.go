@@ -760,6 +760,91 @@ func (lc *LicenseController) UpdateLicense(c *gin.Context) {
 	})
 }
 
+// ExtendLicense продлевает лицензию (админ)
+func (lc *LicenseController) ExtendLicense(c *gin.Context) {
+	licenseIDParam := c.Param("id")
+	licenseID, err := uuid.Parse(licenseIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid license ID",
+		})
+		return
+	}
+
+	var req struct {
+		Months int `json:"months" binding:"required,min=1"` // Количество месяцев для продления
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	var license models.License
+	if err := database.DB.First(&license, licenseID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "License not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Database error",
+			})
+		}
+		return
+	}
+
+	// Определяем базовую дату для продления
+	var baseDate time.Time
+	if license.ExpiresAt != nil && license.ExpiresAt.After(time.Now()) {
+		// Если лицензия еще не истекла, продлеваем от текущей даты окончания
+		baseDate = *license.ExpiresAt
+	} else {
+		// Если лицензия истекла, продлеваем от текущей даты
+		baseDate = time.Now()
+	}
+
+	// Вычисляем новую дату окончания
+	newExpiresAt := baseDate.AddDate(0, req.Months, 0)
+	license.ExpiresAt = &newExpiresAt
+	license.NextPaymentDate = &newExpiresAt
+
+	// Обновляем статус на активный, если был неактивен
+	if license.SubscriptionStatus != models.SubscriptionStatusActive {
+		license.SubscriptionStatus = models.SubscriptionStatusActive
+	}
+	license.IsActive = true
+
+	// Обновляем дату последнего платежа
+	now := time.Now()
+	license.LastPaymentDate = &now
+
+	if err := database.DB.Save(&license).Error; err != nil {
+		log.Printf("❌ Ошибка продления лицензии: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to extend license",
+		})
+		return
+	}
+
+	// Загружаем связанные данные
+	database.DB.Preload("Shop").Preload("User").First(&license, license.ID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": fmt.Sprintf("License extended by %d months", req.Months),
+		"data":    license.ToResponse(),
+	})
+}
+
 // DeactivateLicense деактивирует лицензию для магазина (очищает device_id для возможности активации на новом устройстве)
 func (lc *LicenseController) DeactivateLicense(c *gin.Context) {
 	var req struct {
@@ -882,4 +967,54 @@ func toString(v interface{}) string {
 	default:
 		return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(fmt.Sprintf("%v", val), " ", ""), "\n", ""))
 	}
+}
+
+// DeleteLicense удаляет лицензию (админ)
+func (lc *LicenseController) DeleteLicense(c *gin.Context) {
+	licenseIDParam := c.Param("id")
+	licenseID, err := uuid.Parse(licenseIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid license ID",
+		})
+		return
+	}
+
+	var license models.License
+	if err := database.DB.First(&license, licenseID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "License not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   "Database error",
+			})
+		}
+		return
+	}
+
+	// Сохраняем информацию о лицензии для ответа
+	licenseInfo := license.ToResponse()
+
+	// Удаляем лицензию
+	if err := database.DB.Delete(&license).Error; err != nil {
+		log.Printf("❌ Ошибка удаления лицензии: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to delete license",
+		})
+		return
+	}
+
+	log.Printf("✅ Лицензия удалена: %s (shop_id: %s)", license.ID, license.ShopID)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "License deleted successfully",
+		"data":    licenseInfo,
+	})
 }

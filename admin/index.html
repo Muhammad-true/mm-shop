@@ -75,6 +75,10 @@
                     <i class="fas fa-shopping-cart"></i>
                     <span>Заказы</span>
                 </li>
+                <li class="nav-item" data-tab="shops">
+                    <i class="fas fa-store"></i>
+                    <span>Магазины</span>
+                </li>
                 <li class="nav-item" data-tab="settings">
                     <i class="fas fa-cog"></i>
                     <span>Настройки</span>
@@ -259,6 +263,52 @@
                 
                 <div id="orders-table" class="table-container">
                     <p>Загрузка заказов...</p>
+                </div>
+            </div>
+
+            <!-- Shops Tab -->
+            <div id="shops" class="tab-content">
+                <div class="content-header">
+                    <h2><i class="fas fa-store"></i> Управление магазинами и лицензиями</h2>
+                </div>
+                
+                <div class="filters">
+                    <input type="text" id="shop-search" placeholder="Поиск по названию магазина..." class="search-input" onkeyup="if(event.key==='Enter') window.shops.applyFilters()">
+                    <select id="shop-license-filter" class="filter-select" onchange="window.shops.applyFilters()">
+                        <option value="">Все магазины</option>
+                        <option value="true">С лицензией</option>
+                        <option value="false">Без лицензии</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="window.shops.applyFilters()">
+                        <i class="fas fa-search"></i> Поиск
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-store"></i> Магазин</th>
+                                    <th><i class="fas fa-user"></i> Владелец</th>
+                                    <th><i class="fas fa-box"></i> Товаров</th>
+                                    <th><i class="fas fa-users"></i> Подписчиков</th>
+                                    <th><i class="fas fa-key"></i> Статус лицензии</th>
+                                    <th><i class="fas fa-calendar"></i> Осталось дней</th>
+                                    <th><i class="fas fa-barcode"></i> Ключ лицензии</th>
+                                    <th><i class="fas fa-cogs"></i> Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="shops-table-body">
+                                <tr>
+                                    <td colspan="8" class="text-center loading">
+                                        <i class="fas fa-spinner fa-spin"></i> Загрузка магазинов...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="shops-pagination"></div>
                 </div>
             </div>
 
@@ -656,6 +706,7 @@
     <script>document.write('<script src="js/users.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/roles.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/orders.js?v=' + v + '"><\/script>');</script>
+    <script>document.write('<script src="js/shops.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/navigation.js?v=' + v + '"><\/script>');</script>
     
     <!-- Главный модуль -->
