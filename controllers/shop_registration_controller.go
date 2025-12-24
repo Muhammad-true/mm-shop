@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mm-api/mm-api/config"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
 	"github.com/mm-api/mm-api/utils"
@@ -505,15 +506,29 @@ func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context)
 							}
 						}
 					}
-					// Вариант 4: ищем по email покупателя (последний вариант)
+					// Вариант 4: ищем по email покупателя и синхронизируем подписки из Lemon Squeezy
 					if shopID == nil {
 						if customerEmail, ok := attributes["user_email"].(string); ok {
+							log.Printf("🔍 [LemonSqueezyWebhook] shop_id не найден, проверяем подписки по email: %s", customerEmail)
+							
+							// Сначала пробуем найти магазин по email
 							var shop models.Shop
 							if err := database.DB.Where("email = ?", customerEmail).First(&shop).Error; err == nil {
 								shopID = &shop.ID
 								log.Printf("✅ [LemonSqueezyWebhook] Найден shop_id по email: %s (shop: %s)", customerEmail, shopID.String())
 							} else {
-								log.Printf("⚠️ [LemonSqueezyWebhook] Магазин не найден по email: %s", customerEmail)
+								// Если магазин не найден, ищем пользователя и синхронизируем его подписки
+								var user models.User
+								if err := database.DB.Where("email = ?", customerEmail).First(&user).Error; err == nil {
+									log.Printf("✅ [LemonSqueezyWebhook] Найден пользователь по email: %s (ID: %s)", customerEmail, user.ID)
+									// Синхронизируем подписки из Lemon Squeezy
+									if syncedShopID := src.syncUserSubscriptionsFromLemonSqueezy(&user, variantID, transactionID, amount, plan); syncedShopID != nil {
+										shopID = syncedShopID
+										log.Printf("✅ [LemonSqueezyWebhook] Подписки синхронизированы, shop_id: %s", shopID.String())
+									}
+								} else {
+									log.Printf("⚠️ [LemonSqueezyWebhook] Пользователь не найден по email: %s", customerEmail)
+								}
 							}
 						}
 					}
@@ -636,6 +651,394 @@ func (src *ShopRegistrationController) HandleLemonSqueezyWebhook(c *gin.Context)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Webhook received but not processed",
+	})
+}
+
+// syncUserSubscriptionsFromLemonSqueezy синхронизирует подписки пользователя из Lemon Squeezy
+// Возвращает shop_id для которого была создана лицензия, или nil если не удалось
+func (src *ShopRegistrationController) syncUserSubscriptionsFromLemonSqueezy(
+	user *models.User,
+	variantID string,
+	transactionID string,
+	amount float64,
+	plan models.SubscriptionPlan,
+) *uuid.UUID {
+	log.Printf("🔄 [LemonSqueezySync] Начинаем синхронизацию подписок для пользователя: %s", user.Email)
+
+	cfg := config.GetConfig()
+	if cfg.LemonSqueezyAPIKey == "" {
+		log.Printf("❌ [LemonSqueezySync] Lemon Squeezy API key не настроен")
+		return nil
+	}
+
+	// Получаем все магазины пользователя
+	var shops []models.Shop
+	if err := database.DB.Where("owner_id = ?", user.ID).Find(&shops).Error; err != nil {
+		log.Printf("❌ [LemonSqueezySync] Ошибка получения магазинов: %v", err)
+		return nil
+	}
+
+	if len(shops) == 0 {
+		log.Printf("⚠️ [LemonSqueezySync] У пользователя нет магазинов")
+		return nil
+	}
+
+	log.Printf("📦 [LemonSqueezySync] Найдено магазинов: %d", len(shops))
+
+	// Получаем подписки пользователя из Lemon Squeezy API
+	subscriptions, err := src.getLemonSqueezySubscriptionsByEmail(user.Email, cfg.LemonSqueezyAPIKey)
+	if err != nil {
+		log.Printf("❌ [LemonSqueezySync] Ошибка получения подписок из Lemon Squeezy: %v", err)
+		return nil
+	}
+
+	log.Printf("📋 [LemonSqueezySync] Найдено подписок в Lemon Squeezy: %d", len(subscriptions))
+
+	// Ищем активную подписку с нужным variant_id
+	for _, sub := range subscriptions {
+		subVariantID := src.extractVariantIDFromSubscription(sub)
+		if subVariantID == variantID || (variantID == "" && subVariantID != "") {
+			log.Printf("✅ [LemonSqueezySync] Найдена подписка с variant_id: %s", subVariantID)
+
+			// Находим план подписки
+			var subscriptionPlan models.SubscriptionPlan
+			if err := database.DB.Where("lemonsqueezy_variant_id = ?", subVariantID).First(&subscriptionPlan).Error; err != nil {
+				log.Printf("⚠️ [LemonSqueezySync] План подписки не найден для variant_id: %s", subVariantID)
+				continue
+			}
+
+			// Определяем для какого магазина создавать лицензию
+			// Используем первый магазин пользователя
+			targetShop := &shops[0]
+
+			// Проверяем, нет ли уже активной лицензии
+			var existingLicense models.License
+			if err := database.DB.Where("shop_id = ? AND subscription_status = ?", targetShop.ID, models.SubscriptionStatusActive).First(&existingLicense).Error; err == nil {
+				if !existingLicense.IsExpired() {
+					log.Printf("ℹ️ [LemonSqueezySync] У магазина уже есть активная лицензия: %s", existingLicense.ID)
+					return &targetShop.ID
+				}
+			}
+
+			// Создаем лицензию
+			now := time.Now()
+			license := models.License{
+				ShopID:              &targetShop.ID,
+				UserID:              &user.ID,
+				SubscriptionType:     subscriptionPlan.SubscriptionType,
+				ActivationType:       models.ActivationTypePayment,
+				SubscriptionStatus:   models.SubscriptionStatusActive,
+				ActivatedAt:          &now,
+				PaymentAmount:        amount,
+				PaymentCurrency:      subscriptionPlan.Currency,
+				PaymentProvider:      "lemonsqueezy",
+				PaymentTransactionID: transactionID,
+				LastPaymentDate:      &now,
+				AutoRenew:            true,
+				IsActive:             true,
+			}
+
+			// Вычисляем дату окончания
+			license.ExpiresAt = license.CalculateExpirationDate(now)
+			license.NextPaymentDate = license.ExpiresAt
+
+			if err := database.DB.Create(&license).Error; err != nil {
+				log.Printf("❌ [LemonSqueezySync] Ошибка создания лицензии: %v", err)
+				continue
+			}
+
+			log.Printf("✅ [LemonSqueezySync] Лицензия создана успешно: %s для shop_id: %s", license.ID, targetShop.ID)
+			return &targetShop.ID
+		}
+	}
+
+	log.Printf("⚠️ [LemonSqueezySync] Активная подписка с нужным variant_id не найдена")
+	return nil
+}
+
+// getLemonSqueezySubscriptionsByEmail получает подписки пользователя из Lemon Squeezy API по email
+func (src *ShopRegistrationController) getLemonSqueezySubscriptionsByEmail(email, apiKey string) ([]map[string]interface{}, error) {
+	// Сначала находим customer по email
+	customerID, err := src.findLemonSqueezyCustomerByEmail(email, apiKey)
+	if err != nil || customerID == "" {
+		log.Printf("⚠️ [LemonSqueezyAPI] Customer не найден по email: %s", email)
+		return nil, err
+	}
+
+	// Получаем подписки customer
+	apiURL := fmt.Sprintf("https://api.lemonsqueezy.com/v1/subscriptions?filter[customer_id]=%s", customerID)
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/vnd.api+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var response map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("❌ [LemonSqueezyAPI] Ошибка API: %d, %+v", resp.StatusCode, response)
+		return nil, fmt.Errorf("Lemon Squeezy API error: %d", resp.StatusCode)
+	}
+
+	// Извлекаем подписки из ответа
+	var subscriptions []map[string]interface{}
+	if data, ok := response["data"].([]interface{}); ok {
+		for _, item := range data {
+			if subMap, ok := item.(map[string]interface{}); ok {
+				// Проверяем статус подписки (только активные)
+				if attrs, ok := subMap["attributes"].(map[string]interface{}); ok {
+					if status, ok := attrs["status"].(string); ok {
+						if status == "active" || status == "on_trial" {
+							subscriptions = append(subscriptions, subMap)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return subscriptions, nil
+}
+
+// findLemonSqueezyCustomerByEmail находит customer ID в Lemon Squeezy по email
+func (src *ShopRegistrationController) findLemonSqueezyCustomerByEmail(email, apiKey string) (string, error) {
+	apiURL := fmt.Sprintf("https://api.lemonsqueezy.com/v1/customers?filter[email]=%s", email)
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/vnd.api+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var response map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Lemon Squeezy API error: %d", resp.StatusCode)
+	}
+
+	// Извлекаем customer ID из ответа
+	if data, ok := response["data"].([]interface{}); ok && len(data) > 0 {
+		if customer, ok := data[0].(map[string]interface{}); ok {
+			if id, ok := customer["id"].(string); ok {
+				return id, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("customer not found")
+}
+
+// extractVariantIDFromSubscription извлекает variant_id из подписки Lemon Squeezy
+func (src *ShopRegistrationController) extractVariantIDFromSubscription(subscription map[string]interface{}) string {
+	// Вариант 1: из attributes.variant_id
+	if attrs, ok := subscription["attributes"].(map[string]interface{}); ok {
+		if variantID, ok := attrs["variant_id"].(string); ok {
+			return variantID
+		}
+		if variantID, ok := attrs["variant_id"].(float64); ok {
+			return fmt.Sprintf("%.0f", variantID)
+		}
+	}
+
+	// Вариант 2: из relationships.variant.data.id
+	if relationships, ok := subscription["relationships"].(map[string]interface{}); ok {
+		if variant, ok := relationships["variant"].(map[string]interface{}); ok {
+			if variantData, ok := variant["data"].(map[string]interface{}); ok {
+				if id, ok := variantData["id"].(string); ok {
+					return id
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// SyncUserSubscriptions синхронизирует подписки текущего пользователя из Lemon Squeezy
+func (src *ShopRegistrationController) SyncUserSubscriptions(c *gin.Context) {
+	// Получаем пользователя из контекста (должен быть установлен middleware.AuthRequired)
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Unauthorized",
+		})
+		return
+	}
+
+	userUUID, ok := userID.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Invalid user ID",
+		})
+		return
+	}
+
+	// Получаем пользователя из БД
+	var user models.User
+	if err := database.DB.First(&user, userUUID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "User not found",
+		})
+		return
+	}
+
+	log.Printf("🔄 [SyncSubscriptions] Начинаем синхронизацию подписок для пользователя: %s", user.Email)
+
+	cfg := config.GetConfig()
+	if cfg.LemonSqueezyAPIKey == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Lemon Squeezy API key not configured",
+		})
+		return
+	}
+
+	// Получаем подписки пользователя из Lemon Squeezy
+	subscriptions, err := src.getLemonSqueezySubscriptionsByEmail(user.Email, cfg.LemonSqueezyAPIKey)
+	if err != nil {
+		log.Printf("❌ [SyncSubscriptions] Ошибка получения подписок: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to get subscriptions from Lemon Squeezy",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	if len(subscriptions) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "No active subscriptions found",
+			"data":    []interface{}{},
+		})
+		return
+	}
+
+	// Получаем все магазины пользователя
+	var shops []models.Shop
+	if err := database.DB.Where("owner_id = ?", user.ID).Find(&shops).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to get user shops",
+		})
+		return
+	}
+
+	if len(shops) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "User has no shops",
+		})
+		return
+	}
+
+	// Синхронизируем каждую подписку
+	var syncedLicenses []models.License
+	for _, sub := range subscriptions {
+		variantID := src.extractVariantIDFromSubscription(sub)
+		if variantID == "" {
+			log.Printf("⚠️ [SyncSubscriptions] Не удалось извлечь variant_id из подписки")
+			continue
+		}
+
+		// Находим план подписки
+		var plan models.SubscriptionPlan
+		if err := database.DB.Where("lemonsqueezy_variant_id = ?", variantID).First(&plan).Error; err != nil {
+			log.Printf("⚠️ [SyncSubscriptions] План подписки не найден для variant_id: %s", variantID)
+			continue
+		}
+
+		// Используем первый магазин пользователя
+		targetShop := &shops[0]
+
+		// Проверяем, нет ли уже активной лицензии
+		var existingLicense models.License
+		if err := database.DB.Where("shop_id = ? AND subscription_status = ?", targetShop.ID, models.SubscriptionStatusActive).First(&existingLicense).Error; err == nil {
+			if !existingLicense.IsExpired() {
+				log.Printf("ℹ️ [SyncSubscriptions] У магазина уже есть активная лицензия: %s", existingLicense.ID)
+				syncedLicenses = append(syncedLicenses, existingLicense)
+				continue
+			}
+		}
+
+		// Извлекаем данные о подписке
+		var amount float64
+		var transactionID string
+		if attrs, ok := sub["attributes"].(map[string]interface{}); ok {
+			if total, ok := attrs["total"].(float64); ok {
+				amount = total
+			}
+		}
+		if id, ok := sub["id"].(string); ok {
+			transactionID = id
+		}
+
+		// Создаем лицензию
+		now := time.Now()
+		license := models.License{
+			ShopID:              &targetShop.ID,
+			UserID:              &user.ID,
+			SubscriptionType:     plan.SubscriptionType,
+			ActivationType:       models.ActivationTypePayment,
+			SubscriptionStatus:   models.SubscriptionStatusActive,
+			ActivatedAt:          &now,
+			PaymentAmount:        amount,
+			PaymentCurrency:      plan.Currency,
+			PaymentProvider:      "lemonsqueezy",
+			PaymentTransactionID: transactionID,
+			LastPaymentDate:      &now,
+			AutoRenew:            true,
+			IsActive:             true,
+		}
+
+		license.ExpiresAt = license.CalculateExpirationDate(now)
+		license.NextPaymentDate = license.ExpiresAt
+
+		if err := database.DB.Create(&license).Error; err != nil {
+			log.Printf("❌ [SyncSubscriptions] Ошибка создания лицензии: %v", err)
+			continue
+		}
+
+		log.Printf("✅ [SyncSubscriptions] Лицензия создана: %s для shop_id: %s", license.ID, targetShop.ID)
+		syncedLicenses = append(syncedLicenses, license)
+	}
+
+	// Преобразуем лицензии в ответ
+	var licensesResponse []interface{}
+	for _, license := range syncedLicenses {
+		licensesResponse = append(licensesResponse, license.ToResponse())
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": fmt.Sprintf("Synced %d subscription(s)", len(syncedLicenses)),
+		"data":    licensesResponse,
 	})
 }
 

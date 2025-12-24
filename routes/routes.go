@@ -230,6 +230,12 @@ func SetupRoutes() *gin.Engine {
 			shops.DELETE("/:id/subscribe", shopController.UnsubscribeFromShop) // Отписаться от магазина
 			shops.GET("/:id/subscribers", shopController.GetShopSubscribers)   // Список подписчиков (для владельца)
 		}
+
+		// Синхронизация подписок из Lemon Squeezy
+		shopRegistration := protected.Group("shop-registration")
+		{
+			shopRegistration.POST("/sync-subscriptions", shopRegistrationController.SyncUserSubscriptions) // Синхронизация подписок пользователя из Lemon Squeezy
+		}
 	}
 
 	// Админские маршруты (для админов и супер админов)
