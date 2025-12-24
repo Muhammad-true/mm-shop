@@ -7,9 +7,11 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
-    color: #333;
+    background: #ffffff;
+    color: #000000;
     line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Admin Container */
@@ -85,6 +87,8 @@ body {
     flex: 1;
     margin-left: 280px;
     padding: 20px;
+    background: #ffffff;
+    min-height: 100vh;
 }
 
 /* Top Bar */
@@ -322,12 +326,13 @@ body {
     font-size: 32px;
     font-weight: 700;
     margin-bottom: 5px;
-    color: #333;
+    color: #000000;
 }
 
 .stat-info p {
-    color: #666;
+    color: #000000;
     font-size: 14px;
+    opacity: 0.7;
 }
 
 /* Content Header */
@@ -343,7 +348,7 @@ body {
 
 .content-header h2 {
     font-size: clamp(20px, 4vw, 28px);
-    color: #333;
+    color: #000000;
     font-weight: 600;
     margin: 0;
     flex: 1;
@@ -404,27 +409,36 @@ body {
 
 .search-input, .filter-select {
     padding: 12px 16px;
-    border: 1px solid #dee2e6;
+    border: 1px solid #e5e5e5;
     border-radius: 10px;
     font-size: 14px;
     min-width: 200px;
     transition: border-color 0.3s ease;
+    background: #ffffff;
+    color: #000000;
 }
 
 .search-input:focus, .filter-select:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    background: #ffffff;
+}
+
+.search-input::placeholder {
+    color: #999999;
+    opacity: 0.7;
 }
 
 /* Tables */
 .table-container {
-    background: white;
+    background: #ffffff;
     border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     overflow: hidden;
     padding: 20px;
     margin: 20px 0;
+    border: 1px solid #e5e5e5;
 }
 
 .table-container table {
@@ -442,24 +456,44 @@ body {
     padding: 15px 10px;
     text-align: left;
     font-weight: 600;
-    color: #333;
+    color: #000000;
     border-bottom: 2px solid #dee2e6;
+    font-size: 14px;
 }
 
 .table-container td {
     padding: 12px 10px;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid #e5e5e5;
     vertical-align: middle;
+    color: #000000;
+    font-size: 14px;
+}
+
+.table-container tbody tr {
+    background-color: #ffffff;
+    transition: all 0.2s ease;
 }
 
 .table-container tbody tr:hover {
     background-color: #f8f9fa;
 }
 
+.table-container tbody tr.active,
+.table-container tbody tr.selected {
+    background-color: #f0f4ff;
+    border-left: 3px solid #667eea;
+}
+
+.table-container tbody tr.active:hover,
+.table-container tbody tr.selected:hover {
+    background-color: #e8f0ff;
+}
+
 .table-container p {
     padding: 40px;
     text-align: center;
-    color: #666;
+    color: #000000;
+    opacity: 0.7;
 }
 
 table {
@@ -481,14 +515,17 @@ table {
     padding: 15px 10px;
     text-align: left;
     font-weight: 600;
-    color: #333;
+    color: #000000;
     border-bottom: 2px solid #dee2e6;
+    font-size: 14px;
 }
 
 .data-table td {
     padding: 12px 10px;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid #e5e5e5;
     vertical-align: middle;
+    color: #000000;
+    font-size: 14px;
 }
 
 .data-table tbody tr:hover {
@@ -564,16 +601,32 @@ th, td {
 th {
     background: #f8f9fa;
     font-weight: 600;
-    color: #333;
+    color: #000000;
     font-size: 14px;
 }
 
 td {
-    color: #666;
+    color: #000000;
+}
+
+tr {
+    background: #ffffff;
+    transition: all 0.2s ease;
 }
 
 tr:hover {
     background: #f8f9fa;
+}
+
+tr.active,
+tr.selected {
+    background: #f0f4ff;
+    border-left: 3px solid #667eea;
+}
+
+tr.active:hover,
+tr.selected:hover {
+    background: #e8f0ff;
 }
 
 /* Modal */
@@ -590,7 +643,7 @@ tr:hover {
 }
 
 .modal-content {
-    background: white;
+    background: #ffffff;
     margin: 5% auto;
     padding: 0;
     border-radius: 15px;
@@ -600,6 +653,7 @@ tr:hover {
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     animation: modalSlideIn 0.3s ease;
+    border: 1px solid #e5e5e5;
 }
 
 @keyframes modalSlideIn {
@@ -617,19 +671,22 @@ tr:hover {
 
 .modal-header h3 {
     font-size: 20px;
-    color: #333;
+    color: #000000;
+    font-weight: 600;
 }
 
 .close {
     font-size: 28px;
     font-weight: bold;
-    color: #999;
+    color: #000000;
     cursor: pointer;
     transition: color 0.3s ease;
+    opacity: 0.7;
 }
 
 .close:hover {
-    color: #333;
+    color: #000000;
+    opacity: 1;
 }
 
 /* Forms */
@@ -652,31 +709,40 @@ form {
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
-    color: #333;
+    color: #000000;
     font-size: 14px;
 }
 
 .form-input {
     width: 100%;
     padding: 12px 16px;
-    border: 1px solid #dee2e6;
+    border: 1px solid #e5e5e5;
     border-radius: 10px;
     font-size: 14px;
     transition: all 0.3s ease;
+    background: #ffffff;
+    color: #000000;
 }
 
 .form-input:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    background: #ffffff;
+}
+
+.form-input::placeholder {
+    color: #999999;
+    opacity: 0.7;
 }
 
 .form-help {
     display: block;
     margin-top: 4px;
     font-size: 12px;
-    color: #6c757d;
+    color: #000000;
     font-style: italic;
+    opacity: 0.7;
 }
 
 /* Login Modal Styles */
@@ -755,25 +821,28 @@ textarea.form-input {
 
 /* Settings */
 .settings-form {
-    background: white;
+    background: #ffffff;
     padding: 30px;
     border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     max-width: 500px;
+    border: 1px solid #e5e5e5;
 }
 
 /* Recent Section */
 .recent-section {
-    background: white;
+    background: #ffffff;
     padding: 30px;
     border-radius: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e5e5e5;
 }
 
 .recent-section h3 {
     margin-bottom: 20px;
     font-size: 20px;
-    color: #333;
+    color: #000000;
+    font-weight: 600;
 }
 
 /* Responsive */
@@ -1578,7 +1647,8 @@ input[list] {
 .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: #666;
+    color: #000000;
+    opacity: 0.7;
 }
 
 .empty-state i {
@@ -1618,12 +1688,13 @@ input[list] {
 
 .date-info .date {
     font-weight: 500;
-    color: #333;
+    color: #000000;
 }
 
 .date-info .time {
     font-size: 12px;
-    color: #666;
+    color: #000000;
+    opacity: 0.7;
 }
 
 /* Amount */
@@ -1716,12 +1787,13 @@ code {
 
 .user-name {
     font-weight: 600;
-    color: #333;
+    color: #000000;
 }
 
 .user-phone {
     font-size: 12px;
-    color: #666;
+    color: #000000;
+    opacity: 0.7;
 }
 
 /* Email Info */
@@ -1733,7 +1805,7 @@ code {
 
 .email {
     font-weight: 500;
-    color: #333;
+    color: #000000;
 }
 
 .verified-badge {
@@ -1836,13 +1908,14 @@ code {
 
 .info-item label {
     font-weight: 600;
-    color: #333;
+    color: #000000;
     min-width: 120px;
 }
 
 .info-item span {
-    color: #666;
+    color: #000000;
     text-align: right;
+    opacity: 0.8;
 }
 
 /* Checkbox styling */
@@ -1958,7 +2031,7 @@ code {
 /* Строки таблицы */
 .data-table tbody tr {
     transition: all 0.3s ease;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid #e5e5e5;
     background: #ffffff !important;
 }
 
@@ -1971,7 +2044,26 @@ code {
 .data-table tbody tr:hover {
     background: #f8f9fa !important;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.data-table tbody tr.active {
+    background: #f0f4ff !important;
+    border-left: 3px solid #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+.data-table tbody tr.active:hover {
+    background: #e8f0ff !important;
+}
+
+.data-table tbody tr.selected {
+    background: #f0f4ff !important;
+    border-left: 3px solid #667eea;
+}
+
+.data-table tbody tr.selected:hover {
+    background: #e8f0ff !important;
 }
 
 .data-table tbody tr:last-child {
@@ -1981,14 +2073,34 @@ code {
 /* Ячейки таблицы */
 .data-table td {
     padding: 16px 15px;
-    color: #333;
+    color: #000000;
     font-size: 14px;
     border: none;
     vertical-align: middle;
+    background: transparent;
 }
 
 .data-table tbody tr:hover td {
-    color: #333; /* Темный текст для читаемости */
+    color: #000000; /* Темный текст для читаемости */
+    background: transparent;
+}
+
+.data-table tbody tr.active td {
+    color: #000000;
+    background: transparent;
+    font-weight: 500;
+}
+
+.data-table tbody tr.selected td {
+    color: #000000;
+    background: transparent;
+    font-weight: 500;
+}
+
+.data-table tbody tr.selected td {
+    color: #000000;
+    background: transparent;
+    font-weight: 500;
 }
 
 /* Бейджи ролей */
@@ -2105,12 +2217,13 @@ code {
 .text-center {
     text-align: center !important;
     padding: 40px 20px;
-    color: #666;
+    color: #000000;
     font-size: 16px;
     font-style: italic;
-    background: rgba(255, 255, 255, 0.8);
+    background: #ffffff;
     border-radius: 10px;
     margin: 20px 0;
+    opacity: 0.7;
 }
 
 /* Анимация загрузки */
@@ -2183,6 +2296,23 @@ code {
 .data-table tbody tr:nth-child(4) { animation-delay: 0.4s; }
 .data-table tbody tr:nth-child(5) { animation-delay: 0.5s; }
 
+/* Улучшенные стили для выбранных строк */
+.data-table tbody tr[data-selected="true"] {
+    background: #f0f4ff !important;
+    border-left: 3px solid #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+.data-table tbody tr[data-selected="true"]:hover {
+    background: #e8f0ff !important;
+}
+
+.data-table tbody tr[data-selected="true"] td {
+    color: #000000;
+    background: transparent;
+    font-weight: 500;
+}
+
 /* Стили для модальных окон */
 .modal-content {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -2227,16 +2357,7 @@ code {
     font-size: 14px;
 }
 
-/* Эффект свечения для активных элементов */
-.data-table tbody tr.active {
-    box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
-    border: 2px solid #667eea;
-    background-color: #f0f4ff !important; /* Светло-синий фон вместо белого текста */
-}
-
-.data-table tbody tr.active td {
-    color: #333 !important; /* Темный текст для читаемости */
-}
+/* Эффект свечения для активных элементов - удален, используем более мягкий стиль */
 
 /* Стили для статуса пользователя */
 .status-active {
@@ -2418,13 +2539,13 @@ code {
         margin-left: 0;
         padding: 0;
         margin-bottom: 80px;
-        background: #f2f2f7;
+        background: #ffffff;
         min-height: 100vh;
     }
     
     /* iOS-стиль для контента */
     .tab-content {
-        background: #f2f2f7;
+        background: #ffffff;
         padding: 16px 0;
     }
     
@@ -2432,7 +2553,7 @@ code {
         padding: 16px;
         background: #ffffff;
         margin-bottom: 16px;
-        border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
+        border-bottom: 1px solid #e5e5e5;
     }
     
     .content-header h2 {
@@ -2441,6 +2562,7 @@ code {
         color: #000000;
         letter-spacing: -0.5px;
         margin: 0;
+        line-height: 1.2;
     }
     
     .content-header {
@@ -2460,12 +2582,12 @@ code {
         border-radius: 0;
         margin-bottom: 0;
         box-shadow: none;
-        background: transparent;
+        background: #ffffff;
     }
     
     .table-container h3 {
         font-size: 22px;
-        font-weight: 600;
+        font-weight: 700;
         margin-bottom: 16px;
         margin-top: 0;
         padding: 0 16px;
@@ -2483,7 +2605,7 @@ code {
         display: block;
         width: 100%;
         border-collapse: collapse;
-        background: transparent;
+        background: #ffffff;
     }
     
     .data-table thead {
@@ -2525,6 +2647,27 @@ code {
         background: #f0f0f0 !important;
     }
     
+    .data-table tr.active,
+    .data-table tr.selected,
+    .data-table tr[data-selected="true"] {
+        background: #f0f4ff !important;
+        border-left: 3px solid #667eea;
+    }
+    
+    .data-table tr.active:hover,
+    .data-table tr.selected:hover,
+    .data-table tr[data-selected="true"]:hover {
+        background: #e8f0ff !important;
+    }
+    
+    .data-table tr.active td,
+    .data-table tr.selected td,
+    .data-table tr[data-selected="true"] td {
+        color: #000000 !important;
+        background: transparent !important;
+        font-weight: 500;
+    }
+    
     .data-table td {
         display: flex;
         align-items: center;
@@ -2537,8 +2680,9 @@ code {
         min-height: 50px;
         font-size: 15px;
         line-height: 1.5;
-        background: transparent !important;
+        background: #ffffff !important;
         color: #000000;
+        font-weight: 400;
     }
     
     .data-table td:last-child {
@@ -2547,8 +2691,8 @@ code {
     
     .data-table td:before {
         content: attr(data-label);
-        font-weight: 500;
-        color: #8e8e93;
+        font-weight: 600;
+        color: #666666;
         font-size: 13px;
         position: static;
         flex-shrink: 0;
@@ -2567,12 +2711,12 @@ code {
         flex: 1;
         text-align: right;
         color: #000000;
-        font-weight: 400;
+        font-weight: 500;
         word-break: break-word;
     }
     
     .data-table td strong {
-        font-weight: 600;
+        font-weight: 700;
         color: #000000;
     }
     
@@ -2706,14 +2850,15 @@ code {
     .mobile-user-name {
         font-size: 18px;
         font-weight: 600;
-        color: #2c3e50;
+        color: #000000;
         margin-bottom: 5px;
     }
     
     .mobile-user-details {
-        color: #6c757d;
+        color: #000000;
         font-size: 14px;
         line-height: 1.4;
+        opacity: 0.7;
     }
     
     .mobile-user-actions {
@@ -2792,8 +2937,9 @@ code {
         padding: 12px 16px;
         font-size: 16px;
         border-radius: 12px;
-        border: none;
-        background: #f2f2f7;
+        border: 1px solid #e5e5e5;
+        background: #ffffff;
+        color: #000000;
         -webkit-appearance: none;
         appearance: none;
     }
@@ -2802,7 +2948,15 @@ code {
     .search-input:focus,
     .filter-select:focus {
         outline: none;
-        background: #e5e5ea;
+        background: #ffffff;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .filter-input::placeholder,
+    .search-input::placeholder {
+        color: #999999;
+        opacity: 0.7;
     }
 }
 
