@@ -13,6 +13,7 @@ type ActivationType string
 const (
 	ActivationTypeManual  ActivationType = "manual"  // Ручная активация
 	ActivationTypePayment ActivationType = "payment" // Активация через оплату
+	ActivationTypeTrial   ActivationType = "trial"   // Пробная активация
 )
 
 // SubscriptionType тип подписки
@@ -22,6 +23,7 @@ const (
 	SubscriptionTypeMonthly  SubscriptionType = "monthly"  // Месячная подписка
 	SubscriptionTypeYearly   SubscriptionType = "yearly"   // Годовая подписка
 	SubscriptionTypeLifetime SubscriptionType = "lifetime" // Пожизненная подписка
+	SubscriptionTypeTrial    SubscriptionType = "trial"    // Пробная подписка
 )
 
 // SubscriptionStatus статус подписки
@@ -112,6 +114,8 @@ func (l *License) IsValid() bool {
 func (l *License) CalculateExpirationDate(startDate time.Time) *time.Time {
 	var expirationDate time.Time
 	switch l.SubscriptionType {
+	case SubscriptionTypeTrial:
+		expirationDate = startDate.AddDate(0, 0, 7) // +7 дней
 	case SubscriptionTypeMonthly:
 		expirationDate = startDate.AddDate(0, 1, 0) // +1 месяц
 	case SubscriptionTypeYearly:

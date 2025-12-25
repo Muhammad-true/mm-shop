@@ -1018,3 +1018,147 @@ func (lc *LicenseController) DeleteLicense(c *gin.Context) {
 		"data":    licenseInfo,
 	})
 }
+
+// CreateTrialLicense создает пробную лицензию для магазина
+func (lc *LicenseController) CreateTrialLicense(c *gin.Context) {
+	// Получаем пользователя из контекста
+	userIDValue, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"error":   "Unauthorized",
+		})
+		return
+	}
+
+	userID := userIDValue.(uuid.UUID)
+
+	// Парсим запрос
+	var req struct {
+		ShopID string `json:"shopId" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Парсим shopID
+	shopID, err := uuid.Parse(req.ShopID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Invalid shop ID",
+		})
+		return
+	}
+
+	// Проверяем существование магазина
+	var shop models.Shop
+	if err := database.DB.First(&shop, shopID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error":   "Shop not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Database error",
+		})
+		return
+	}
+
+	// Проверяем, что магазин принадлежит пользователю
+	if shop.OwnerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   "Access denied: shop does not belong to user",
+		})
+		return
+	}
+
+	// Проверяем, нет ли уже активной лицензии (пробной или платной)
+	var existingLicense models.License
+	err = database.DB.Where("shop_id = ? AND is_active = true AND subscription_status = ?", shopID, models.SubscriptionStatusActive).
+		First(&existingLicense).Error
+
+	if err == nil {
+		// Активная лицензия найдена
+		c.JSON(http.StatusConflict, gin.H{
+			"success": false,
+			"error":   "Shop already has an active license",
+			"details": gin.H{
+				"licenseId":   existingLicense.ID,
+				"licenseKey":  existingLicense.LicenseKey,
+				"subscriptionType": existingLicense.SubscriptionType,
+			},
+		})
+		return
+	} else if err != gorm.ErrRecordNotFound {
+		// Ошибка базы данных
+		log.Printf("❌ Ошибка проверки существующей лицензии: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Database error",
+		})
+		return
+	}
+
+	// Создаем пробную лицензию
+	now := time.Now()
+	expiresAt := now.AddDate(0, 0, 7) // +7 дней
+
+	license := models.License{
+		ShopID:             &shopID,
+		UserID:             &userID,
+		SubscriptionType:   models.SubscriptionTypeTrial,
+		ActivationType:     models.ActivationTypeTrial,
+		SubscriptionStatus: models.SubscriptionStatusActive,
+		ActivatedAt:        &now,
+		ExpiresAt:          &expiresAt,
+		LastPaymentDate:    &now,
+		NextPaymentDate:    &expiresAt,
+		PaymentAmount:      0,
+		PaymentCurrency:    "USD",
+		PaymentProvider:    "",
+		PaymentTransactionID: "",
+		IsActive:           true,
+		AutoRenew:          false,
+	}
+
+	// Генерируем licenseKey (будет сгенерирован в BeforeCreate)
+	if err := database.DB.Create(&license).Error; err != nil {
+		log.Printf("❌ Ошибка создания пробной лицензии: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to create trial license",
+		})
+		return
+	}
+
+	// Загружаем связанные данные
+	if err := database.DB.Preload("Shop").Preload("User").First(&license, license.ID).Error; err != nil {
+		log.Printf("⚠️ Ошибка загрузки связанных данных: %v", err)
+		// Продолжаем, даже если не удалось загрузить связанные данные
+	}
+
+	log.Printf("✅ Пробная лицензия создана: %s для магазина %s", license.LicenseKey, shopID)
+
+	// Вычисляем daysRemaining
+	daysRemaining := 7
+
+	response := license.ToResponse()
+	response.DaysRemaining = &daysRemaining
+
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"message": "Trial license created successfully",
+		"data":    response,
+	})
+}

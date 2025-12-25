@@ -234,7 +234,8 @@ func SetupRoutes() *gin.Engine {
 		// Лицензии текущего пользователя
 		licenses := protected.Group("licenses")
 		{
-			licenses.GET("/my", licenseController.GetMyLicenses) // Получить лицензии текущего пользователя
+			licenses.GET("/my", licenseController.GetMyLicenses)      // Получить лицензии текущего пользователя
+			licenses.POST("/trial", licenseController.CreateTrialLicense) // Создать пробную лицензию
 		}
 
 		// Синхронизация подписок из Lemon Squeezy
