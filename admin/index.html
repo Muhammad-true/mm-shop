@@ -79,6 +79,10 @@
                     <i class="fas fa-store"></i>
                     <span>Магазины</span>
                 </li>
+                <li class="nav-item" data-tab="updates">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span>Обновления</span>
+                </li>
                 <li class="nav-item" data-tab="settings">
                     <i class="fas fa-cog"></i>
                     <span>Настройки</span>
@@ -403,6 +407,52 @@
                 </div>
             </div>
 
+            <!-- Updates Tab -->
+            <div id="updates" class="tab-content">
+                <div class="content-header">
+                    <h2><i class="fas fa-cloud-upload-alt"></i> Обновления</h2>
+                </div>
+
+                <div class="card" style="margin-bottom: 20px;">
+                    <h3><i class="fas fa-upload"></i> Загрузить обновление</h3>
+                    <form id="update-upload-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Платформа</label>
+                                <select id="update-platform" class="form-input" required>
+                                    <option value="server">Сервер (Node.js, zip)</option>
+                                    <option value="windows">Windows (exe)</option>
+                                    <option value="android">Android (apk)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Версия</label>
+                                <input type="text" id="update-version" class="form-input" placeholder="1.0.0" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Файл обновления</label>
+                            <input type="file" id="update-file" class="form-input" accept=".zip,.exe,.apk" required>
+                            <small style="color: #666;">Поддерживаются .zip (сервер), .exe (Windows), .apk (Android)</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Описание / список изменений</label>
+                            <textarea id="update-notes" class="form-input" rows="3" placeholder="Что изменилось?"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-cloud-upload-alt"></i> Загрузить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="updates-table" class="table-container">
+                    <h3><i class="fas fa-history"></i> История обновлений</h3>
+                    <p>Загрузка...</p>
+                </div>
+            </div>
+
             <!-- Settings Tab -->
             <div id="settings" class="tab-content">
                 <div class="content-header">
@@ -707,6 +757,7 @@
     <script>document.write('<script src="js/roles.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/orders.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/shops.js?v=' + v + '"><\/script>');</script>
+    <script>document.write('<script src="js/updates.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/navigation.js?v=' + v + '"><\/script>');</script>
     
     <!-- Главный модуль -->

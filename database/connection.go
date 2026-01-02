@@ -196,6 +196,7 @@ func runMigrations() error {
 		&models.DeviceToken{},
 		&models.SubscriptionPlan{}, // Планы подписки
 		&models.License{},          // Лицензии
+		&models.UpdateRelease{},    // Обновления приложений/сервера
 	); err != nil {
 		return fmt.Errorf("failed to run GORM AutoMigrate: %w", err)
 	}

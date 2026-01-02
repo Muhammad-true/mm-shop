@@ -40,6 +40,7 @@ func SetupRoutes() *gin.Engine {
 	subscriptionController := &controllers.SubscriptionController{}
 	shopRegistrationController := &controllers.ShopRegistrationController{}
 	paymentController := &controllers.PaymentController{}
+	updateController := &controllers.UpdateController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -73,6 +74,12 @@ func SetupRoutes() *gin.Engine {
 			products.GET("/featured", productController.GetProducts)                      // TODO: Добавить логику для рекомендуемых
 			products.GET("/search", productController.GetProducts)                        // Используем тот же метод с параметром search
 			products.GET("/with-variations", productController.GetProductsWithVariations) // Новый endpoint с JOIN запросом
+		}
+
+		// Обновления (публичный доступ, но с обязательной платформой)
+		updates := public.Group("updates")
+		{
+			updates.GET("/latest", updateController.GetLatestUpdate)
 		}
 
 		// Категории (публичный доступ)
@@ -234,7 +241,7 @@ func SetupRoutes() *gin.Engine {
 		// Лицензии текущего пользователя
 		licenses := protected.Group("licenses")
 		{
-			licenses.GET("/my", licenseController.GetMyLicenses)      // Получить лицензии текущего пользователя
+			licenses.GET("/my", licenseController.GetMyLicenses)          // Получить лицензии текущего пользователя
 			licenses.POST("/trial", licenseController.CreateTrialLicense) // Создать пробную лицензию
 		}
 
@@ -300,6 +307,13 @@ func SetupRoutes() *gin.Engine {
 		{
 			adminProducts.GET("/", productController.GetAllProducts)
 			// adminProducts.GET("/:id", productController.GetProductAdmin) // Перенесено в публичные маршруты
+		}
+
+		// Управление обновлениями (публикация файлов)
+		adminUpdates := admin.Group("updates")
+		{
+			adminUpdates.GET("/", updateController.ListUpdates)
+			adminUpdates.POST("/upload", updateController.UploadUpdate)
 		}
 
 		// Управление магазинами (админы и супер админы)
@@ -381,6 +395,7 @@ func SetupRoutes() *gin.Engine {
 	// Статические файлы для изображений
 	// Используем абсолютный путь для продакшена в Docker
 	r.Static("/images", "/app/images")
+	r.Static("/updates", "/app/updates")
 
 	// Обслуживание админ панели (если файлы присутствуют)
 	r.Static("/admin", "./admin")

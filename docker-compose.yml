@@ -54,6 +54,7 @@ services:
     volumes:
       - ./images:/app/images
       - ./logs:/app/logs
+      - ./updates:/app/updates
     depends_on:
       postgres:
         condition: service_started

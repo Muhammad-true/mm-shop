@@ -17,7 +17,7 @@ function setupNavigation(userRole = 'admin') {
             item.style.display = 'flex';
         });
     } else if (userRole === 'admin') {
-        const allowedTabs = ['dashboard', 'products', 'categories', 'users', 'orders', 'shops', 'settings'];
+        const allowedTabs = ['dashboard', 'products', 'categories', 'users', 'orders', 'shops', 'updates', 'settings'];
         
         navItems.forEach(item => {
             const tabName = item.dataset.tab;
@@ -164,6 +164,11 @@ function showTab(tabName, userRole = 'admin') {
                     console.log('🛍️ Загрузка магазинов, роль:', roleName);
                     if (window.shops && window.shops.loadShops) {
                         window.shops.loadShops(1, {});
+                    }
+                    break;
+                case 'updates':
+                    if (window.updates && window.updates.init) {
+                        window.updates.init();
                     }
                     break;
                 case 'settings':
