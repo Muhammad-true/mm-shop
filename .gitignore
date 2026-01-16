@@ -62,3 +62,10 @@ backups/
 mm_shop
 mm_shop.exe
 
+# SSL certificates (private keys should never be committed)
+ssl/
+*.pem
+*.key
+*.crt
+*.csr
+
