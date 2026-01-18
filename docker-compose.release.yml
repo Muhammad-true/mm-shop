@@ -89,10 +89,8 @@ services:
       - "80:80"   # HTTP (редирект на HTTPS)
       - "443:443" # HTTPS
     volumes:
-      # Монтируем SSL сертификаты
-      # Для Let's Encrypt: /etc/letsencrypt:/etc/letsencrypt:ro
-      # Для самоподписанного: ./ssl:/etc/nginx/ssl:ro
-      - ./ssl:/etc/nginx/ssl:ro
+      # Монтируем SSL сертификаты Let's Encrypt
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       api:
         condition: service_healthy
