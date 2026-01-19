@@ -6,13 +6,13 @@ const CONFIG = {
     // Базовый URL для разработки
     DEV_BASE_URL: '',  // Пусто для same-origin через Nginx
 
-    // Базовый URL для продакшена — пусто, чтобы ходить на тот же хост (same-origin)
-    PROD_BASE_URL: '',
+    // Базовый URL для продакшена — отдельный поддомен API
+    PROD_BASE_URL: 'https://api.mmshop.online',
 
     // Автоматический выбор URL
     get BASE_URL() {
-      // Везде используем относительные пути, чтобы ходить через Nginx
-      return this.PROD_BASE_URL; // Same-origin через прокси
+      const isLocalhost = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+      return isLocalhost ? this.DEV_BASE_URL : this.PROD_BASE_URL;
     },
 
     // Эндпоинты API
