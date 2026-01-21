@@ -7,7 +7,7 @@ const CONFIG = {
     DEV_BASE_URL: '',  // Пусто для same-origin через Nginx
 
     // Базовый URL для продакшена — отдельный поддомен API
-    PROD_BASE_URL: 'https://api.libis.com',
+    PROD_BASE_URL: 'https://api.libiss.com',
 
     // Автоматический выбор URL
     get BASE_URL() {
