@@ -500,6 +500,47 @@ func (ac *AuthController) ForgotPassword(c *gin.Context) {
 	}))
 }
 
+// DeleteAccount удаляет аккаунт текущего пользователя
+func (ac *AuthController) DeleteAccount(c *gin.Context) {
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
+			models.ErrAuthRequired,
+			"User not found",
+		))
+		return
+	}
+
+	userModel := user.(models.User)
+
+	// Проверяем, что пользователь активен
+	if !userModel.IsActive {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Account is already deleted",
+		))
+		return
+	}
+
+	// Мягкое удаление - деактивируем аккаунт
+	userModel.IsActive = false
+	if err := database.DB.Save(&userModel).Error; err != nil {
+		log.Printf("❌ Ошибка удаления аккаунта пользователя %s: %v", userModel.ID, err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Failed to delete account",
+		))
+		return
+	}
+
+	log.Printf("✅ Аккаунт пользователя %s успешно удален (деактивирован)", userModel.ID)
+
+	c.JSON(http.StatusOK, models.SuccessResponse(
+		nil,
+		"Account deleted successfully",
+	))
+}
+
 // sendUnreadNotificationsPush отправляет push-уведомления о непрочитанных уведомлениях при входе
 func sendUnreadNotificationsPush(userID uuid.UUID) {
 	// Получаем все непрочитанные уведомления пользователя

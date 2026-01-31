@@ -61,6 +61,10 @@ backups/
 # Compiled binaries
 mm_shop
 mm_shop.exe
+mm-api.exe
+
+# Temporary files
+Owner
 
 # SSL certificates (private keys should never be committed)
 ssl/

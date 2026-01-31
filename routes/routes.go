@@ -153,6 +153,7 @@ func SetupRoutes() *gin.Engine {
 		{
 			users.GET("/profile", authController.Profile)
 			users.PUT("/profile", authController.UpdateProfile)
+			users.DELETE("/delete-account", authController.DeleteAccount) // Удаление собственного аккаунта
 			// users.POST("/avatar", authController.UploadAvatar) // TODO: Реализовать
 
 			// Адреса пользователя
