@@ -1,7 +1,7 @@
 # MM Shop - Production Release
 # ============================
 
-version: '3.8'
+# version: '3.8' # Устаревший атрибут, удален для устранения предупреждения
 
 services:
   # PostgreSQL Database

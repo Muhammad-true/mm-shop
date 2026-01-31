@@ -6,17 +6,28 @@ FROM golang:1.23-alpine AS builder
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
+# Оптимизация для экономии места: отключаем кэш Go во время сборки
+ENV GOCACHE=off
+ENV GOTMPDIR=/tmp/go-tmp
+
 # Копируем go.mod и go.sum
 COPY go.mod go.sum ./
 
-# Загружаем зависимости
-RUN go mod download
+# Загружаем зависимости и сразу очищаем кэш
+RUN go mod download && \
+    go clean -cache -modcache -testcache 2>/dev/null || true
 
 # Копируем исходный код
 COPY . .
 
-# Собираем бинарник
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o mm_shop .
+# Очищаем все временные файлы перед сборкой
+RUN rm -rf /tmp/* /var/tmp/* /root/.cache/go-build 2>/dev/null || true
+
+# Собираем бинарник с оптимизацией (без кэша, с strip символов)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-w -s" -trimpath -a -installsuffix cgo -o mm_shop . && \
+    go clean -cache -modcache -testcache 2>/dev/null || true && \
+    rm -rf /tmp/* /var/tmp/* /root/.cache 2>/dev/null || true
 
 # Финальный образ
 FROM alpine:latest
