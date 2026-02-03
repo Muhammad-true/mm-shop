@@ -127,53 +127,124 @@ const libissPos = {
             return;
         }
 
-            // Показываем индикатор загрузки
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Загрузка...';
+        // Показываем индикатор загрузки
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Загрузка...';
 
-            try {
-                const token = window.storage?.getAdminToken() || localStorage.getItem('adminToken');
-                if (!token) {
-                    throw new Error('Токен не найден');
-                }
+        // Показываем прогресс-бар
+        const progressContainer = document.getElementById('libiss-pos-upload-progress');
+        const progressBar = document.getElementById('libiss-pos-progress-bar');
+        const progressText = document.getElementById('libiss-pos-progress-text');
+        const speedText = document.getElementById('libiss-pos-speed-text');
+        
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressText.textContent = 'Загрузка: 0%';
+        speedText.textContent = '0 MB/s';
 
-            formData.append('file', file);
-            
-            // Добавляем isPublic из checkbox
-            const isPublicCheckbox = form.querySelector('input[name="isPublic"]');
-            if (isPublicCheckbox && isPublicCheckbox.checked) {
-                formData.append('isPublic', 'true');
-            } else {
-                formData.append('isPublic', 'false');
+        try {
+            const token = window.storage?.getAdminToken() || localStorage.getItem('adminToken');
+            if (!token) {
+                throw new Error('Токен не найден');
             }
 
-            const apiBaseUrl = window.getApiUrl ? window.getApiUrl('') : (window.API_BASE_URL || 'http://localhost:8080');
-            const response = await fetch(`${apiBaseUrl}/api/v1/admin/libiss-pos/upload`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
+        formData.append('file', file);
+        
+        // Добавляем isPublic из checkbox
+        const isPublicCheckbox = form.querySelector('input[name="isPublic"]');
+        if (isPublicCheckbox && isPublicCheckbox.checked) {
+            formData.append('isPublic', 'true');
+        } else {
+            formData.append('isPublic', 'false');
+        }
+
+        const apiBaseUrl = window.getApiUrl ? window.getApiUrl('') : (window.API_BASE_URL || 'http://localhost:8080');
+        
+        // Используем XMLHttpRequest для отслеживания прогресса
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const startTime = Date.now();
+            let lastLoaded = 0;
+            let lastTime = startTime;
+
+            // Отслеживание прогресса загрузки
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    const currentTime = Date.now();
+                    const timeDiff = (currentTime - lastTime) / 1000; // секунды
+                    const loadedDiff = e.loaded - lastLoaded; // байты
+                    
+                    // Обновляем прогресс-бар
+                    progressBar.style.width = percent + '%';
+                    progressBar.textContent = percent + '%';
+                    progressText.textContent = `Загрузка: ${percent}% (${this.formatSize(e.loaded)} / ${this.formatSize(e.total)})`;
+                    
+                    // Вычисляем скорость
+                    if (timeDiff > 0) {
+                        const speed = loadedDiff / timeDiff; // байт/сек
+                        const speedMB = (speed / (1024 * 1024)).toFixed(2);
+                        speedText.textContent = `${speedMB} MB/s`;
+                        
+                        lastLoaded = e.loaded;
+                        lastTime = currentTime;
+                    }
+                }
             });
 
-            const data = await response.json();
+            // Обработка завершения загрузки
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            progressBar.style.width = '100%';
+                            progressBar.textContent = '100%';
+                            progressText.textContent = 'Загрузка завершена!';
+                            speedText.textContent = '';
+                            
+                            setTimeout(() => {
+                                progressContainer.style.display = 'none';
+                                window.ui?.showNotification('Файл успешно загружен', 'success');
+                                form.reset();
+                                this.loadFiles();
+                            }, 1000);
+                            resolve(data);
+                        } else {
+                            throw new Error(data.error || 'Неизвестная ошибка');
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                } else {
+                    reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+                }
+            });
 
-            if (data.success) {
-                window.ui?.showNotification('Файл успешно загружен', 'success');
-                form.reset();
-                this.loadFiles();
-            } else {
-                window.ui?.showNotification('Ошибка загрузки: ' + (data.error || 'Неизвестная ошибка'), 'error');
-            }
-        } catch (error) {
-            console.error('❌ Ошибка при загрузке файла:', error);
-            window.ui?.showNotification('Ошибка при загрузке файла', 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-        }
+            // Обработка ошибок
+            xhr.addEventListener('error', () => {
+                reject(new Error('Ошибка сети при загрузке файла'));
+            });
+
+            xhr.addEventListener('abort', () => {
+                reject(new Error('Загрузка отменена'));
+            });
+
+            // Отправка запроса
+            xhr.open('POST', `${apiBaseUrl}/api/v1/admin/libiss-pos/upload`);
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            xhr.send(formData);
+        });
+    } catch (error) {
+        console.error('❌ Ошибка при загрузке файла:', error);
+        window.ui?.showNotification('Ошибка при загрузке файла: ' + error.message, 'error');
+        progressContainer.style.display = 'none';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
     },
 
     // Отображение списка файлов
@@ -202,12 +273,6 @@ const libissPos = {
             'android': 'Android'
         };
 
-        const formatSize = (bytes) => {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-        };
-
         const formatDate = (dateStr) => {
             const date = new Date(dateStr);
             return date.toLocaleString('ru-RU');
@@ -228,7 +293,7 @@ const libissPos = {
                     <div class="file-info">
                         <p><strong>Версия:</strong> ${file.version}</p>
                         <p><strong>Платформа:</strong> ${platformNames[file.platform] || file.platform}</p>
-                        <p><strong>Размер:</strong> ${formatSize(file.fileSize)}</p>
+                        <p><strong>Размер:</strong> ${this.formatSize(file.fileSize)}</p>
                         <p><strong>Загрузок:</strong> ${file.downloadCount || 0}</p>
                         <p><strong>Загружен:</strong> ${formatDate(file.createdAt)}</p>
                         ${file.description ? `<p><strong>Описание:</strong> ${file.description}</p>` : ''}
