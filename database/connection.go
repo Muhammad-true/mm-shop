@@ -197,6 +197,7 @@ func runMigrations() error {
 		&models.SubscriptionPlan{}, // Планы подписки
 		&models.License{},          // Лицензии
 		&models.UpdateRelease{},    // Обновления приложений/сервера
+		&models.LibissPosFile{},   // Файлы программ libiss_pos
 	); err != nil {
 		return fmt.Errorf("failed to run GORM AutoMigrate: %w", err)
 	}

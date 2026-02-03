@@ -41,6 +41,7 @@ func SetupRoutes() *gin.Engine {
 	shopRegistrationController := &controllers.ShopRegistrationController{}
 	paymentController := &controllers.PaymentController{}
 	updateController := &controllers.UpdateController{}
+	libissPosController := &controllers.LibissPosController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -80,6 +81,13 @@ func SetupRoutes() *gin.Engine {
 		updates := public.Group("updates")
 		{
 			updates.GET("/latest", updateController.GetLatestUpdate)
+		}
+
+		// Файлы libiss_pos (публичный доступ для скачивания)
+		libissPosPublic := public.Group("libiss-pos")
+		{
+			libissPosPublic.GET("/latest", libissPosController.GetLatestFile)        // Последний файл по типу
+			libissPosPublic.GET("/public/:filename", libissPosController.PublicDownload) // Публичное скачивание
 		}
 
 		// Категории (публичный доступ)
@@ -251,6 +259,12 @@ func SetupRoutes() *gin.Engine {
 		{
 			shopRegistration.POST("/sync-subscriptions", shopRegistrationController.SyncUserSubscriptions) // Синхронизация подписок пользователя из Lemon Squeezy
 		}
+
+		// Скачивание файлов libiss_pos (требует аутентификации)
+		libissPos := protected.Group("libiss-pos")
+		{
+			libissPos.GET("/download/:filename", libissPosController.DownloadFile) // Скачивание файла
+		}
 	}
 
 	// Админские маршруты (для админов и супер админов)
@@ -315,6 +329,15 @@ func SetupRoutes() *gin.Engine {
 		{
 			adminUpdates.GET("/", updateController.ListUpdates)
 			adminUpdates.POST("/upload", updateController.UploadUpdate)
+		}
+
+		// Управление файлами libiss_pos (админы и супер админы)
+		adminLibissPos := admin.Group("libiss-pos")
+		{
+			adminLibissPos.GET("/", libissPosController.ListFiles)           // Список всех файлов
+			adminLibissPos.POST("/upload", libissPosController.UploadFile)   // Загрузка файла
+			adminLibissPos.GET("/:id", libissPosController.GetFileInfo)     // Информация о файле
+			adminLibissPos.DELETE("/:id", libissPosController.DeleteFile)     // Удаление файла
 		}
 
 		// Управление магазинами (админы и супер админы)
@@ -397,6 +420,7 @@ func SetupRoutes() *gin.Engine {
 	// Используем абсолютный путь для продакшена в Docker
 	r.Static("/images", "/app/images")
 	r.Static("/updates", "/app/updates")
+	r.Static("/libiss_pos", "/app/libiss_pos")
 
 	// Обслуживание админ панели (если файлы присутствуют)
 	r.Static("/admin", "./admin")
@@ -406,7 +430,7 @@ func SetupRoutes() *gin.Engine {
 		c.JSON(200, gin.H{
 			"status":  "ok",
 			"message": "MM API is running",
-			"version": "1.4.0",
+			"version": "1.5.0",
 		})
 	}
 	r.GET("/health", healthHandler)
@@ -414,17 +438,17 @@ func SetupRoutes() *gin.Engine {
 
 	r.GET("/version", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"version": "1.4.0",
+			"version": "1.5.0",
 			"name":    "MM API",
 			"build":   "development",
-			"changes": "Added automatic FCM token registration for web admin panel, Service Worker for push notifications",
+			"changes": "Added Libiss POS file management system with support for Windows (.exe) and Android (.apk) files",
 		})
 	})
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "Welcome to MM API",
-			"version": "1.3.2",
+			"version": "1.5.0",
 			"docs":    "/api/v1/docs",
 			"health":  "/health",
 		})

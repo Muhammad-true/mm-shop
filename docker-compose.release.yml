@@ -65,6 +65,7 @@ services:
       - ./images:/app/images
       - ./logs:/app/logs
       - ./updates:/app/updates
+      - ./libiss_pos:/app/libiss_pos
     depends_on:
       postgres:
         condition: service_healthy

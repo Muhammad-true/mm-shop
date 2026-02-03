@@ -17,7 +17,7 @@ function setupNavigation(userRole = 'admin') {
             item.style.display = 'flex';
         });
     } else if (userRole === 'admin') {
-        const allowedTabs = ['dashboard', 'products', 'categories', 'users', 'orders', 'shops', 'updates', 'settings'];
+        const allowedTabs = ['dashboard', 'products', 'categories', 'users', 'orders', 'shops', 'updates', 'libiss-pos', 'settings'];
         
         navItems.forEach(item => {
             const tabName = item.dataset.tab;
@@ -169,6 +169,11 @@ function showTab(tabName, userRole = 'admin') {
                 case 'updates':
                     if (window.updates && window.updates.init) {
                         window.updates.init();
+                    }
+                    break;
+                case 'libiss-pos':
+                    if (window.libissPos && window.libissPos.init) {
+                        window.libissPos.init();
                     }
                     break;
                 case 'settings':

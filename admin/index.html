@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MM Shop - Админ Панель v1.7.0</title>
-    <meta name="version" content="1.7.0">
-    <link rel="stylesheet" href="styles.css?v=1.7.0">
+    <title>MM Shop - Админ Панель v1.8.0</title>
+    <meta name="version" content="1.8.0">
+    <link rel="stylesheet" href="styles.css?v=1.8.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -83,6 +83,10 @@
                     <i class="fas fa-cloud-upload-alt"></i>
                     <span>Обновления</span>
                 </li>
+                <li class="nav-item" data-tab="libiss-pos">
+                    <i class="fas fa-desktop"></i>
+                    <span>Libiss POS</span>
+                </li>
                 <li class="nav-item" data-tab="settings">
                     <i class="fas fa-cog"></i>
                     <span>Настройки</span>
@@ -104,10 +108,10 @@
                     <i class="fas fa-code-branch"></i> Version
                 </div>
                 <div style="color: white; font-weight: 600; font-size: 14px;">
-                    1.3.3
+                    1.8.0
                 </div>
                 <div style="color: rgba(255, 255, 255, 0.4); font-size: 10px; margin-top: 5px;">
-                    Categories with Icons & Subcategories
+                    Libiss POS File Management
                 </div>
             </div>
         </nav>
@@ -453,6 +457,81 @@
                 </div>
             </div>
 
+            <!-- Libiss POS Tab -->
+            <div id="libiss-pos" class="tab-content">
+                <div class="content-header">
+                    <h2><i class="fas fa-desktop"></i> Управление файлами Libiss POS</h2>
+                </div>
+
+                <div class="card" style="margin-bottom: 20px;">
+                    <h3><i class="fas fa-upload"></i> Загрузить файл программы</h3>
+                    <form id="libiss-pos-upload-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Тип программы</label>
+                                <select name="type" id="libiss-pos-type" class="form-input" required>
+                                    <option value="">Выберите тип</option>
+                                    <option value="full">Полный пакет (Касса1: программа + сервер + MySQL)</option>
+                                    <option value="cassa2">Программа для Касса2</option>
+                                    <option value="server_only">Программа + сервер без MySQL</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Платформа</label>
+                                <select name="platform" id="libiss-pos-platform" class="form-input" required>
+                                    <option value="">Выберите платформу</option>
+                                    <option value="windows">Windows (.exe)</option>
+                                    <option value="android">Android (.apk)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Версия</label>
+                                <input type="text" name="version" class="form-input" placeholder="1.0.0" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label id="libiss-pos-file-label">Файл программы</label>
+                            <input type="file" name="file" id="libiss-pos-file-input" class="form-input" accept=".exe,.apk" required>
+                            <small id="libiss-pos-file-hint" style="color: #666;">Выберите платформу для отображения допустимых форматов</small>
+                            <small style="color: #666; display: block; margin-top: 5px;">
+                                <strong>Размеры файлов:</strong> full (~595 МБ), server_only (~31.8 МБ), cassa2 (~11.3 МБ). Максимум: 600 МБ
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label>Описание</label>
+                            <textarea name="description" class="form-input" rows="3" placeholder="Описание программы, изменения и т.д."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" name="isPublic" checked>
+                                Публичный доступ (доступно для скачивания без авторизации)
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Загрузить файл
+                        </button>
+                    </form>
+                </div>
+
+                <div class="filters" style="margin-bottom: 20px;">
+                    <select id="libiss-pos-filter-type" class="filter-select">
+                        <option value="">Все типы</option>
+                        <option value="full">Полный пакет (Касса1)</option>
+                        <option value="cassa2">Программа для Касса2</option>
+                        <option value="server_only">Программа + сервер без MySQL</option>
+                    </select>
+                    <select id="libiss-pos-filter-platform" class="filter-select">
+                        <option value="">Все платформы</option>
+                        <option value="windows">Windows</option>
+                        <option value="android">Android</option>
+                    </select>
+                </div>
+
+                <div id="libiss-pos-files-list" class="table-container">
+                    <p>Загрузка файлов...</p>
+                </div>
+            </div>
+
             <!-- Settings Tab -->
             <div id="settings" class="tab-content">
                 <div class="content-header">
@@ -758,6 +837,7 @@
     <script>document.write('<script src="js/orders.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/shops.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/updates.js?v=' + v + '"><\/script>');</script>
+    <script>document.write('<script src="js/libiss_pos.js?v=' + v + '"><\/script>');</script>
     <script>document.write('<script src="js/navigation.js?v=' + v + '"><\/script>');</script>
     
     <!-- Главный модуль -->
