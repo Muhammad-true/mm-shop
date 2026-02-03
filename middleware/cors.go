@@ -14,17 +14,32 @@ func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		isAllowed := false
+		allowAll := false
 
 		// Проверяем, есть ли origin в списке разрешенных
 		for _, allowed := range allowedOrigins {
-			if allowed == "*" || allowed == origin {
+			if allowed == "*" {
+				allowAll = true
+				isAllowed = true
+				break
+			} else if allowed == origin {
 				isAllowed = true
 				break
 			}
 		}
 
+		// Устанавливаем заголовок CORS
 		if isAllowed {
-			c.Header("Access-Control-Allow-Origin", origin)
+			if allowAll {
+				// Если разрешены все origins, используем конкретный origin из запроса или *
+				if origin != "" {
+					c.Header("Access-Control-Allow-Origin", origin)
+				} else {
+					c.Header("Access-Control-Allow-Origin", "*")
+				}
+			} else {
+				c.Header("Access-Control-Allow-Origin", origin)
+			}
 		}
 
 		c.Header("Access-Control-Allow-Credentials", "true")

@@ -122,6 +122,7 @@ function showConfirmDialog(title, message, description = '', confirmText = 'Да
 }
 
 // Экспорт функций
+window.showMessage = showMessage; // Глобальная функция для обратной совместимости
 window.ui = {
     showMessage,
     showModal,

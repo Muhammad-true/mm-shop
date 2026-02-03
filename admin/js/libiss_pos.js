@@ -93,11 +93,23 @@ const libissPos = {
                 this.renderFiles();
             } else {
                 console.error('❌ Ошибка загрузки файлов:', data.error);
-                window.ui?.showNotification('Ошибка загрузки файлов: ' + (data.error || 'Неизвестная ошибка'), 'error');
+                if (window.showMessage) {
+                    window.showMessage('Ошибка загрузки файлов: ' + (data.error || 'Неизвестная ошибка'), 'error');
+                } else if (window.ui?.showMessage) {
+                    window.ui.showMessage('Ошибка загрузки файлов: ' + (data.error || 'Неизвестная ошибка'), 'error');
+                } else {
+                    alert('Ошибка загрузки файлов: ' + (data.error || 'Неизвестная ошибка'));
+                }
             }
         } catch (error) {
             console.error('❌ Ошибка при загрузке файлов:', error);
-            window.ui?.showNotification('Ошибка при загрузке файлов', 'error');
+            if (window.showMessage) {
+                window.showMessage('Ошибка при загрузке файлов', 'error');
+            } else if (window.ui?.showMessage) {
+                window.ui.showMessage('Ошибка при загрузке файлов', 'error');
+            } else {
+                alert('Ошибка при загрузке файлов');
+            }
         }
     },
 
@@ -110,7 +122,11 @@ const libissPos = {
         
         const fileInput = form.querySelector('input[type="file"]');
         if (!fileInput.files || !fileInput.files[0]) {
-            window.ui?.showNotification('Выберите файл для загрузки', 'error');
+            if (window.showMessage) {
+                window.showMessage('Выберите файл для загрузки', 'error');
+            } else {
+                alert('Выберите файл для загрузки');
+            }
             return;
         }
 
@@ -119,11 +135,19 @@ const libissPos = {
         const platform = platformSelect?.value;
         
         if (platform === 'windows' && !file.name.endsWith('.exe')) {
-            window.ui?.showNotification('Для Windows разрешены только .exe файлы', 'error');
+            if (window.showMessage) {
+                window.showMessage('Для Windows разрешены только .exe файлы', 'error');
+            } else {
+                alert('Для Windows разрешены только .exe файлы');
+            }
             return;
         }
         if (platform === 'android' && !file.name.endsWith('.apk')) {
-            window.ui?.showNotification('Для Android разрешены только .apk файлы', 'error');
+            if (window.showMessage) {
+                window.showMessage('Для Android разрешены только .apk файлы', 'error');
+            } else {
+                alert('Для Android разрешены только .apk файлы');
+            }
             return;
         }
 
@@ -162,6 +186,9 @@ const libissPos = {
 
         const apiBaseUrl = window.getApiUrl ? window.getApiUrl('') : (window.API_BASE_URL || 'http://localhost:8080');
         
+        // Сохраняем ссылку на formatSize для использования в обработчиках
+        const formatSizeFn = (bytes) => this.formatSize(bytes);
+
         // Используем XMLHttpRequest для отслеживания прогресса
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
@@ -180,7 +207,7 @@ const libissPos = {
                     // Обновляем прогресс-бар
                     progressBar.style.width = percent + '%';
                     progressBar.textContent = percent + '%';
-                    progressText.textContent = `Загрузка: ${percent}% (${this.formatSize(e.loaded)} / ${this.formatSize(e.total)})`;
+                    progressText.textContent = `Загрузка: ${percent}% (${formatSizeFn(e.loaded)} / ${formatSizeFn(e.total)})`;
                     
                     // Вычисляем скорость
                     if (timeDiff > 0) {
@@ -207,7 +234,13 @@ const libissPos = {
                             
                             setTimeout(() => {
                                 progressContainer.style.display = 'none';
-                                window.ui?.showNotification('Файл успешно загружен', 'success');
+                                if (window.showMessage) {
+                                    window.showMessage('Файл успешно загружен', 'success');
+                                } else if (window.ui?.showMessage) {
+                                    window.ui.showMessage('Файл успешно загружен', 'success');
+                                } else {
+                                    alert('Файл успешно загружен');
+                                }
                                 form.reset();
                                 this.loadFiles();
                             }, 1000);
@@ -239,7 +272,13 @@ const libissPos = {
         });
     } catch (error) {
         console.error('❌ Ошибка при загрузке файла:', error);
-        window.ui?.showNotification('Ошибка при загрузке файла: ' + error.message, 'error');
+        if (window.showMessage) {
+            window.showMessage('Ошибка при загрузке файла: ' + error.message, 'error');
+        } else if (window.ui?.showMessage) {
+            window.ui.showMessage('Ошибка при загрузке файла: ' + error.message, 'error');
+        } else {
+            alert('Ошибка при загрузке файла: ' + error.message);
+        }
         progressContainer.style.display = 'none';
     } finally {
         submitBtn.disabled = false;
@@ -347,14 +386,32 @@ const libissPos = {
             const data = await response.json();
 
             if (data.success) {
-                window.ui?.showNotification('Файл успешно удален', 'success');
+                if (window.showMessage) {
+                    window.showMessage('Файл успешно удален', 'success');
+                } else if (window.ui?.showMessage) {
+                    window.ui.showMessage('Файл успешно удален', 'success');
+                } else {
+                    alert('Файл успешно удален');
+                }
                 this.loadFiles();
             } else {
-                window.ui?.showNotification('Ошибка удаления: ' + (data.error || 'Неизвестная ошибка'), 'error');
+                if (window.showMessage) {
+                    window.showMessage('Ошибка удаления: ' + (data.error || 'Неизвестная ошибка'), 'error');
+                } else if (window.ui?.showMessage) {
+                    window.ui.showMessage('Ошибка удаления: ' + (data.error || 'Неизвестная ошибка'), 'error');
+                } else {
+                    alert('Ошибка удаления: ' + (data.error || 'Неизвестная ошибка'));
+                }
             }
         } catch (error) {
             console.error('❌ Ошибка при удалении файла:', error);
-            window.ui?.showNotification('Ошибка при удалении файла', 'error');
+            if (window.showMessage) {
+                window.showMessage('Ошибка при удалении файла', 'error');
+            } else if (window.ui?.showMessage) {
+                window.ui.showMessage('Ошибка при удалении файла', 'error');
+            } else {
+                alert('Ошибка при удалении файла');
+            }
         }
     }
 };
