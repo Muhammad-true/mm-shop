@@ -246,23 +246,64 @@ const libissPos = {
                             }, 1000);
                             resolve(data);
                         } else {
-                            throw new Error(data.error || 'Неизвестная ошибка');
+                            const errorMsg = data.error || 'Неизвестная ошибка';
+                            progressContainer.style.display = 'none';
+                            if (window.showMessage) {
+                                window.showMessage('Ошибка загрузки: ' + errorMsg, 'error');
+                            } else {
+                                alert('Ошибка загрузки: ' + errorMsg);
+                            }
+                            reject(new Error(errorMsg));
                         }
                     } catch (error) {
+                        progressContainer.style.display = 'none';
+                        if (window.showMessage) {
+                            window.showMessage('Ошибка обработки ответа: ' + error.message, 'error');
+                        } else {
+                            alert('Ошибка обработки ответа: ' + error.message);
+                        }
                         reject(error);
                     }
                 } else {
-                    reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+                    // HTTP ошибка (4xx, 5xx)
+                    let errorMsg = `HTTP ${xhr.status}: ${xhr.statusText}`;
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
+                        if (errorData.error) {
+                            errorMsg = errorData.error;
+                        }
+                    } catch (e) {
+                        // Игнорируем ошибки парсинга
+                    }
+                    progressContainer.style.display = 'none';
+                    if (window.showMessage) {
+                        window.showMessage('Ошибка загрузки: ' + errorMsg, 'error');
+                    } else {
+                        alert('Ошибка загрузки: ' + errorMsg);
+                    }
+                    reject(new Error(errorMsg));
                 }
             });
 
-            // Обработка ошибок
+            // Обработка ошибок сети
             xhr.addEventListener('error', () => {
-                reject(new Error('Ошибка сети при загрузке файла'));
+                progressContainer.style.display = 'none';
+                const errorMsg = 'Ошибка сети при загрузке файла. Проверьте подключение к интернету.';
+                if (window.showMessage) {
+                    window.showMessage(errorMsg, 'error');
+                } else {
+                    alert(errorMsg);
+                }
+                reject(new Error(errorMsg));
             });
 
             xhr.addEventListener('abort', () => {
-                reject(new Error('Загрузка отменена'));
+                progressContainer.style.display = 'none';
+                const errorMsg = 'Загрузка отменена';
+                if (window.showMessage) {
+                    window.showMessage(errorMsg, 'warning');
+                }
+                reject(new Error(errorMsg));
             });
 
             // Отправка запроса
