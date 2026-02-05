@@ -84,7 +84,7 @@
             container.innerHTML = '<p>Загрузка...</p>';
 
             try {
-                const data = await fetchData('/api/v1/admin/updates');
+                const data = await fetchData('/api/v1/admin/updates/');
                 const updates = data.data || data.updates || [];
                 container.innerHTML = this.renderTable(updates);
             } catch (err) {
