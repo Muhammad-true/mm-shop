@@ -1176,6 +1176,195 @@ Authorization: Bearer <token>
 
 ---
 
+## 🔄 Обновления приложения
+
+### Публичные эндпоинты (без аутентификации)
+
+#### `GET /updates/latest`
+Получить последнее активное обновление для платформы
+
+**Параметры запроса:**
+- `platform` (string, обязательный) - платформа: `server`, `windows`, `android`
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "platform": "android",
+    "version": "1.0.0",
+    "fileName": "android_1.0.0_abc12345.apk",
+    "fileUrl": "/updates/android/android_1.0.0_abc12345.apk",
+    "fileSize": 15728640,
+    "checksumSha256": "abc123def456...",
+    "releaseNotes": "Описание изменений",
+    "isActive": true,
+    "createdAt": "2024-01-01T12:00:00Z",
+    "updatedAt": "2024-01-01T12:00:00Z"
+  }
+}
+```
+
+**Ошибки:**
+- `400 Bad Request` - если параметр `platform` не указан
+- `404 Not Found` - если обновление для указанной платформы не найдено
+
+**Пример использования:**
+```
+GET /api/v1/updates/latest?platform=android
+GET /api/v1/updates/latest?platform=windows
+GET /api/v1/updates/latest?platform=server
+```
+
+**Скачивание файла обновления:**
+После получения информации об обновлении, файл можно скачать по URL из поля `fileUrl`:
+```
+GET /updates/{platform}/{filename}
+```
+
+Например:
+```
+GET /updates/android/android_1.0.0_abc12345.apk
+GET /updates/windows/windows_1.0.0_xyz67890.exe
+GET /updates/server/server_1.0.0_def12345.zip
+```
+
+**Поддерживаемые платформы и форматы:**
+- `server` - Node.js сервер (файл `.zip`)
+- `windows` - Flutter Windows приложение (файл `.exe`)
+- `android` - Flutter Android приложение (файл `.apk`)
+
+---
+
+### Админские эндпоинты (требуют роль admin или super_admin)
+
+#### `GET /admin/updates`
+Получить список всех обновлений
+
+**Параметры запроса:**
+- `platform` (string, опционально) - фильтр по платформе: `server`, `windows`, `android`
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "platform": "android",
+      "version": "1.0.0",
+      "fileName": "android_1.0.0_abc12345.apk",
+      "filePath": "updates/android/android_1.0.0_abc12345.apk",
+      "fileUrl": "/updates/android/android_1.0.0_abc12345.apk",
+      "fileSize": 15728640,
+      "checksumSha256": "abc123def456...",
+      "releaseNotes": "Описание изменений",
+      "isActive": true,
+      "createdAt": "2024-01-01T12:00:00Z",
+      "updatedAt": "2024-01-01T12:00:00Z"
+    }
+  ]
+}
+```
+
+#### `POST /admin/updates/upload`
+Загрузить новое обновление
+
+**Формат:** `multipart/form-data`
+
+**Параметры:**
+- `platform` (string, обязательный) - платформа: `server`, `windows`, `android`
+- `version` (string, обязательный) - версия обновления (например: `1.0.0`)
+- `file` (file, обязательный) - файл обновления:
+  - `.zip` для `server`
+  - `.exe` для `windows`
+  - `.apk` для `android`
+- `releaseNotes` (string, опционально) - описание изменений
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "message": "Update uploaded successfully",
+  "data": {
+    "id": "uuid",
+    "platform": "android",
+    "version": "1.0.0",
+    "fileName": "android_1.0.0_abc12345.apk",
+    "fileUrl": "/updates/android/android_1.0.0_abc12345.apk",
+    "fileSize": 15728640,
+    "checksumSha256": "abc123def456...",
+    "releaseNotes": "Описание изменений",
+    "isActive": true,
+    "createdAt": "2024-01-01T12:00:00Z",
+    "updatedAt": "2024-01-01T12:00:00Z"
+  }
+}
+```
+
+**Ошибки при загрузке:**
+- `400 Bad Request` - если `platform` или `version` не указаны
+  ```json
+  {
+    "success": false,
+    "error": "platform and version are required"
+  }
+  ```
+- `400 Bad Request` - если указана неверная платформа
+  ```json
+  {
+    "success": false,
+    "error": "invalid platform (allowed: server, windows, android)"
+  }
+  ```
+- `400 Bad Request` - если файл не указан
+  ```json
+  {
+    "success": false,
+    "error": "file is required",
+    "details": "error details"
+  }
+  ```
+- `400 Bad Request` - если расширение файла не поддерживается
+  ```json
+  {
+    "success": false,
+    "error": "unsupported extension .pdf (allowed: [.zip .exe .apk])"
+  }
+  ```
+- `500 Internal Server Error` - если не удалось создать директорию для файлов
+  ```json
+  {
+    "success": false,
+    "error": "failed to create updates directory",
+    "details": "error details"
+  }
+  ```
+- `500 Internal Server Error` - если не удалось сохранить файл
+  ```json
+  {
+    "success": false,
+    "error": "failed to save file",
+    "details": "error details"
+  }
+  ```
+- `500 Internal Server Error` - если не удалось сохранить метаданные в БД
+  ```json
+  {
+    "success": false,
+    "error": "failed to save update metadata",
+    "details": "error details"
+  }
+  ```
+
+**Примечания:**
+- При загрузке нового обновления автоматически вычисляется SHA256 хеш файла для проверки целостности
+- Файл сохраняется в директории `/app/updates/{platform}/` с уникальным именем
+- Все загруженные обновления по умолчанию помечаются как активные (`isActive: true`)
+
+---
+
 ## 📤 Загрузка файлов
 
 #### `POST /upload/image`

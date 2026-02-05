@@ -2,10 +2,13 @@
 
 (function() {
     const updatesModule = {
+        isInitialized: false,
+        isUploading: false,
         async init() {
             const form = document.getElementById('update-upload-form');
-            if (form) {
+            if (form && !this.isInitialized) {
                 form.addEventListener('submit', this.handleUpload.bind(this));
+                this.isInitialized = true;
             }
             await this.loadUpdates();
         },
@@ -17,13 +20,24 @@
 
         async handleUpload(e) {
             e.preventDefault();
+            if (this.isUploading) {
+                this.setUploadStatus('Загрузка уже выполняется. Пожалуйста, подождите...', 'info');
+                return;
+            }
+
             const platform = document.getElementById('update-platform').value;
             const version = document.getElementById('update-version').value.trim();
             const notes = document.getElementById('update-notes').value.trim();
             const fileInput = document.getElementById('update-file');
             const file = fileInput.files[0];
 
+            if (!platform || !version) {
+                this.setUploadStatus('Укажите платформу и версию', 'error');
+                return;
+            }
+
             if (!file) {
+                this.setUploadStatus('Выберите файл обновления', 'error');
                 window.ui?.showMessage ? window.ui.showMessage('Выберите файл обновления', 'error') : alert('Выберите файл');
                 return;
             }
@@ -35,26 +49,32 @@
             formData.append('file', file);
 
             try {
-                const token = this.getToken();
-                const response = await fetch(window.getApiUrl('/api/v1/admin/updates/upload'), {
-                    method: 'POST',
-                    headers: {
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                    },
-                    body: formData
-                });
+                this.isUploading = true;
+                this.setUploadButtonState(true, 'Загрузка...');
+                this.setUploadStatus('Загрузка файла...', 'info');
+                this.resetProgress();
 
-                const data = await response.json();
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || data.message || 'Ошибка загрузки');
+                const token = this.getToken();
+                const url = window.getApiUrl('/api/v1/admin/updates/upload');
+                const data = await this.uploadWithProgress(url, formData, token);
+
+                if (!data || data.success === false) {
+                    throw new Error(data?.error || data?.message || 'Ошибка загрузки');
                 }
 
+                this.setUploadStatus('Обновление загружено', 'success');
                 window.ui?.showMessage ? window.ui.showMessage('Обновление загружено', 'success') : alert('Обновление загружено');
                 e.target.reset();
                 await this.loadUpdates();
             } catch (err) {
                 console.error('Ошибка загрузки обновления:', err);
-                window.ui?.showMessage ? window.ui.showMessage(err.message || 'Ошибка загрузки', 'error') : alert(err.message || 'Ошибка');
+                const message = this.formatErrorMessage(err, 'upload');
+                this.setUploadStatus(message, 'error');
+                window.ui?.showMessage ? window.ui.showMessage(message, 'error') : alert(message);
+            } finally {
+                this.isUploading = false;
+                this.setUploadButtonState(false);
+                this.hideProgress();
             }
         },
 
@@ -69,7 +89,8 @@
                 container.innerHTML = this.renderTable(updates);
             } catch (err) {
                 console.error('Ошибка загрузки обновлений:', err);
-                container.innerHTML = `<p style="color:red;">Ошибка загрузки: ${err.message}</p>`;
+                const message = this.formatErrorMessage(err, 'list');
+                container.innerHTML = `<p style="color:red;">Ошибка загрузки: ${message}</p>`;
             }
         },
 
@@ -117,6 +138,129 @@
             const units = ['B', 'KB', 'MB', 'GB'];
             const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
             return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+        },
+
+        setUploadStatus(message, type = 'info') {
+            const status = document.getElementById('update-upload-status');
+            if (!status) return;
+            status.style.display = message ? 'block' : 'none';
+            status.textContent = message || '';
+
+            let color = '#666';
+            if (type === 'error') color = '#d9534f';
+            if (type === 'success') color = '#28a745';
+            status.style.color = color;
+        },
+
+        setUploadButtonState(disabled, label) {
+            const button = document.getElementById('update-upload-submit');
+            if (!button) return;
+            if (!button.dataset.originalHtml) {
+                button.dataset.originalHtml = button.innerHTML;
+            }
+            button.disabled = !!disabled;
+            button.innerHTML = disabled ? `<i class="fas fa-spinner fa-spin"></i> ${label || 'Загрузка...'}` : button.dataset.originalHtml;
+        },
+
+        resetProgress() {
+            const wrap = document.getElementById('update-upload-progress');
+            const bar = document.getElementById('update-upload-progress-bar');
+            const text = document.getElementById('update-upload-progress-text');
+            const time = document.getElementById('update-upload-progress-time');
+            if (!wrap || !bar || !text || !time) return;
+            wrap.style.display = 'block';
+            bar.style.width = '0%';
+            text.textContent = 'Загрузка: 0%';
+            time.textContent = '';
+        },
+
+        updateProgress(percent, elapsedMs) {
+            const bar = document.getElementById('update-upload-progress-bar');
+            const text = document.getElementById('update-upload-progress-text');
+            const time = document.getElementById('update-upload-progress-time');
+            if (!bar || !text || !time) return;
+            const pct = Math.max(0, Math.min(100, Math.round(percent)));
+            bar.style.width = `${pct}%`;
+            text.textContent = `Загрузка: ${pct}%`;
+            time.textContent = elapsedMs ? `Прошло: ${this.formatElapsed(elapsedMs)}` : '';
+        },
+
+        hideProgress() {
+            const wrap = document.getElementById('update-upload-progress');
+            if (wrap) wrap.style.display = 'none';
+        },
+
+        formatElapsed(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            if (minutes <= 0) return `${seconds}с`;
+            return `${minutes}м ${seconds}с`;
+        },
+
+        uploadWithProgress(url, formData, token) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                const startTime = Date.now();
+
+                xhr.open('POST', url, true);
+                xhr.timeout = 10 * 60 * 1000;
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+
+                xhr.upload.onprogress = (event) => {
+                    if (!event.lengthComputable) return;
+                    const percent = (event.loaded / event.total) * 100;
+                    this.updateProgress(percent, Date.now() - startTime);
+                };
+
+                xhr.onerror = () => {
+                    reject(new Error('Сетевая ошибка. Проверьте интернет и доступность API.'));
+                };
+
+                xhr.ontimeout = () => {
+                    reject(new Error('Истек таймаут загрузки. Сервер не ответил вовремя.'));
+                };
+
+                xhr.onload = () => {
+                    let responseData = null;
+                    try {
+                        responseData = JSON.parse(xhr.responseText || '{}');
+                    } catch (e) {
+                        // игнор
+                    }
+
+                    if (xhr.status < 200 || xhr.status >= 300) {
+                        const serverMessage = responseData?.error || responseData?.message;
+                        const raw = !serverMessage && xhr.responseText ? xhr.responseText : '';
+                        const statusText = xhr.statusText ? ` ${xhr.statusText}` : '';
+                        const message = serverMessage || raw || 'Неизвестная ошибка сервера';
+                        reject(new Error(`Сервер вернул ${xhr.status}${statusText}: ${message}`));
+                        return;
+                    }
+                    resolve(responseData);
+                };
+
+                xhr.send(formData);
+            });
+        },
+
+        formatErrorMessage(err, context) {
+            const rawMessage = err?.message || 'Неизвестная ошибка';
+            if (rawMessage.includes('Failed to fetch')) {
+                return 'Сетевая ошибка: запрос не выполнен (CORS/нет соединения/сервер недоступен).';
+            }
+            if (rawMessage.toLowerCase().includes('timeout')) {
+                return `Сетевая ошибка: ${rawMessage}`;
+            }
+            if (rawMessage.startsWith('Сервер вернул')) {
+                return `Ошибка сервера: ${rawMessage}`;
+            }
+            if (context === 'upload') {
+                return `Ошибка загрузки: ${rawMessage}`;
+            }
+            return rawMessage;
         }
     };
 
