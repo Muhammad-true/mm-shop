@@ -203,8 +203,21 @@
                 const xhr = new XMLHttpRequest();
                 const startTime = Date.now();
 
+                // Вычисляем динамический таймаут на основе размера файла
+                // Базовый таймаут: 5 минут + 1 минута на каждый МБ файла (минимум 30 минут для больших файлов)
+                const fileInput = document.getElementById('update-file');
+                const file = fileInput?.files?.[0];
+                let timeoutMs = 30 * 60 * 1000; // 30 минут по умолчанию
+                
+                if (file && file.size) {
+                    const fileSizeMB = file.size / (1024 * 1024);
+                    // Минимум 30 минут, максимум 60 минут для очень больших файлов
+                    timeoutMs = Math.max(30 * 60 * 1000, Math.min(60 * 60 * 1000, (5 + fileSizeMB) * 60 * 1000));
+                    console.log(`⏱️ Установлен таймаут ${Math.round(timeoutMs / 60000)} минут для файла ${fileSizeMB.toFixed(2)} МБ`);
+                }
+
                 xhr.open('POST', url, true);
-                xhr.timeout = 10 * 60 * 1000;
+                xhr.timeout = timeoutMs;
                 if (token) {
                     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                 }
