@@ -77,3 +77,14 @@ ssl/
 CLOUDFLARE_QUICK_FIX.md
 CLOUDFLARE_FIX.md
 
+# Development files (only production files in Git)
+docker-compose.yml
+docker-compose.release.override.yml
+Dockerfile.admin.dev
+Dockerfile.*.dev
+nginx.development.conf
+env.development
+.env.development
+.env.local
+.env.*.local
+
