@@ -396,59 +396,14 @@
                 </div>
 
                 <div class="card" style="margin-bottom: 20px; background: #e7f3ff; border-left: 4px solid #2196F3;">
-                    <h3><i class="fas fa-info-circle"></i> Способы загрузки обновлений</h3>
+                    <h3><i class="fas fa-info-circle"></i> Загрузка обновлений</h3>
                     <p style="margin: 10px 0; color: #333;">
-                        <strong>1. Через админ-панель:</strong> Используй форму ниже для загрузки файлов напрямую.<br>
-                        <strong>2. Через FTP:</strong> Загрузи файл в папку <code>/var/ftp/uploads/</code> с именем в формате <code>platform_version.ext</code> (например: <code>android_1.0.0.apk</code>). 
+                        <strong>Загрузка обновлений выполняется через FTP:</strong> Загрузи файл в папку <code>/var/ftp/uploads/</code> с именем в формате <code>platform_version.ext</code> (например: <code>android_1.0.0.apk</code>). 
                         Скрипт автоматически обработает файл и добавит его в систему.
                     </p>
                     <p style="margin: 10px 0; color: #666; font-size: 13px;">
                         <i class="fas fa-book"></i> Подробная инструкция: <a href="/docs/FTP_UPLOAD_GUIDE.md" target="_blank" style="color: #2196F3;">FTP Upload Guide</a>
                     </p>
-                </div>
-
-                <div class="card" style="margin-bottom: 20px;">
-                    <h3><i class="fas fa-upload"></i> Загрузить обновление</h3>
-                    <form id="update-upload-form" novalidate>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Платформа</label>
-                                <select id="update-platform" class="form-input" required>
-                                    <option value="server">Сервер (Node.js, zip)</option>
-                                    <option value="windows">Windows (exe)</option>
-                                    <option value="android">Android (apk)</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Версия</label>
-                                <input type="text" id="update-version" class="form-input" placeholder="1.0.0" required>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Файл обновления</label>
-                            <input type="file" id="update-file" class="form-input" accept=".zip,.exe,.apk" required>
-                            <small style="color: #666;">Поддерживаются .zip (сервер), .exe (Windows), .apk (Android)</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Описание / список изменений</label>
-                            <textarea id="update-notes" class="form-input" rows="3" placeholder="Что изменилось?"></textarea>
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" id="update-upload-submit" class="btn btn-primary">
-                                <i class="fas fa-cloud-upload-alt"></i> Загрузить
-                            </button>
-                        </div>
-                        <div id="update-upload-status" style="display: none; margin-top: 10px; font-size: 14px;"></div>
-                        <div id="update-upload-progress" style="display: none; margin-top: 10px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                <span id="update-upload-progress-text" style="font-size: 14px; color: #666;">Загрузка: 0%</span>
-                                <span id="update-upload-progress-time" style="font-size: 12px; color: #999;"></span>
-                            </div>
-                            <div style="background: #f1f1f1; border-radius: 4px; overflow: hidden; height: 8px;">
-                                <div id="update-upload-progress-bar" style="width: 0%; height: 100%; background: #007bff;"></div>
-                            </div>
-                        </div>
-                    </form>
                 </div>
 
                 <div class="card">
@@ -815,7 +770,7 @@
     <script>
         // ВАЖНО: Версия для cache busting - меняется при каждой пересборке!
         // BUILD_VERSION будет обновляться автоматически
-        window.BUILD_VERSION = '1.9.3-' + new Date().toISOString().replace(/[-:]/g, '').split('.')[0]; // Формат: версия-датавремя
+        window.BUILD_VERSION = '1.9.4-' + new Date().toISOString().replace(/[-:]/g, '').split('.')[0]; // Формат: версия-датавремя
         
         // Проверяем загрузку стилей
         document.addEventListener('DOMContentLoaded', function() {

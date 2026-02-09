@@ -3,13 +3,9 @@
 (function() {
     const updatesModule = {
         isInitialized: false,
-        isUploading: false,
         async init() {
-            const form = document.getElementById('update-upload-form');
-            if (form && !this.isInitialized) {
-                form.addEventListener('submit', this.handleUpload.bind(this));
-                this.isInitialized = true;
-            }
+            // Форма загрузки удалена - загрузка только через FTP
+            this.isInitialized = true;
             await this.loadUpdates();
         },
 
