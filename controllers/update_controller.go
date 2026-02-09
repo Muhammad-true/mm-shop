@@ -25,10 +25,36 @@ type UpdateController struct{}
 func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	log.Println("📤 [UploadUpdate] Начало загрузки обновления")
 	
-	// Получаем параметры формы (теперь nginx буферизует запрос, так что можно использовать PostForm)
+	// Логируем информацию о запросе
+	log.Printf("🔍 [UploadUpdate] Content-Type: %s", c.Request.Header.Get("Content-Type"))
+	log.Printf("🔍 [UploadUpdate] Content-Length: %s", c.Request.Header.Get("Content-Length"))
+	log.Printf("🔍 [UploadUpdate] Method: %s", c.Request.Method)
+	log.Printf("🔍 [UploadUpdate] URL: %s", c.Request.URL.String())
+	
+	// Пробуем разные способы получения данных
+	// Сначала пробуем PostForm
 	platformStr := c.PostForm("platform")
 	version := strings.TrimSpace(c.PostForm("version"))
 	releaseNotes := c.PostForm("releaseNotes")
+	
+	// Если PostForm пустые, пробуем получить из Query или MultipartForm
+	if platformStr == "" || version == "" {
+		log.Println("⚠️ [UploadUpdate] PostForm пустые, пробуем ParseMultipartForm...")
+		if err := c.Request.ParseMultipartForm(100 << 20); err == nil {
+			log.Println("✅ [UploadUpdate] ParseMultipartForm успешно")
+			if values := c.Request.MultipartForm.Value["platform"]; len(values) > 0 {
+				platformStr = values[0]
+			}
+			if values := c.Request.MultipartForm.Value["version"]; len(values) > 0 {
+				version = strings.TrimSpace(values[0])
+			}
+			if values := c.Request.MultipartForm.Value["releaseNotes"]; len(values) > 0 {
+				releaseNotes = values[0]
+			}
+		} else {
+			log.Printf("❌ [UploadUpdate] Ошибка ParseMultipartForm: %v", err)
+		}
+	}
 
 	log.Printf("📋 [UploadUpdate] Параметры: platform=%s, version=%s, releaseNotes=%s", platformStr, version, releaseNotes)
 
