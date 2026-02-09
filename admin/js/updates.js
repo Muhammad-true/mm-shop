@@ -18,6 +18,25 @@
             return null;
         },
 
+        // Получить прямой URL для загрузки (обход Cloudflare)
+        // Cloudflare может обрывать соединения при загрузке больших файлов (>100 секунд)
+        getDirectUploadUrl(endpoint) {
+            // Используем прямой IP только в продакшене и только для загрузки файлов
+            const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+            if (!isProduction) return null;
+            
+            // Прямой IP сервера (обход Cloudflare)
+            // ВАЖНО: убедись, что на сервере настроен SSL для этого IP или используй HTTP
+            // Если используешь HTTP, убедись, что nginx слушает на порту 80 для прямого IP
+            const DIRECT_SERVER_IP = '159.89.99.252';
+            const DIRECT_SERVER_PORT = '443'; // HTTPS через nginx
+            const DIRECT_SERVER_PROTOCOL = 'https';
+            
+            // Формируем URL с прямым IP
+            // Используем Host header для правильной маршрутизации в nginx
+            return `${DIRECT_SERVER_PROTOCOL}://${DIRECT_SERVER_IP}:${DIRECT_SERVER_PORT}${endpoint}`;
+        },
+
         async handleUpload(e) {
             e.preventDefault();
             if (this.isUploading) {
@@ -55,7 +74,13 @@
                 this.resetProgress();
 
                 const token = this.getToken();
-                const url = window.getApiUrl('/api/v1/admin/updates/upload');
+                
+                // ОБХОД CLOUDFLARE: используем прямой IP для загрузки больших файлов
+                // Cloudflare имеет таймаут 100 секунд на бесплатном тарифе
+                // Прямой IP обходит Cloudflare и позволяет загружать файлы без ограничений
+                const directIpUrl = this.getDirectUploadUrl('/api/v1/admin/updates/upload');
+                const url = directIpUrl || window.getApiUrl('/api/v1/admin/updates/upload');
+                
                 const data = await this.uploadWithProgress(url, formData, token);
 
                 if (!data || data.success === false) {
@@ -218,6 +243,12 @@
 
                 xhr.open('POST', url, true);
                 xhr.timeout = timeoutMs;
+                
+                // Если используем прямой IP, добавляем Host header для правильной маршрутизации в nginx
+                if (url.includes('159.89.99.252')) {
+                    xhr.setRequestHeader('Host', 'api.libiss.com');
+                }
+                
                 if (token) {
                     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                 }
