@@ -25,34 +25,10 @@ type UpdateController struct{}
 func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	log.Println("📤 [UploadUpdate] Начало загрузки обновления")
 	
-	// При потоковой передаче (proxy_request_buffering off) нужно сначала распарсить форму
-	// Устанавливаем большой лимит для больших файлов
-	if err := c.Request.ParseMultipartForm(100 << 20); err != nil { // 100 MB
-		log.Printf("❌ [UploadUpdate] Ошибка парсинга multipart формы: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "failed to parse multipart form",
-			"details": err.Error(),
-		})
-		return
-	}
-	log.Println("✅ [UploadUpdate] Multipart форма распарсена")
-	
-	// Получаем данные из распарсенной формы
-	platformStr := ""
-	if values := c.Request.MultipartForm.Value["platform"]; len(values) > 0 {
-		platformStr = values[0]
-	}
-	
-	version := ""
-	if values := c.Request.MultipartForm.Value["version"]; len(values) > 0 {
-		version = strings.TrimSpace(values[0])
-	}
-	
-	releaseNotes := ""
-	if values := c.Request.MultipartForm.Value["releaseNotes"]; len(values) > 0 {
-		releaseNotes = values[0]
-	}
+	// Получаем параметры формы (теперь nginx буферизует запрос, так что можно использовать PostForm)
+	platformStr := c.PostForm("platform")
+	version := strings.TrimSpace(c.PostForm("version"))
+	releaseNotes := c.PostForm("releaseNotes")
 
 	log.Printf("📋 [UploadUpdate] Параметры: platform=%s, version=%s, releaseNotes=%s", platformStr, version, releaseNotes)
 
@@ -77,25 +53,12 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	}
 
 	log.Println("📁 [UploadUpdate] Получение файла из запроса...")
-	
-	// Получаем файл из уже распарсенной формы
-	fileHeaders := c.Request.MultipartForm.File["file"]
-	if len(fileHeaders) == 0 {
-		log.Printf("❌ [UploadUpdate] Файл не найден в форме")
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		log.Printf("❌ [UploadUpdate] Ошибка получения файла: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "file is required",
-		})
-		return
-	}
-	
-	header := fileHeaders[0]
-	file, err := header.Open()
-	if err != nil {
-		log.Printf("❌ [UploadUpdate] Ошибка открытия файла: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "failed to open file",
 			"details": err.Error(),
 		})
 		return
