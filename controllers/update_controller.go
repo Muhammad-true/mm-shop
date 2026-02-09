@@ -31,62 +31,12 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	log.Printf("🔍 [UploadUpdate] Method: %s", c.Request.Method)
 	log.Printf("🔍 [UploadUpdate] URL: %s", c.Request.URL.String())
 	
-	// Отправляем промежуточный ответ HTTP 100 Continue сразу, чтобы браузер знал, что сервер принимает данные
-	// Это критично при буферизации в nginx - браузер не будет отменять соединение
-	if flusher, ok := c.Writer.(http.Flusher); ok {
-		c.Writer.WriteHeader(http.StatusContinue) // 100 Continue
-		flusher.Flush()
-		log.Println("✅ [UploadUpdate] Отправлен промежуточный ответ 100 Continue")
-	}
-	
-	// Проверяем, что тело запроса не было прочитано
-	if c.Request.Body == nil {
-		log.Println("❌ [UploadUpdate] Request.Body is nil!")
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "request body is empty",
-		})
-		return
-	}
-	
-	// Парсим multipart форму ПЕРЕД получением данных
-	// Устанавливаем большой лимит для больших файлов
-	log.Println("🔄 [UploadUpdate] Парсинг multipart формы...")
-	if err := c.Request.ParseMultipartForm(100 << 20); err != nil {
-		log.Printf("❌ [UploadUpdate] Ошибка ParseMultipartForm: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "failed to parse multipart form",
-			"details": err.Error(),
-		})
-		return
-	}
-	log.Println("✅ [UploadUpdate] Multipart форма успешно распарсена")
-	
-	// Получаем данные из распарсенной формы
-	platformStr := ""
-	if values := c.Request.MultipartForm.Value["platform"]; len(values) > 0 {
-		platformStr = values[0]
-		log.Printf("✅ [UploadUpdate] platform найден: %s", platformStr)
-	} else {
-		log.Println("⚠️ [UploadUpdate] platform не найден в форме")
-	}
-	
-	version := ""
-	if values := c.Request.MultipartForm.Value["version"]; len(values) > 0 {
-		version = strings.TrimSpace(values[0])
-		log.Printf("✅ [UploadUpdate] version найден: %s", version)
-	} else {
-		log.Println("⚠️ [UploadUpdate] version не найден в форме")
-	}
-	
-	releaseNotes := ""
-	if values := c.Request.MultipartForm.Value["releaseNotes"]; len(values) > 0 {
-		releaseNotes = values[0]
-	}
-	
-	// Логируем все доступные поля формы для отладки
-	log.Printf("🔍 [UploadUpdate] Все поля формы: %v", c.Request.MultipartForm.Value)
+	// Используем стандартные методы Gin - они автоматически парсят multipart при первом обращении
+	// При потоковой передаче (proxy_request_buffering off) Gin парсит форму по мере чтения
+	platformStr := c.PostForm("platform")
+	version := strings.TrimSpace(c.PostForm("version"))
+	releaseNotes := c.PostForm("releaseNotes")
+
 	log.Printf("📋 [UploadUpdate] Параметры: platform=%s, version=%s, releaseNotes=%s", platformStr, version, releaseNotes)
 
 	if platformStr == "" || version == "" {
