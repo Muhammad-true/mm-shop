@@ -10,6 +10,10 @@ import (
 func SetupRoutes() *gin.Engine {
 	r := gin.Default()
 
+	// Увеличиваем лимит памяти для multipart форм (для загрузки больших файлов)
+	// По умолчанию 32MB, увеличиваем до 100MB для файлов обновлений
+	r.MaxMultipartMemory = 100 << 20 // 100 MB
+
 	// Настройка перенаправления для API маршрутов
 	r.RedirectTrailingSlash = true // Разрешаем перенаправление для совместимости
 	r.RedirectFixedPath = false
