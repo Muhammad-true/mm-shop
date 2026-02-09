@@ -18,24 +18,6 @@
             return null;
         },
 
-        // Получить прямой URL для загрузки (обход Cloudflare)
-        // Cloudflare может обрывать соединения при загрузке больших файлов (>100 секунд)
-        getDirectUploadUrl(endpoint) {
-            // Используем прямой IP только в продакшене и только для загрузки файлов
-            const isProduction = location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
-            if (!isProduction) return null;
-            
-            // Прямой IP сервера (обход Cloudflare)
-            // Используем HTTP, так как SSL сертификат выдан для домена, а не для IP
-            // Это безопасно, так как загрузка идет напрямую на сервер, минуя Cloudflare
-            const DIRECT_SERVER_IP = '159.89.99.252';
-            const DIRECT_SERVER_PORT = '80'; // HTTP через nginx (обход SSL проблем)
-            const DIRECT_SERVER_PROTOCOL = 'http';
-            
-            // Формируем URL с прямым IP
-            // Используем Host header для правильной маршрутизации в nginx
-            return `${DIRECT_SERVER_PROTOCOL}://${DIRECT_SERVER_IP}:${DIRECT_SERVER_PORT}${endpoint}`;
-        },
 
         async handleUpload(e) {
             e.preventDefault();
@@ -74,13 +56,7 @@
                 this.resetProgress();
 
                 const token = this.getToken();
-                
-                // ОБХОД CLOUDFLARE: используем прямой IP для загрузки больших файлов
-                // Cloudflare имеет таймаут 100 секунд на бесплатном тарифе
-                // Прямой IP обходит Cloudflare и позволяет загружать файлы без ограничений
-                const directIpUrl = this.getDirectUploadUrl('/api/v1/admin/updates/upload');
-                const url = directIpUrl || window.getApiUrl('/api/v1/admin/updates/upload');
-                
+                const url = window.getApiUrl('/api/v1/admin/updates/upload');
                 const data = await this.uploadWithProgress(url, formData, token);
 
                 if (!data || data.success === false) {
