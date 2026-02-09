@@ -220,14 +220,6 @@
                 xhr.open('POST', url, true);
                 xhr.timeout = timeoutMs;
                 
-                // Если используем прямой IP, устанавливаем Host header равным IP адресу
-                // Это гарантирует, что nginx выберет default_server блок (server_name 159.89.99.252)
-                // и не будет редиректить на HTTPS
-                if (url.includes('159.89.99.252')) {
-                    // Устанавливаем Host равным IP, чтобы nginx выбрал правильный server block
-                    xhr.setRequestHeader('Host', '159.89.99.252');
-                }
-                
                 if (token) {
                     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                 }
