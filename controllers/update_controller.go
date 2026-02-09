@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,9 +23,13 @@ type UpdateController struct{}
 
 // UploadUpdate загружает файл обновления (только для админов)
 func (uc *UpdateController) UploadUpdate(c *gin.Context) {
+	log.Println("📤 [UploadUpdate] Начало загрузки обновления")
+	
 	platformStr := c.PostForm("platform")
 	version := strings.TrimSpace(c.PostForm("version"))
 	releaseNotes := c.PostForm("releaseNotes")
+
+	log.Printf("📋 [UploadUpdate] Параметры: platform=%s, version=%s", platformStr, version)
 
 	if platformStr == "" || version == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -45,8 +50,10 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 		return
 	}
 
+	log.Println("📁 [UploadUpdate] Получение файла из запроса...")
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
+		log.Printf("❌ [UploadUpdate] Ошибка получения файла: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "file is required",
@@ -55,6 +62,8 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 		return
 	}
 	defer file.Close()
+	
+	log.Printf("✅ [UploadUpdate] Файл получен: %s, размер: %d байт", header.Filename, header.Size)
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext == "" {
@@ -82,7 +91,9 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	}
 
 	dir := filepath.Join("updates", string(platform))
+	log.Printf("📂 [UploadUpdate] Создание директории: %s", dir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Printf("❌ [UploadUpdate] Ошибка создания директории: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "failed to create updates directory",
@@ -93,9 +104,11 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 
 	filename := fmt.Sprintf("%s_%s_%s%s", platform, version, uuid.NewString(), ext)
 	filePath := filepath.Join(dir, filename)
+	log.Printf("💾 [UploadUpdate] Сохранение файла: %s", filePath)
 
 	dst, err := os.Create(filePath)
 	if err != nil {
+		log.Printf("❌ [UploadUpdate] Ошибка создания файла: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "failed to create file",
@@ -105,9 +118,19 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	}
 	defer dst.Close()
 
+	// Отправляем промежуточный ответ, чтобы браузер знал, что сервер получил файл
+	// Это особенно важно для Cloudflare, чтобы он не закрыл соединение
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		c.Writer.WriteHeader(http.StatusProcessing) // 102 Processing
+		flusher.Flush()
+		log.Println("🔄 [UploadUpdate] Отправлен промежуточный ответ 102 Processing")
+	}
+
+	log.Println("📥 [UploadUpdate] Начало копирования файла и вычисления SHA256...")
 	hasher := sha256.New()
 	size, err := io.Copy(io.MultiWriter(dst, hasher), file)
 	if err != nil {
+		log.Printf("❌ [UploadUpdate] Ошибка копирования файла: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "failed to save file",
@@ -115,10 +138,15 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 		})
 		return
 	}
+	log.Printf("✅ [UploadUpdate] Файл скопирован: %d байт", size)
 
+	log.Println("🔐 [UploadUpdate] Вычисление SHA256...")
 	checksum := hex.EncodeToString(hasher.Sum(nil))
+	log.Printf("✅ [UploadUpdate] SHA256 вычислен: %s", checksum[:16]+"...")
+	
 	fileURL := fmt.Sprintf("/updates/%s/%s", platform, filename)
 
+	log.Println("💾 [UploadUpdate] Сохранение метаданных в БД...")
 	update := models.UpdateRelease{
 		Platform:       platform,
 		Version:        version,
@@ -134,6 +162,7 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	}
 
 	if err := database.DB.Create(&update).Error; err != nil {
+		log.Printf("❌ [UploadUpdate] Ошибка сохранения в БД: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"error":   "failed to save update metadata",
@@ -141,7 +170,9 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 		})
 		return
 	}
+	log.Printf("✅ [UploadUpdate] Метаданные сохранены в БД, ID: %s", update.ID)
 
+	log.Println("🎉 [UploadUpdate] Загрузка завершена успешно!")
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
 		"message": "Update uploaded successfully",
