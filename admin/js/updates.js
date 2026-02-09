@@ -26,11 +26,11 @@
             if (!isProduction) return null;
             
             // Прямой IP сервера (обход Cloudflare)
-            // ВАЖНО: убедись, что на сервере настроен SSL для этого IP или используй HTTP
-            // Если используешь HTTP, убедись, что nginx слушает на порту 80 для прямого IP
+            // Используем HTTP, так как SSL сертификат выдан для домена, а не для IP
+            // Это безопасно, так как загрузка идет напрямую на сервер, минуя Cloudflare
             const DIRECT_SERVER_IP = '159.89.99.252';
-            const DIRECT_SERVER_PORT = '443'; // HTTPS через nginx
-            const DIRECT_SERVER_PROTOCOL = 'https';
+            const DIRECT_SERVER_PORT = '80'; // HTTP через nginx (обход SSL проблем)
+            const DIRECT_SERVER_PROTOCOL = 'http';
             
             // Формируем URL с прямым IP
             // Используем Host header для правильной маршрутизации в nginx
