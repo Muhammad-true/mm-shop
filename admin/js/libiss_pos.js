@@ -187,7 +187,10 @@ const libissPos = {
         const apiBaseUrl = window.getApiUrl ? window.getApiUrl('') : (window.API_BASE_URL || 'http://localhost:8080');
         
         // Сохраняем ссылку на formatSize для использования в обработчиках
-        const formatSizeFn = (bytes) => this.formatSize(bytes);
+        const self = this;
+        const formatSizeFn = function(bytes) {
+            return self.formatSize(bytes);
+        };
 
         // Используем XMLHttpRequest для отслеживания прогресса
         return new Promise((resolve, reject) => {

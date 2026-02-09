@@ -439,8 +439,8 @@ func SetupRoutes() *gin.Engine {
 	r.GET("/version", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 		"version": "1.5.1",
-		"name":    "MM API",
-		"build":   "development",
+			"name":    "MM API",
+			"build":   "development",
 		"changes": "Fixed CORS middleware, improved file upload with progress tracking, UI improvements",
 		})
 	})
