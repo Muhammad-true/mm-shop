@@ -333,6 +333,7 @@ func SetupRoutes() *gin.Engine {
 		{
 			adminUpdates.GET("/", updateController.ListUpdates)
 			adminUpdates.POST("/upload", updateController.UploadUpdate)
+			adminUpdates.DELETE("/:id", updateController.DeleteUpdate)
 		}
 
 		// Управление файлами libiss_pos (админы и супер админы)

@@ -264,3 +264,56 @@ func (uc *UpdateController) GetLatestUpdate(c *gin.Context) {
 		"data":    update,
 	})
 }
+
+// DeleteUpdate удаляет обновление (только для админов)
+func (uc *UpdateController) DeleteUpdate(c *gin.Context) {
+	updateID := c.Param("id")
+	if updateID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "update id is required",
+		})
+		return
+	}
+
+	log.Printf("🗑️ [DeleteUpdate] Попытка удаления обновления ID: %s", updateID)
+
+	// Находим обновление в БД
+	var update models.UpdateRelease
+	if err := database.DB.Where("id = ?", updateID).First(&update).Error; err != nil {
+		log.Printf("❌ [DeleteUpdate] Обновление не найдено: %v", err)
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   "update not found",
+		})
+		return
+	}
+
+	// Удаляем файл с диска
+	if update.FilePath != "" {
+		if err := os.Remove(update.FilePath); err != nil {
+			// Логируем ошибку, но продолжаем удаление из БД
+			log.Printf("⚠️ [DeleteUpdate] Ошибка удаления файла %s: %v", update.FilePath, err)
+		} else {
+			log.Printf("✅ [DeleteUpdate] Файл удален: %s", update.FilePath)
+		}
+	}
+
+	// Удаляем запись из БД
+	if err := database.DB.Delete(&update).Error; err != nil {
+		log.Printf("❌ [DeleteUpdate] Ошибка удаления из БД: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "failed to delete update",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	log.Printf("✅ [DeleteUpdate] Обновление удалено: ID=%s, Platform=%s, Version=%s", updateID, update.Platform, update.Version)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Update deleted successfully",
+	})
+}

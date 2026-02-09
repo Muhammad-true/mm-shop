@@ -101,14 +101,19 @@
             }
 
             const rows = updates.map(u => `
-                <tr>
+                <tr data-update-id="${u.id}">
                     <td>${u.platform}</td>
                     <td>${u.version}</td>
                     <td>${this.formatSize(u.fileSize)}</td>
                     <td><a href="${u.fileUrl}" target="_blank">${u.fileName}</a></td>
-                    <td><code>${u.checksumSha256 || u.checksumSHA256 || ''}</code></td>
-                    <td>${u.releaseNotes ? `<div class="notes">${u.releaseNotes}</div>` : '-'}</td>
+                    <td><code title="${u.checksumSha256 || u.checksumSHA256 || ''}">${(u.checksumSha256 || u.checksumSHA256 || '').substring(0, 16)}...</code></td>
+                    <td>${u.releaseNotes ? `<div class="notes" title="${u.releaseNotes}">${u.releaseNotes.length > 50 ? u.releaseNotes.substring(0, 50) + '...' : u.releaseNotes}</div>` : '-'}</td>
                     <td>${new Date(u.createdAt).toLocaleString('ru-RU')}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="window.updates.deleteUpdate('${u.id}', '${u.platform}', '${u.version}')" title="Удалить обновление">
+                            <i class="fas fa-trash"></i> Удалить
+                        </button>
+                    </td>
                 </tr>
             `).join('');
 
@@ -124,6 +129,7 @@
                                 <th>SHA256</th>
                                 <th>Описание</th>
                                 <th>Загружено</th>
+                                <th>Действия</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -261,6 +267,46 @@
             });
         },
 
+        async deleteUpdate(updateId, platform, version) {
+            if (!updateId) {
+                window.ui?.showMessage ? window.ui.showMessage('ID обновления не указан', 'error') : alert('ID обновления не указан');
+                return;
+            }
+
+            const confirmMessage = `Вы уверены, что хотите удалить обновление?\n\nПлатформа: ${platform}\nВерсия: ${version}\n\nЭто действие нельзя отменить!`;
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            try {
+                const token = this.getToken();
+                const url = window.getApiUrl(`/api/v1/admin/updates/${updateId}`);
+                
+                const response = await fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || data.message || 'Ошибка удаления');
+                }
+
+                window.ui?.showMessage ? window.ui.showMessage('Обновление удалено', 'success') : alert('Обновление удалено');
+                
+                // Обновляем список обновлений
+                await this.loadUpdates();
+            } catch (err) {
+                console.error('Ошибка удаления обновления:', err);
+                const message = this.formatErrorMessage(err, 'delete');
+                window.ui?.showMessage ? window.ui.showMessage(message, 'error') : alert(message);
+            }
+        },
+
         formatErrorMessage(err, context) {
             const rawMessage = err?.message || 'Неизвестная ошибка';
             if (rawMessage.includes('Failed to fetch')) {
@@ -274,6 +320,9 @@
             }
             if (context === 'upload') {
                 return `Ошибка загрузки: ${rawMessage}`;
+            }
+            if (context === 'delete') {
+                return `Ошибка удаления: ${rawMessage}`;
             }
             return rawMessage;
         }
