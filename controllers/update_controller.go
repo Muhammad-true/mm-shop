@@ -30,7 +30,14 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	log.Printf("🔍 [UploadUpdate] Content-Length: %s", c.Request.Header.Get("Content-Length"))
 	log.Printf("🔍 [UploadUpdate] Method: %s", c.Request.Method)
 	log.Printf("🔍 [UploadUpdate] URL: %s", c.Request.URL.String())
-	log.Printf("🔍 [UploadUpdate] Request.Body != nil: %v", c.Request.Body != nil)
+	
+	// Отправляем промежуточный ответ HTTP 100 Continue сразу, чтобы браузер знал, что сервер принимает данные
+	// Это критично при буферизации в nginx - браузер не будет отменять соединение
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		c.Writer.WriteHeader(http.StatusContinue) // 100 Continue
+		flusher.Flush()
+		log.Println("✅ [UploadUpdate] Отправлен промежуточный ответ 100 Continue")
+	}
 	
 	// Проверяем, что тело запроса не было прочитано
 	if c.Request.Body == nil {
