@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,12 +32,97 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	log.Printf("🔍 [UploadUpdate] Method: %s", c.Request.Method)
 	log.Printf("🔍 [UploadUpdate] URL: %s", c.Request.URL.String())
 	
-	// Используем стандартные методы Gin - они автоматически парсят multipart при первом обращении
-	// При потоковой передаче (proxy_request_buffering off) Gin парсит форму по мере чтения
-	platformStr := c.PostForm("platform")
-	version := strings.TrimSpace(c.PostForm("version"))
-	releaseNotes := c.PostForm("releaseNotes")
-
+	// Отправляем промежуточный ответ сразу, чтобы клиент знал, что сервер обрабатывает запрос
+	if flusher, ok := c.Writer.(http.Flusher); ok {
+		c.Writer.WriteHeader(http.StatusProcessing) // 102 Processing
+		flusher.Flush()
+		log.Println("✅ [UploadUpdate] Отправлен промежуточный ответ 102 Processing")
+	}
+	
+	// Парсим multipart форму потоково через multipart.Reader
+	// Это работает при proxy_request_buffering off
+	contentType := c.Request.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "multipart/form-data") {
+		log.Printf("❌ [UploadUpdate] Неверный Content-Type: %s", contentType)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "Content-Type must be multipart/form-data",
+		})
+		return
+	}
+	
+	// Создаем multipart reader для потокового парсинга
+	boundary := ""
+	if parts := strings.Split(contentType, "boundary="); len(parts) > 1 {
+		boundary = parts[1]
+	}
+	if boundary == "" {
+		log.Println("❌ [UploadUpdate] Boundary не найден в Content-Type")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "multipart boundary not found",
+		})
+		return
+	}
+	
+	reader := multipart.NewReader(c.Request.Body, boundary)
+	
+	// Переменные для хранения данных формы
+	var platformStr, version, releaseNotes string
+	var file multipart.File
+	var fileHeader *multipart.FileHeader
+	
+	// Читаем все части multipart формы
+	log.Println("🔄 [UploadUpdate] Парсинг multipart формы потоково...")
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Printf("❌ [UploadUpdate] Ошибка чтения части формы: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "failed to parse multipart form",
+				"details": err.Error(),
+			})
+			return
+		}
+		
+		formName := part.FormName()
+		log.Printf("📋 [UploadUpdate] Обработка поля формы: %s", formName)
+		
+		if formName == "file" {
+			// Это файл
+			file = part
+			fileHeader = &multipart.FileHeader{
+				Filename: part.FileName(),
+			}
+			log.Printf("✅ [UploadUpdate] Файл найден: %s", fileHeader.Filename)
+		} else {
+			// Это текстовое поле
+			data, err := io.ReadAll(part)
+			if err != nil {
+				log.Printf("❌ [UploadUpdate] Ошибка чтения поля %s: %v", formName, err)
+				continue
+			}
+			value := string(data)
+			
+			switch formName {
+			case "platform":
+				platformStr = value
+				log.Printf("✅ [UploadUpdate] platform: %s", platformStr)
+			case "version":
+				version = strings.TrimSpace(value)
+				log.Printf("✅ [UploadUpdate] version: %s", version)
+			case "releaseNotes":
+				releaseNotes = value
+				log.Printf("✅ [UploadUpdate] releaseNotes: %s", releaseNotes)
+			}
+		}
+		part.Close()
+	}
+	
 	log.Printf("📋 [UploadUpdate] Параметры: platform=%s, version=%s, releaseNotes=%s", platformStr, version, releaseNotes)
 
 	if platformStr == "" || version == "" {
@@ -59,22 +145,20 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 		return
 	}
 
-	log.Println("📁 [UploadUpdate] Получение файла из запроса...")
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		log.Printf("❌ [UploadUpdate] Ошибка получения файла: %v", err)
+	// Проверяем, что файл был найден
+	if file == nil || fileHeader == nil {
+		log.Println("❌ [UploadUpdate] Файл не найден в форме")
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"error":   "file is required",
-			"details": err.Error(),
 		})
 		return
 	}
 	defer file.Close()
 	
-	log.Printf("✅ [UploadUpdate] Файл получен: %s, размер: %d байт", header.Filename, header.Size)
+	log.Printf("✅ [UploadUpdate] Файл получен: %s", fileHeader.Filename)
 
-	ext := strings.ToLower(filepath.Ext(header.Filename))
+	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
 	if ext == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -126,14 +210,6 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 		return
 	}
 	defer dst.Close()
-
-	// Отправляем промежуточный ответ, чтобы браузер знал, что сервер получил файл
-	// Это особенно важно для Cloudflare, чтобы он не закрыл соединение
-	if flusher, ok := c.Writer.(http.Flusher); ok {
-		c.Writer.WriteHeader(http.StatusProcessing) // 102 Processing
-		flusher.Flush()
-		log.Println("🔄 [UploadUpdate] Отправлен промежуточный ответ 102 Processing")
-	}
 
 	log.Println("📥 [UploadUpdate] Начало копирования файла и вычисления SHA256...")
 	hasher := sha256.New()
