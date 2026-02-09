@@ -30,32 +30,56 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	log.Printf("🔍 [UploadUpdate] Content-Length: %s", c.Request.Header.Get("Content-Length"))
 	log.Printf("🔍 [UploadUpdate] Method: %s", c.Request.Method)
 	log.Printf("🔍 [UploadUpdate] URL: %s", c.Request.URL.String())
+	log.Printf("🔍 [UploadUpdate] Request.Body != nil: %v", c.Request.Body != nil)
 	
-	// Пробуем разные способы получения данных
-	// Сначала пробуем PostForm
-	platformStr := c.PostForm("platform")
-	version := strings.TrimSpace(c.PostForm("version"))
-	releaseNotes := c.PostForm("releaseNotes")
-	
-	// Если PostForm пустые, пробуем получить из Query или MultipartForm
-	if platformStr == "" || version == "" {
-		log.Println("⚠️ [UploadUpdate] PostForm пустые, пробуем ParseMultipartForm...")
-		if err := c.Request.ParseMultipartForm(100 << 20); err == nil {
-			log.Println("✅ [UploadUpdate] ParseMultipartForm успешно")
-			if values := c.Request.MultipartForm.Value["platform"]; len(values) > 0 {
-				platformStr = values[0]
-			}
-			if values := c.Request.MultipartForm.Value["version"]; len(values) > 0 {
-				version = strings.TrimSpace(values[0])
-			}
-			if values := c.Request.MultipartForm.Value["releaseNotes"]; len(values) > 0 {
-				releaseNotes = values[0]
-			}
-		} else {
-			log.Printf("❌ [UploadUpdate] Ошибка ParseMultipartForm: %v", err)
-		}
+	// Проверяем, что тело запроса не было прочитано
+	if c.Request.Body == nil {
+		log.Println("❌ [UploadUpdate] Request.Body is nil!")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "request body is empty",
+		})
+		return
 	}
-
+	
+	// Парсим multipart форму ПЕРЕД получением данных
+	// Устанавливаем большой лимит для больших файлов
+	log.Println("🔄 [UploadUpdate] Парсинг multipart формы...")
+	if err := c.Request.ParseMultipartForm(100 << 20); err != nil {
+		log.Printf("❌ [UploadUpdate] Ошибка ParseMultipartForm: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   "failed to parse multipart form",
+			"details": err.Error(),
+		})
+		return
+	}
+	log.Println("✅ [UploadUpdate] Multipart форма успешно распарсена")
+	
+	// Получаем данные из распарсенной формы
+	platformStr := ""
+	if values := c.Request.MultipartForm.Value["platform"]; len(values) > 0 {
+		platformStr = values[0]
+		log.Printf("✅ [UploadUpdate] platform найден: %s", platformStr)
+	} else {
+		log.Println("⚠️ [UploadUpdate] platform не найден в форме")
+	}
+	
+	version := ""
+	if values := c.Request.MultipartForm.Value["version"]; len(values) > 0 {
+		version = strings.TrimSpace(values[0])
+		log.Printf("✅ [UploadUpdate] version найден: %s", version)
+	} else {
+		log.Println("⚠️ [UploadUpdate] version не найден в форме")
+	}
+	
+	releaseNotes := ""
+	if values := c.Request.MultipartForm.Value["releaseNotes"]; len(values) > 0 {
+		releaseNotes = values[0]
+	}
+	
+	// Логируем все доступные поля формы для отладки
+	log.Printf("🔍 [UploadUpdate] Все поля формы: %v", c.Request.MultipartForm.Value)
 	log.Printf("📋 [UploadUpdate] Параметры: platform=%s, version=%s, releaseNotes=%s", platformStr, version, releaseNotes)
 
 	if platformStr == "" || version == "" {
