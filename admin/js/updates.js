@@ -81,15 +81,24 @@
 
         async loadUpdates() {
             const container = document.getElementById('updates-table');
-            if (!container) return;
+            if (!container) {
+                console.warn('⚠️ [loadUpdates] Контейнер updates-table не найден');
+                return;
+            }
             container.innerHTML = '<p>Загрузка...</p>';
 
             try {
+                console.log('📡 [loadUpdates] Начало загрузки обновлений...');
                 const data = await fetchData('/api/v1/admin/updates/');
+                console.log('✅ [loadUpdates] Данные получены:', data);
+                
                 const updates = data.data || data.updates || [];
+                console.log(`📦 [loadUpdates] Найдено обновлений: ${updates.length}`, updates);
+                
                 container.innerHTML = this.renderTable(updates);
+                console.log('✅ [loadUpdates] Таблица обновлена');
             } catch (err) {
-                console.error('Ошибка загрузки обновлений:', err);
+                console.error('❌ [loadUpdates] Ошибка загрузки обновлений:', err);
                 const message = this.formatErrorMessage(err, 'list');
                 container.innerHTML = `<p style="color:red;">Ошибка загрузки: ${message}</p>`;
             }
