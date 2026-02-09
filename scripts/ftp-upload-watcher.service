@@ -1,0 +1,22 @@
+[Unit]
+Description=FTP Upload Watcher - Automatic update uploader
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/mm-shop/release/scripts
+Environment="FTP_WATCH_DIR=/var/ftp/uploads"
+Environment="API_BASE_URL=https://api.libiss.com/api/v1"
+Environment="API_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMWE1ZjUzNWEtODZkYi00YTlhLTkyNWYtODBhZjkyNWY5MWUwIiwiZW1haWwiOiJhZG1pbkBtbS5jb20iLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJpc3MiOiJtbS1hcGkiLCJzdWIiOiIxYTVmNTM1YS04NmRiLTRhOWEtOTI1Zi04MGFmOTI1ZjkxZTAiLCJleHAiOjE3NzA3NTM4MjIsIm5iZiI6MTc3MDY2NzQyMiwiaWF0IjoxNzcwNjY3NDIyfQ.12h3QlzNjh093aNAN_MSwBKczA6SFssN9tOSLB4Zzfs"
+Environment="PROCESSED_DIR=/var/ftp/processed"
+Environment="CHECK_INTERVAL=30"
+ExecStart=/root/mm-shop/release/scripts/ftp_upload_watcher.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
