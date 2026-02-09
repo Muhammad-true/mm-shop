@@ -69,8 +69,8 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	
 	// Переменные для хранения данных формы
 	var platformStr, version, releaseNotes string
-	var file multipart.File
-	var fileHeader *multipart.FileHeader
+	var filePart *multipart.Part
+	var fileName string
 	
 	// Читаем все части multipart формы
 	log.Println("🔄 [UploadUpdate] Парсинг multipart формы потоково...")
@@ -93,15 +93,15 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 		log.Printf("📋 [UploadUpdate] Обработка поля формы: %s", formName)
 		
 		if formName == "file" {
-			// Это файл
-			file = part
-			fileHeader = &multipart.FileHeader{
-				Filename: part.FileName(),
-			}
-			log.Printf("✅ [UploadUpdate] Файл найден: %s", fileHeader.Filename)
+			// Это файл - сохраняем part для дальнейшего чтения
+			filePart = part
+			fileName = part.FileName()
+			log.Printf("✅ [UploadUpdate] Файл найден: %s", fileName)
+			// НЕ закрываем part здесь - будем читать из него дальше
 		} else {
-			// Это текстовое поле
+			// Это текстовое поле - читаем сразу
 			data, err := io.ReadAll(part)
+			part.Close()
 			if err != nil {
 				log.Printf("❌ [UploadUpdate] Ошибка чтения поля %s: %v", formName, err)
 				continue
@@ -120,7 +120,6 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 				log.Printf("✅ [UploadUpdate] releaseNotes: %s", releaseNotes)
 			}
 		}
-		part.Close()
 	}
 	
 	log.Printf("📋 [UploadUpdate] Параметры: platform=%s, version=%s, releaseNotes=%s", platformStr, version, releaseNotes)
@@ -146,7 +145,7 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 	}
 
 	// Проверяем, что файл был найден
-	if file == nil || fileHeader == nil {
+	if filePart == nil {
 		log.Println("❌ [UploadUpdate] Файл не найден в форме")
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -154,11 +153,11 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 		})
 		return
 	}
-	defer file.Close()
+	defer filePart.Close()
 	
-	log.Printf("✅ [UploadUpdate] Файл получен: %s", fileHeader.Filename)
+	log.Printf("✅ [UploadUpdate] Файл получен: %s", fileName)
 
-	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	ext := strings.ToLower(filepath.Ext(fileName))
 	if ext == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -213,7 +212,7 @@ func (uc *UpdateController) UploadUpdate(c *gin.Context) {
 
 	log.Println("📥 [UploadUpdate] Начало копирования файла и вычисления SHA256...")
 	hasher := sha256.New()
-	size, err := io.Copy(io.MultiWriter(dst, hasher), file)
+	size, err := io.Copy(io.MultiWriter(dst, hasher), filePart)
 	if err != nil {
 		log.Printf("❌ [UploadUpdate] Ошибка копирования файла: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
