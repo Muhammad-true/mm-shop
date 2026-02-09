@@ -73,3 +73,7 @@ ssl/
 *.crt
 *.csr
 
+# Temporary documentation files (keep main docs in docs/)
+CLOUDFLARE_QUICK_FIX.md
+CLOUDFLARE_FIX.md
+
