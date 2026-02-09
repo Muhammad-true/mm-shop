@@ -109,13 +109,14 @@ process_file() {
 while true; do
     # Сканируем папку
     processed=0
-    for file in "$FTP_WATCH_DIR"/*.{apk,exe,zip} 2>/dev/null; do
+    # Используем find вместо glob для совместимости
+    while IFS= read -r -d '' file; do
         if [ -f "$file" ]; then
             if process_file "$file"; then
                 ((processed++))
             fi
         fi
-    done
+    done < <(find "$FTP_WATCH_DIR" -maxdepth 1 -type f \( -name "*.apk" -o -name "*.exe" -o -name "*.zip" \) -print0 2>/dev/null)
 
     if [ $processed -gt 0 ]; then
         echo "✅ Обработано файлов: $processed"
