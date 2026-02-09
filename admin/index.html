@@ -395,6 +395,18 @@
                     <h2><i class="fas fa-cloud-upload-alt"></i> Обновления</h2>
                 </div>
 
+                <div class="card" style="margin-bottom: 20px; background: #e7f3ff; border-left: 4px solid #2196F3;">
+                    <h3><i class="fas fa-info-circle"></i> Способы загрузки обновлений</h3>
+                    <p style="margin: 10px 0; color: #333;">
+                        <strong>1. Через админ-панель:</strong> Используй форму ниже для загрузки файлов напрямую.<br>
+                        <strong>2. Через FTP:</strong> Загрузи файл в папку <code>/var/ftp/uploads/</code> с именем в формате <code>platform_version.ext</code> (например: <code>android_1.0.0.apk</code>). 
+                        Скрипт автоматически обработает файл и добавит его в систему.
+                    </p>
+                    <p style="margin: 10px 0; color: #666; font-size: 13px;">
+                        <i class="fas fa-book"></i> Подробная инструкция: <a href="/docs/FTP_UPLOAD_GUIDE.md" target="_blank" style="color: #2196F3;">FTP Upload Guide</a>
+                    </p>
+                </div>
+
                 <div class="card" style="margin-bottom: 20px;">
                     <h3><i class="fas fa-upload"></i> Загрузить обновление</h3>
                     <form id="update-upload-form" novalidate>
@@ -801,7 +813,7 @@
     <script>
         // ВАЖНО: Версия для cache busting - меняется при каждой пересборке!
         // BUILD_VERSION будет обновляться автоматически
-        window.BUILD_VERSION = '1.9.2-' + new Date().toISOString().replace(/[-:]/g, '').split('.')[0]; // Формат: версия-датавремя
+        window.BUILD_VERSION = '1.9.3-' + new Date().toISOString().replace(/[-:]/g, '').split('.')[0]; // Формат: версия-датавремя
         
         // Проверяем загрузку стилей
         document.addEventListener('DOMContentLoaded', function() {

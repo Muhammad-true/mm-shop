@@ -97,7 +97,13 @@
 
         renderTable(updates) {
             if (!updates || updates.length === 0) {
-                return '<p>Обновления отсутствуют</p>';
+                return `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <i class="fas fa-inbox" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
+                        <p style="font-size: 16px; margin: 10px 0;">Обновления отсутствуют</p>
+                        <p style="font-size: 14px; color: #999;">Загрузи первое обновление через форму выше или через FTP</p>
+                    </div>
+                `;
             }
 
             const rows = updates.map(u => `
