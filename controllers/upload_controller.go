@@ -192,7 +192,6 @@ func (uc *UploadController) compressAndSaveImage(file io.Reader, filePath string
 	// Декодируем изображение
 	var img image.Image
 	var err error
-	finalExt := ext
 	finalPath := filePath
 
 	switch {
@@ -207,7 +206,6 @@ func (uc *UploadController) compressAndSaveImage(file io.Reader, filePath string
 			return "", 0, fmt.Errorf("ошибка декодирования PNG: %v", err)
 		}
 		// PNG конвертируем в JPEG для лучшего сжатия
-		finalExt = ".jpg"
 		finalPath = strings.TrimSuffix(filePath, ".png") + ".jpg"
 	case ext == ".webp" || strings.Contains(contentType, "webp"):
 		img, err = webp.Decode(file)
@@ -223,7 +221,6 @@ func (uc *UploadController) compressAndSaveImage(file io.Reader, filePath string
 			return filepath.Base(filePath), bytesWritten, err
 		}
 		// WebP конвертируем в JPEG для лучшего сжатия
-		finalExt = ".jpg"
 		finalPath = strings.TrimSuffix(filePath, ".webp") + ".jpg"
 	default:
 		// Для других форматов (GIF и т.д.) просто копируем без сжатия
