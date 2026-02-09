@@ -1,0 +1,15 @@
+[Unit]
+Description=Cleanup Old Updates - Remove update files older than 10 days
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/mm-shop/release
+ExecStart=/root/mm-shop/release/scripts/cleanup_old_updates.sh 10 ./updates
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+

@@ -2,6 +2,9 @@ package controllers
 
 import (
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +15,7 @@ import (
 	"github.com/mm-api/mm-api/config"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"golang.org/x/image/webp"
 )
 
 type UploadController struct{}
@@ -142,20 +146,9 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 	filePath := filepath.Join(uploadDir, filename)
 	log.Printf("💾 Путь сохранения: %s", filePath)
 
-	// Создаем файл
-	dst, err := os.Create(filePath)
-	if err != nil {
-		log.Printf("❌ Ошибка создания файла: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to create file",
-			"details": err.Error(),
-		})
-		return
-	}
-	defer dst.Close()
-
-	// Копируем содержимое файла
-	bytesWritten, err := io.Copy(dst, file)
+	// Сжимаем и сохраняем изображение
+	originalSize := header.Size
+	finalFilename, bytesWritten, err := uc.compressAndSaveImage(file, filePath, ext, contentType)
 	if err != nil {
 		log.Printf("❌ Ошибка сохранения файла: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -165,7 +158,17 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 		return
 	}
 
-	log.Printf("✅ Файл успешно сохранен: %d байт записано", bytesWritten)
+	// Обновляем filename, если формат изменился (PNG/WebP -> JPEG)
+	if finalFilename != filename {
+		filename = finalFilename
+		log.Printf("🔄 Формат изменен, новое имя файла: %s", filename)
+	}
+
+	// Вычисляем процент сжатия
+	compressionRatio := float64(bytesWritten) / float64(originalSize) * 100
+	savedBytes := originalSize - bytesWritten
+	log.Printf("✅ Файл успешно сохранен: %d байт записано (было %d байт, сжато на %.1f%%, сэкономлено %d байт)", 
+		bytesWritten, originalSize, 100-compressionRatio, savedBytes)
 
 	// Формируем URL для доступа к файлу
 	fileURL := uc.GetImageURL(filename, folder)
@@ -178,6 +181,86 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 		"size":     bytesWritten,
 		"folder":   folder,
 	})
+}
+
+// compressAndSaveImage сжимает и сохраняет изображение
+// Поддерживает JPEG, PNG, WebP
+// Для JPEG: качество 85% (хороший баланс между размером и качеством)
+// Для PNG: конвертирует в JPEG для лучшего сжатия (если возможно)
+// Возвращает: (finalFilename, bytesWritten, error)
+func (uc *UploadController) compressAndSaveImage(file io.Reader, filePath string, ext string, contentType string) (string, int64, error) {
+	// Декодируем изображение
+	var img image.Image
+	var err error
+	finalExt := ext
+	finalPath := filePath
+
+	switch {
+	case ext == ".jpg" || ext == ".jpeg" || strings.Contains(contentType, "jpeg"):
+		img, err = jpeg.Decode(file)
+		if err != nil {
+			return "", 0, fmt.Errorf("ошибка декодирования JPEG: %v", err)
+		}
+	case ext == ".png" || strings.Contains(contentType, "png"):
+		img, err = png.Decode(file)
+		if err != nil {
+			return "", 0, fmt.Errorf("ошибка декодирования PNG: %v", err)
+		}
+		// PNG конвертируем в JPEG для лучшего сжатия
+		finalExt = ".jpg"
+		finalPath = strings.TrimSuffix(filePath, ".png") + ".jpg"
+	case ext == ".webp" || strings.Contains(contentType, "webp"):
+		img, err = webp.Decode(file)
+		if err != nil {
+			// Если не удалось декодировать WebP, пробуем сохранить как есть
+			log.Printf("⚠️ Не удалось декодировать WebP, сохраняем без сжатия: %v", err)
+			dst, err := os.Create(filePath)
+			if err != nil {
+				return "", 0, err
+			}
+			defer dst.Close()
+			bytesWritten, err := io.Copy(dst, file)
+			return filepath.Base(filePath), bytesWritten, err
+		}
+		// WebP конвертируем в JPEG для лучшего сжатия
+		finalExt = ".jpg"
+		finalPath = strings.TrimSuffix(filePath, ".webp") + ".jpg"
+	default:
+		// Для других форматов (GIF и т.д.) просто копируем без сжатия
+		dst, err := os.Create(filePath)
+		if err != nil {
+			return "", 0, err
+		}
+		defer dst.Close()
+		bytesWritten, err := io.Copy(dst, file)
+		return filepath.Base(filePath), bytesWritten, err
+	}
+
+	// Создаем файл для сохранения
+	dst, err := os.Create(finalPath)
+	if err != nil {
+		return "", 0, err
+	}
+	defer dst.Close()
+
+	// Сохраняем с сжатием
+	// JPEG качество 85% - хороший баланс между размером и качеством
+	// Можно уменьшить до 75% для большего сжатия, но качество будет хуже
+	quality := 85
+
+	err = jpeg.Encode(dst, img, &jpeg.Options{Quality: quality})
+	if err != nil {
+		return "", 0, fmt.Errorf("ошибка кодирования JPEG: %v", err)
+	}
+
+	// Получаем размер файла
+	info, err := dst.Stat()
+	if err != nil {
+		return "", 0, err
+	}
+	bytesWritten := info.Size()
+
+	return filepath.Base(finalPath), bytesWritten, nil
 }
 
 // DeleteImage удаляет изображение
