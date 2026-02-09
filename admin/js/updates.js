@@ -3,8 +3,10 @@
 (function() {
     const updatesModule = {
         isInitialized: false,
+        isUploading: false, // Оставляем для совместимости, но больше не используется
         async init() {
             // Форма загрузки удалена - загрузка только через FTP
+            // Оставляем функции загрузки в коде для совместимости, но они не вызываются
             this.isInitialized = true;
             await this.loadUpdates();
         },
@@ -106,7 +108,10 @@
                     <div style="text-align: center; padding: 40px; color: #666;">
                         <i class="fas fa-inbox" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
                         <p style="font-size: 16px; margin: 10px 0;">Обновления отсутствуют</p>
-                        <p style="font-size: 14px; color: #999;">Загрузи первое обновление через форму выше или через FTP</p>
+                        <p style="font-size: 14px; color: #999;">Загрузи первое обновление через FTP в папку <code>/var/ftp/uploads/</code></p>
+                        <p style="font-size: 13px; color: #999; margin-top: 10px;">
+                            <a href="/docs/FTP_UPLOAD_GUIDE.md" target="_blank" style="color: #2196F3;">📖 Инструкция по загрузке через FTP</a>
+                        </p>
                     </div>
                 `;
             }
