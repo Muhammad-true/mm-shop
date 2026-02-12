@@ -58,11 +58,14 @@ git pull origin main
 # LEMONSQUEEZY_API_KEY=your-api-key
 # LEMONSQUEEZY_STORE_ID=your-store-id
 # JWT_SECRET=your-jwt-secret
+# PGADMIN_EMAIL=admin@mm.com (опционально, по умолчанию admin@mm.com)
+# PGADMIN_PASSWORD=your-secure-password (опционально, по умолчанию admin123)
+# POSTGRES_PASSWORD=your-postgres-password (опционально, по умолчанию muhammadjon)
 # и другие необходимые переменные
 
 # ОСТАНОВКА и удаление контейнеров для чистого билда
-docker compose -f docker-compose.release.yml stop api admin
-docker compose -f docker-compose.release.yml rm -f api admin
+docker compose -f docker-compose.release.yml stop api admin pgadmin
+docker compose -f docker-compose.release.yml rm -f api admin pgadmin
 
 # Удаляем старые образы
 docker rmi release-api release-admin 2>/dev/null || true
@@ -117,7 +120,7 @@ fi
 
 # ПЕРЕСБОРКА без кэша и запуск
 docker compose -f docker-compose.release.yml build --no-cache api admin
-docker compose -f docker-compose.release.yml up -d api admin
+docker compose -f docker-compose.release.yml up -d api admin pgadmin
 ```
 
 ## Проверка:
@@ -125,9 +128,18 @@ docker compose -f docker-compose.release.yml up -d api admin
 ```bash
 docker ps
 docker logs mm-api-prod --tail 50 -f
+docker logs mm-pgadmin-prod --tail 50 -f
 ```
+
+## Доступ к сервисам:
+
+- **API:** http://159.89.99.252:8080
+- **Admin Panel:** https://159.89.99.252 (или http://159.89.99.252)
+- **PgAdmin:** http://159.89.99.252:5050
+  - Email: admin@mm.com (или значение из PGADMIN_EMAIL)
+  - Password: admin123 (или значение из PGADMIN_PASSWORD)
 
 ## Версия:
 
-**1.2.8** - Admin panel now served directly from API on port 8080
+**1.2.9** - Добавлен PgAdmin для управления базой данных в продакшене
 

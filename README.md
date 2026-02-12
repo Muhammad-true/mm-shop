@@ -72,14 +72,23 @@ docker-compose -f docker-compose.release.yml -f docker-compose.release.override.
 docker-compose -f docker-compose.release.yml -f docker-compose.release.override.yml up -d --build
 ```
 
-### Или раздельно (API и Admin):
+### Или раздельно (API, Admin и PgAdmin):
 
 ```bash
 cd /root/mm-shop
 git pull origin main
 docker-compose -f docker-compose.release.yml up -d --build api
 docker-compose -f docker-compose.release.yml up -d --build admin
+docker-compose -f docker-compose.release.yml up -d pgadmin
 ```
+
+### Доступ к сервисам в продакшене:
+
+- **API:** http://159.89.99.252:8080
+- **Admin Panel:** https://159.89.99.252 (или http://159.89.99.252)
+- **PgAdmin:** http://159.89.99.252:5050
+  - Email: admin@mm.com (или значение из переменной окружения PGADMIN_EMAIL)
+  - Password: admin123 (или значение из переменной окружения PGADMIN_PASSWORD)
 
 ## Полезные команды
 
@@ -87,6 +96,7 @@ docker-compose -f docker-compose.release.yml up -d --build admin
 ```bash
 docker logs mm-api-prod --tail 50 -f
 docker logs mm-admin-prod --tail 50 -f
+docker logs mm-pgadmin-prod --tail 50 -f
 ```
 
 **Посмотреть логи (dev):**
@@ -112,7 +122,7 @@ docker-compose down -v
 docker-compose up -d
 ```
 
-**Подключиться к pgAdmin:**
+**Подключиться к pgAdmin (локальная разработка):**
 1. Откройте http://localhost:5050
 2. Войдите: admin@mm.com / admin123
 3. Добавьте новый сервер:
@@ -122,4 +132,15 @@ docker-compose up -d
    - Database: mm_shop_dev
    - Username: mm_user
    - Password: dev_password
+
+**Подключиться к pgAdmin (продакшен):**
+1. Откройте http://159.89.99.252:5050
+2. Войдите: admin@mm.com / admin123 (или значения из переменных окружения)
+3. Добавьте новый сервер:
+   - Name: MM Shop Prod
+   - Host: postgres (важно!)
+   - Port: 5432
+   - Database: mm_shop_prod
+   - Username: mm_user
+   - Password: muhammadjon (или значение из переменной окружения POSTGRES_PASSWORD)
 
