@@ -4,7 +4,9 @@
 async function handleLogin(e) {
     if (e) e.preventDefault();
     
-    const phone = document.getElementById('login-phone').value;
+    const countryCode = document.getElementById('login-country-code').value;
+    const phoneNumber = document.getElementById('login-phone').value;
+    const phone = countryCode + phoneNumber.replace(/\D/g, ''); // Убираем все нецифровые символы и добавляем код страны
     const password = document.getElementById('login-password').value;
     
     // Показываем сообщение о загрузке

@@ -129,7 +129,7 @@ services:
     container_name: mm-pgadmin-prod
     restart: unless-stopped
     ports:
-      - "5050:80"
+      - "5050:80"  # Резервный доступ (рекомендуется использовать поддомен pgadmin.libiss.com через nginx)
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@mm.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}

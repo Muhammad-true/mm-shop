@@ -46,6 +46,7 @@ func SetupRoutes() *gin.Engine {
 	paymentController := &controllers.PaymentController{}
 	updateController := &controllers.UpdateController{}
 	libissPosController := &controllers.LibissPosController{}
+	shopCustomerController := &controllers.ShopCustomerController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -148,6 +149,12 @@ func SetupRoutes() *gin.Engine {
 			shops.GET("/:id/subscription/check", shopController.CheckSubscription) // Проверка подписки (требует аутентификации)
 		}
 
+		// Регистрация клиентов магазинами (публичный эндпоинт с проверкой shop_id)
+		shopCustomers := public.Group("shop")
+		{
+			shopCustomers.POST("/customers/register", shopCustomerController.RegisterOrUpdateCustomer) // Регистрация/обновление клиента магазином
+		}
+
 		// Админские продукты (публичный доступ)
 		adminPublic := public.Group("admin")
 		{
@@ -246,9 +253,12 @@ func SetupRoutes() *gin.Engine {
 		shops := protected.Group("shops")
 		{
 			shops.GET("/", shopController.GetShops)                            // Список всех магазинов с информацией о подписке пользователя
+			shops.GET("/my", shopCustomerController.GetMyShops)                // Список магазинов клиента с бонусами
 			shops.POST("/:id/subscribe", shopController.SubscribeToShop)       // Подписаться на магазин
 			shops.DELETE("/:id/subscribe", shopController.UnsubscribeFromShop) // Отписаться от магазина
 			shops.GET("/:id/subscribers", shopController.GetShopSubscribers)   // Список подписчиков (для владельца)
+			shops.GET("/:id/bonus", shopCustomerController.GetShopBonusInfo)    // Информация о бонусах в магазине
+			shops.GET("/:id/bonus/history", shopCustomerController.GetBonusHistory) // История бонусов в магазине
 		}
 
 		// Лицензии текущего пользователя

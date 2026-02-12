@@ -63,6 +63,10 @@ git pull origin main
 # POSTGRES_PASSWORD=your-postgres-password (опционально, по умолчанию muhammadjon)
 # и другие необходимые переменные
 
+# ⚠️ ВАЖНО: Если используете поддомен для PgAdmin (pgadmin.libiss.com):
+# 1. Настройте DNS запись A для pgadmin.libiss.com на IP сервера (159.89.99.252)
+# 2. Получите SSL сертификат для поддомена (см. инструкцию ниже)
+
 # ОСТАНОВКА и удаление контейнеров для чистого билда
 docker compose -f docker-compose.release.yml stop api admin pgadmin
 docker compose -f docker-compose.release.yml rm -f api admin pgadmin
@@ -133,13 +137,36 @@ docker logs mm-pgadmin-prod --tail 50 -f
 
 ## Доступ к сервисам:
 
-- **API:** http://159.89.99.252:8080
-- **Admin Panel:** https://159.89.99.252 (или http://159.89.99.252)
-- **PgAdmin:** http://159.89.99.252:5050
+- **API:** http://159.89.99.252:8080 или https://api.libiss.com
+- **Admin Panel:** https://admin.libiss.com
+- **PgAdmin (через поддомен):** https://pgadmin.libiss.com (рекомендуется)
+- **PgAdmin (прямой доступ):** http://159.89.99.252:5050 (резервный)
   - Email: admin@mm.com (или значение из PGADMIN_EMAIL)
   - Password: admin123 (или значение из PGADMIN_PASSWORD)
 
+## 🔒 Настройка SSL для поддомена PgAdmin (pgadmin.libiss.com):
+
+Если вы хотите использовать поддомен для доступа к PgAdmin:
+
+```bash
+# 1. Убедитесь, что DNS запись A для pgadmin.libiss.com указывает на IP сервера (159.89.99.252)
+
+# 2. Остановите nginx контейнер (освободить порт 80)
+docker compose -f docker-compose.release.yml stop admin
+
+# 3. Получите SSL сертификат для поддомена
+sudo certbot certonly --standalone -d pgadmin.libiss.com
+
+# 4. Если у вас уже есть сертификат для admin.libiss.com, можно добавить поддомен к существующему:
+sudo certbot certonly --standalone -d admin.libiss.com -d api.libiss.com -d shop.libiss.com -d pgadmin.libiss.com
+
+# 5. Запустите контейнеры заново
+docker compose -f docker-compose.release.yml up -d admin pgadmin
+
+# 6. Проверьте доступ: https://pgadmin.libiss.com
+```
+
 ## Версия:
 
-**1.2.9** - Добавлен PgAdmin для управления базой данных в продакшене
+**1.2.10** - Добавлена поддержка поддомена для PgAdmin (pgadmin.libiss.com) через nginx reverse proxy
 

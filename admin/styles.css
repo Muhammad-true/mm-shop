@@ -785,6 +785,15 @@ form {
     color: white;
 }
 
+#login-modal select.form-input {
+    cursor: pointer;
+}
+
+#login-modal select.form-input option {
+    background: #667eea;
+    color: white;
+}
+
 #login-modal .form-input::placeholder {
     color: rgba(255, 255, 255, 0.7);
 }

@@ -36,6 +36,7 @@ func (src *ShopRegistrationController) RegisterShop(c *gin.Context) {
 		Description string  `json:"description"`
 		Address     string  `json:"address"`
 		CityID      *string `json:"cityId"` // ID города (опционально)
+		Logo        string  `json:"logo"`   // URL логотипа магазина (опционально)
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -117,6 +118,7 @@ func (src *ShopRegistrationController) RegisterShop(c *gin.Context) {
 		Address:     req.Address,
 		Email:       req.Email,
 		Phone:       req.Phone,
+		Logo:        req.Logo, // URL логотипа магазина
 		IsActive:    true,
 		OwnerID:     user.ID,
 		CityID:      cityID,
@@ -161,6 +163,7 @@ func (src *ShopRegistrationController) RegisterShop(c *gin.Context) {
 				"inn":         shop.INN,
 				"description": shop.Description,
 				"address":     shop.Address,
+				"logo":        shop.Logo,
 				"cityId":      shop.CityID,
 			},
 			"token": token, // Токен для автоматического входа

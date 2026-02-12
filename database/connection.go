@@ -198,6 +198,8 @@ func runMigrations() error {
 		&models.License{},          // Лицензии
 		&models.UpdateRelease{},    // Обновления приложений/сервера
 		&models.LibissPosFile{},   // Файлы программ libiss_pos
+		&models.ShopClient{},       // Клиенты магазинов с бонусами
+		&models.BonusHistory{},     // История изменений бонусов
 	); err != nil {
 		return fmt.Errorf("failed to run GORM AutoMigrate: %w", err)
 	}

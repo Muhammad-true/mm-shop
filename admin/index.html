@@ -21,11 +21,26 @@
             <form id="login-form">
                 <div class="form-group">
                     <label>Телефон</label>
-                    <input type="text" id="login-phone" required class="form-input" placeholder="+992927781020">
+                    <div style="display: flex; gap: 10px;">
+                        <select id="login-country-code" class="form-input" style="width: 120px; flex-shrink: 0;">
+                            <option value="+992" selected>🇹🇯 TJ +992</option>
+                            <option value="+7">🇷🇺 RU +7</option>
+                            <option value="+7">🇰🇿 KZ +7</option>
+                            <option value="+998">🇺🇿 UZ +998</option>
+                            <option value="+996">🇰🇬 KG +996</option>
+                            <option value="+993">🇹🇲 TM +993</option>
+                            <option value="+375">🇧🇾 BY +375</option>
+                            <option value="+374">🇦🇲 AM +374</option>
+                            <option value="+994">🇦🇿 AZ +994</option>
+                            <option value="+373">🇲🇩 MD +373</option>
+                            <option value="+380">🇺🇦 UA +380</option>
+                        </select>
+                        <input type="text" id="login-phone" required class="form-input" placeholder="(номер телефона)" style="flex: 1;">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Пароль</label>
-                    <input type="password" id="login-password" required class="form-input" placeholder="admin123">
+                    <input type="password" id="login-password" required class="form-input" placeholder="(пароль)">
                 </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary">Войти</button>

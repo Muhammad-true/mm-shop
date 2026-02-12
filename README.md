@@ -84,11 +84,23 @@ docker-compose -f docker-compose.release.yml up -d pgadmin
 
 ### Доступ к сервисам в продакшене:
 
-- **API:** http://159.89.99.252:8080
-- **Admin Panel:** https://159.89.99.252 (или http://159.89.99.252)
-- **PgAdmin:** http://159.89.99.252:5050
+- **API:** https://api.libiss.com или http://159.89.99.252:8080
+- **Admin Panel:** https://admin.libiss.com
+- **PgAdmin (через поддомен):** https://pgadmin.libiss.com (рекомендуется)
+- **PgAdmin (прямой доступ):** http://159.89.99.252:5050 (резервный)
   - Email: admin@mm.com (или значение из переменной окружения PGADMIN_EMAIL)
   - Password: admin123 (или значение из переменной окружения PGADMIN_PASSWORD)
+
+### Настройка поддомена для PgAdmin:
+
+1. **Настройте DNS запись A** для `pgadmin.libiss.com` на IP сервера (159.89.99.252)
+2. **Получите SSL сертификат:**
+   ```bash
+   docker compose -f docker-compose.release.yml stop admin
+   sudo certbot certonly --standalone -d pgadmin.libiss.com
+   docker compose -f docker-compose.release.yml up -d admin pgadmin
+   ```
+3. **Проверьте доступ:** https://pgadmin.libiss.com
 
 ## Полезные команды
 
@@ -134,11 +146,11 @@ docker-compose up -d
    - Password: dev_password
 
 **Подключиться к pgAdmin (продакшен):**
-1. Откройте http://159.89.99.252:5050
+1. Откройте https://pgadmin.libiss.com (или http://159.89.99.252:5050 для прямого доступа)
 2. Войдите: admin@mm.com / admin123 (или значения из переменных окружения)
 3. Добавьте новый сервер:
    - Name: MM Shop Prod
-   - Host: postgres (важно!)
+   - Host: postgres (важно! Используйте имя контейнера, не localhost)
    - Port: 5432
    - Database: mm_shop_prod
    - Username: mm_user

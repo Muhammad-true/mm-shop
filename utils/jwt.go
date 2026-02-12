@@ -84,3 +84,23 @@ func RefreshJWT(tokenString string) (string, error) {
 
 	return GenerateJWT(userID, claims.Email, claims.Role)
 }
+
+// NormalizePhone нормализует номер телефона (убирает пробелы, дефисы и другие символы)
+// Оставляет только цифры и знак + в начале
+func NormalizePhone(phone string) string {
+	if phone == "" {
+		return ""
+	}
+	
+	// Убираем все пробелы, дефисы, скобки и другие символы кроме цифр и +
+	result := ""
+	for _, char := range phone {
+		if char >= '0' && char <= '9' {
+			result += string(char)
+		} else if char == '+' && len(result) == 0 {
+			result += string(char)
+		}
+	}
+	
+	return result
+}

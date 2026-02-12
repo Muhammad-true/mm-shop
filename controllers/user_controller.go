@@ -210,6 +210,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 			Email       string  `json:"email"`
 			Phone       string  `json:"phone"`
 			CityID      *string `json:"cityId"` // ID города
+			Logo        string  `json:"logo"`   // URL логотипа магазина
 		} `json:"shop"` // Данные магазина (если роль shop_owner)
 	}
 
@@ -300,6 +301,7 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 			Address:     req.Shop.Address,
 			Email:       req.Shop.Email,
 			Phone:       req.Shop.Phone,
+			Logo:        req.Shop.Logo, // URL логотипа магазина
 			IsActive:    user.IsActive,
 			OwnerID:     user.ID,
 			CityID:      cityID, // ID города
