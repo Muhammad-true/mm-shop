@@ -66,13 +66,22 @@ func (scc *ShopCustomerController) RegisterOrUpdateCustomer(c *gin.Context) {
 		return
 	}
 
-	// Нормализуем номер телефона
+	// Сохраняем номер телефона "как есть" (обычно с кодом страны)
+	// Но также нормализуем для поиска существующих записей
+	phoneAsIs := req.Phone
 	normalizedPhone := utils.NormalizePhone(req.Phone)
+	
+	// Используем нормализованный номер для поиска (чтобы находить записи в любом формате)
+	// Но сохраняем "как есть" для совместимости
+	searchPhone := normalizedPhone
+	if searchPhone == "" {
+		searchPhone = phoneAsIs
+	}
 
-	// Ищем существующего клиента
+	// Ищем существующего клиента по нормализованному номеру или "как есть"
 	var shopClient models.ShopClient
 	isNew := false
-	err = database.DB.Where("shop_id = ? AND phone = ?", shopID, normalizedPhone).First(&shopClient).Error
+	err = database.DB.Where("shop_id = ? AND (phone = ? OR phone = ?)", shopID, searchPhone, phoneAsIs).First(&shopClient).Error
 
 	if err == gorm.ErrRecordNotFound {
 		// Новый клиент - создаем запись
@@ -97,7 +106,7 @@ func (scc *ShopCustomerController) RegisterOrUpdateCustomer(c *gin.Context) {
 
 		shopClient = models.ShopClient{
 			ShopID:      shopID,
-			Phone:       normalizedPhone,
+			Phone:       phoneAsIs, // Сохраняем "как есть" (обычно с кодом страны)
 			QRCode:      req.QRCode,
 			BonusAmount: req.BonusAmount,
 		}
@@ -192,9 +201,9 @@ func (scc *ShopCustomerController) GetMyShops(c *gin.Context) {
 
 	user := currentUser.(models.User)
 
-	// Нормализуем номер телефона пользователя
-	normalizedPhone := utils.NormalizePhone(user.Phone)
-	if normalizedPhone == "" {
+	// Проверяем, что номер телефона указан
+	if user.Phone == "" {
+		log.Printf("⚠️ [GetMyShops] У пользователя не указан номер телефона: userID=%s", user.ID)
 		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
 			models.ErrValidationError,
 			"У пользователя не указан номер телефона",
@@ -202,10 +211,25 @@ func (scc *ShopCustomerController) GetMyShops(c *gin.Context) {
 		return
 	}
 
+	// Нормализуем номер телефона пользователя
+	normalizedPhone := utils.NormalizePhone(user.Phone)
+	
+	log.Printf("🔍 [GetMyShops] Поиск магазинов для пользователя: userID=%s, phone=%s, normalizedPhone=%s", user.ID, user.Phone, normalizedPhone)
+
 	// Находим все связи клиента с магазинами по номеру телефона
+	// Сначала ищем "как есть" (обычно с кодом страны), потом по нормализованному
 	var shopClients []models.ShopClient
+	
+	// Собираем варианты номеров для поиска (сначала оригинальный, потом нормализованный)
+	phoneVariants := []string{user.Phone} // Сначала ищем как есть
+	if normalizedPhone != "" && normalizedPhone != user.Phone {
+		phoneVariants = append(phoneVariants, normalizedPhone) // Потом нормализованный
+	}
+	
+	log.Printf("🔍 [GetMyShops] Поиск магазинов по вариантам номеров (приоритет: оригинальный -> нормализованный): %v", phoneVariants)
+	
 	if err := database.DB.Preload("Shop").
-		Where("phone = ?", normalizedPhone).
+		Where("phone IN ?", phoneVariants).
 		Order("created_at DESC").
 		Find(&shopClients).Error; err != nil {
 		log.Printf("❌ [GetMyShops] Ошибка получения магазинов клиента: %v", err)
@@ -214,6 +238,25 @@ func (scc *ShopCustomerController) GetMyShops(c *gin.Context) {
 			"Ошибка при получении магазинов",
 		))
 		return
+	}
+
+	log.Printf("📋 [GetMyShops] Найдено магазинов: %d для пользователя %s (phone: %s, normalized: %s)", 
+		len(shopClients), user.ID, user.Phone, normalizedPhone)
+
+	// Если не найдено, проверяем есть ли вообще записи ShopClient с похожими номерами (для отладки)
+	if len(shopClients) == 0 {
+		var allShopClients []models.ShopClient
+		database.DB.Select("phone").Distinct("phone").Limit(10).Find(&allShopClients)
+		log.Printf("🔍 [GetMyShops] Отладка: Всего уникальных номеров в ShopClient (первые 10): %d", len(allShopClients))
+		if len(allShopClients) > 0 {
+			examplePhones := make([]string, 0)
+			for i, sc := range allShopClients {
+				if i < 5 { // Показываем первые 5
+					examplePhones = append(examplePhones, sc.Phone)
+				}
+			}
+			log.Printf("🔍 [GetMyShops] Примеры номеров в БД: %v", examplePhones)
+		}
 	}
 
 	// Обновляем user_id для всех найденных клиентов, если он еще не установлен
@@ -261,9 +304,8 @@ func (scc *ShopCustomerController) GetShopBonusInfo(c *gin.Context) {
 
 	user := currentUser.(models.User)
 
-	// Нормализуем номер телефона
-	normalizedPhone := utils.NormalizePhone(user.Phone)
-	if normalizedPhone == "" {
+	// Проверяем, что номер телефона указан
+	if user.Phone == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
 			models.ErrValidationError,
 			"У пользователя не указан номер телефона",
@@ -271,10 +313,19 @@ func (scc *ShopCustomerController) GetShopBonusInfo(c *gin.Context) {
 		return
 	}
 
+	// Нормализуем номер телефона для поиска
+	normalizedPhone := utils.NormalizePhone(user.Phone)
+	
+	// Сначала ищем "как есть", потом по нормализованному
+	phoneVariants := []string{user.Phone}
+	if normalizedPhone != "" && normalizedPhone != user.Phone {
+		phoneVariants = append(phoneVariants, normalizedPhone)
+	}
+
 	// Находим клиента в этом магазине
 	var shopClient models.ShopClient
 	if err := database.DB.Preload("Shop").
-		Where("shop_id = ? AND phone = ?", shopID, normalizedPhone).
+		Where("shop_id = ? AND phone IN ?", shopID, phoneVariants).
 		First(&shopClient).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponseWithCode(
@@ -328,9 +379,8 @@ func (scc *ShopCustomerController) GetBonusHistory(c *gin.Context) {
 
 	user := currentUser.(models.User)
 
-	// Нормализуем номер телефона
-	normalizedPhone := utils.NormalizePhone(user.Phone)
-	if normalizedPhone == "" {
+	// Проверяем, что номер телефона указан
+	if user.Phone == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
 			models.ErrValidationError,
 			"У пользователя не указан номер телефона",
@@ -338,9 +388,18 @@ func (scc *ShopCustomerController) GetBonusHistory(c *gin.Context) {
 		return
 	}
 
+	// Нормализуем номер телефона для поиска
+	normalizedPhone := utils.NormalizePhone(user.Phone)
+	
+	// Сначала ищем "как есть", потом по нормализованному
+	phoneVariants := []string{user.Phone}
+	if normalizedPhone != "" && normalizedPhone != user.Phone {
+		phoneVariants = append(phoneVariants, normalizedPhone)
+	}
+
 	// Находим клиента в этом магазине
 	var shopClient models.ShopClient
-	if err := database.DB.Where("shop_id = ? AND phone = ?", shopID, normalizedPhone).First(&shopClient).Error; err != nil {
+	if err := database.DB.Where("shop_id = ? AND phone IN ?", shopID, phoneVariants).First(&shopClient).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponseWithCode(
 				models.ErrNotFound,

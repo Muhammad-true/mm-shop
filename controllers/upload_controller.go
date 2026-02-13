@@ -183,6 +183,11 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 	})
 }
 
+// CompressAndSaveImage сжимает и сохраняет изображение (публичный метод для использования в других контроллерах)
+func (uc *UploadController) CompressAndSaveImage(file io.Reader, filePath string, ext string, contentType string) (string, int64, error) {
+	return uc.compressAndSaveImage(file, filePath, ext, contentType)
+}
+
 // compressAndSaveImage сжимает и сохраняет изображение
 // Поддерживает JPEG, PNG, WebP
 // Для JPEG: качество 85% (хороший баланс между размером и качеством)

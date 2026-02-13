@@ -173,7 +173,7 @@ func SetupRoutes() *gin.Engine {
 			users.GET("/profile", authController.Profile)
 			users.PUT("/profile", authController.UpdateProfile)
 			users.DELETE("/delete-account", authController.DeleteAccount) // Удаление собственного аккаунта
-			// users.POST("/avatar", authController.UploadAvatar) // TODO: Реализовать
+			users.POST("/avatar", authController.UploadAvatar) // Загрузка аватара пользователя
 
 			// Адреса пользователя
 			addresses := users.Group("addresses")
@@ -414,6 +414,12 @@ func SetupRoutes() *gin.Engine {
 		{
 			shopCustomers.GET("/", userController.GetShopCustomers)             // Только клиенты
 			shopCustomers.GET("/:id/orders", orderController.GetCustomerOrders) // Заказы клиента
+		}
+
+		// Управление магазином
+		shopManagement := shop.Group("")
+		{
+			shopManagement.POST("/:id/logo", shopController.UploadLogo) // Загрузка логотипа магазина
 		}
 	}
 

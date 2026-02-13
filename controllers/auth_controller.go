@@ -2,8 +2,12 @@ package controllers
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -443,6 +447,127 @@ func (ac *AuthController) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(
 		userModel.ToResponse(),
 		"Profile updated successfully",
+	))
+}
+
+// UploadAvatar загружает аватар пользователя
+func (ac *AuthController) UploadAvatar(c *gin.Context) {
+	// Получаем текущего пользователя
+	user, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
+			models.ErrAuthRequired,
+			"Пользователь не авторизован",
+		))
+		return
+	}
+
+	userModel := user.(models.User)
+
+	// Получаем файл из формы
+	file, header, err := c.Request.FormFile("avatar")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Файл не предоставлен",
+			err.Error(),
+		))
+		return
+	}
+	defer file.Close()
+
+	// Используем UploadController для загрузки
+	uploadController := &UploadController{}
+	
+	// Создаем временный файл для чтения содержимого
+	tempFile, err := os.CreateTemp("", "avatar-*.tmp")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка создания временного файла",
+		))
+		return
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	// Копируем содержимое файла
+	if _, err := io.Copy(tempFile, file); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка сохранения файла",
+		))
+		return
+	}
+
+	// Перемещаем указатель в начало файла
+	tempFile.Seek(0, 0)
+
+	// Загружаем изображение
+	folder := "avatars"
+	uploadDir := fmt.Sprintf("images/%s", folder)
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка создания папки",
+		))
+		return
+	}
+
+	// Генерируем уникальное имя файла
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".jpg"
+	}
+	ext = strings.ToLower(ext)
+	filename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
+	filePath := filepath.Join(uploadDir, filename)
+
+	// Сохраняем файл через метод UploadController
+	contentType := header.Header.Get("Content-Type")
+	finalFilename, _, err := uploadController.CompressAndSaveImage(tempFile, filePath, ext, contentType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка сохранения изображения",
+			err.Error(),
+		))
+		return
+	}
+
+	// Обновляем filename если формат изменился
+	if finalFilename != filename {
+		filename = finalFilename
+	}
+
+	// Формируем URL
+	avatarURL := uploadController.GetImageURL(filename, folder)
+
+	// Удаляем старый аватар, если он есть
+	if userModel.Avatar != "" {
+		oldFilename := filepath.Base(userModel.Avatar)
+		oldPath := filepath.Join(uploadDir, oldFilename)
+		if _, err := os.Stat(oldPath); err == nil {
+			os.Remove(oldPath)
+		}
+	}
+
+	// Обновляем аватар пользователя
+	userModel.Avatar = avatarURL
+	if err := database.DB.Save(&userModel).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка обновления аватара",
+		))
+		return
+	}
+
+	// Загружаем обновленные данные
+	database.DB.Preload("Addresses").Preload("Role").First(&userModel, userModel.ID)
+
+	c.JSON(http.StatusOK, models.SuccessResponse(
+		userModel.ToResponse(),
+		"Аватар успешно загружен",
 	))
 }
 

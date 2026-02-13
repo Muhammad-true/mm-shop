@@ -1,8 +1,12 @@
 package controllers
 
 import (
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -1315,5 +1319,170 @@ func (sc *ShopController) GetShopsWithLicenses(c *gin.Context) {
 			"pagination": pagination,
 		},
 	})
+}
+
+// UploadLogo загружает логотип магазина (только для владельца магазина)
+func (sc *ShopController) UploadLogo(c *gin.Context) {
+	// Получаем текущего пользователя
+	currentUser, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(
+			models.ErrAuthRequired,
+			"Пользователь не авторизован",
+		))
+		return
+	}
+
+	user := currentUser.(models.User)
+
+	// Получаем shop_id из параметра или из запроса
+	shopIDParam := c.Param("id")
+	if shopIDParam == "" {
+		// Пробуем получить из тела запроса
+		var req struct {
+			ShopID string `json:"shopId"`
+		}
+		if err := c.ShouldBindJSON(&req); err == nil && req.ShopID != "" {
+			shopIDParam = req.ShopID
+		} else {
+			c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+				models.ErrValidationError,
+				"shop_id обязателен",
+			))
+			return
+		}
+	}
+
+	shopID, err := uuid.Parse(shopIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Неверный формат shop_id",
+		))
+		return
+	}
+
+	// Проверяем, что магазин существует и пользователь является его владельцем
+	var shop models.Shop
+	if err := database.DB.Where("id = ? AND owner_id = ?", shopID, user.ID).First(&shop).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusForbidden, models.ErrorResponseWithCode(
+				models.ErrForbidden,
+				"Магазин не найден или вы не являетесь его владельцем",
+			))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка базы данных",
+		))
+		return
+	}
+
+	// Получаем файл из формы
+	file, header, err := c.Request.FormFile("logo")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponseWithCode(
+			models.ErrValidationError,
+			"Файл не предоставлен",
+			err.Error(),
+		))
+		return
+	}
+	defer file.Close()
+
+	// Используем UploadController для загрузки
+	uploadController := &UploadController{}
+
+	// Создаем временный файл для чтения содержимого
+	tempFile, err := os.CreateTemp("", "logo-*.tmp")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка создания временного файла",
+		))
+		return
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	// Копируем содержимое файла
+	if _, err := io.Copy(tempFile, file); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка сохранения файла",
+		))
+		return
+	}
+
+	// Перемещаем указатель в начало файла
+	tempFile.Seek(0, 0)
+
+	// Загружаем изображение
+	folder := "shop-logos"
+	uploadDir := fmt.Sprintf("images/%s", folder)
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка создания папки",
+		))
+		return
+	}
+
+	// Генерируем уникальное имя файла
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".jpg"
+	}
+	ext = strings.ToLower(ext)
+	filename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
+	filePath := filepath.Join(uploadDir, filename)
+
+	// Сохраняем файл через метод UploadController
+	contentType := header.Header.Get("Content-Type")
+	finalFilename, _, err := uploadController.CompressAndSaveImage(tempFile, filePath, ext, contentType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка сохранения изображения",
+			err.Error(),
+		))
+		return
+	}
+
+	// Обновляем filename если формат изменился
+	if finalFilename != filename {
+		filename = finalFilename
+	}
+
+	// Формируем URL
+	logoURL := uploadController.GetImageURL(filename, folder)
+
+	// Удаляем старый логотип, если он есть
+	if shop.Logo != "" {
+		oldFilename := filepath.Base(shop.Logo)
+		oldPath := filepath.Join(uploadDir, oldFilename)
+		if _, err := os.Stat(oldPath); err == nil {
+			os.Remove(oldPath)
+		}
+	}
+
+	// Обновляем логотип магазина
+	shop.Logo = logoURL
+	if err := database.DB.Save(&shop).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponseWithCode(
+			models.ErrInternalError,
+			"Ошибка обновления логотипа",
+		))
+		return
+	}
+
+	// Загружаем обновленные данные
+	database.DB.Preload("Owner").Preload("City").First(&shop, shop.ID)
+
+	c.JSON(http.StatusOK, models.SuccessResponse(
+		shop.ToResponse(),
+		"Логотип успешно загружен",
+	))
 }
 
