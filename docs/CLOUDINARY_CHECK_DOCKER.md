@@ -12,8 +12,14 @@ docker compose -f docker-compose.release.yml exec api printenv | grep CLOUDINARY
 ### Вариант 2: Использование скрипта внутри контейнера
 
 ```bash
-# Запустить скрипт проверки внутри контейнера
-docker compose -f docker-compose.release.yml exec api bash -c "cd /app && ./scripts/check_cloudinary_config.sh"
+# Запустить скрипт проверки внутри контейнера (используется sh, так как Alpine не имеет bash)
+docker compose -f docker-compose.release.yml exec api sh /app/scripts/check_cloudinary_docker.sh
+```
+
+Или через printenv:
+```bash
+# Простая проверка переменных
+docker compose -f docker-compose.release.yml exec api printenv | grep CLOUDINARY
 ```
 
 ### Вариант 3: Проверка файла .env.production на сервере
@@ -146,8 +152,8 @@ docker compose -f docker-compose.release.yml exec api printenv
 # Проверить только Cloudinary переменные
 docker compose -f docker-compose.release.yml exec api printenv | grep CLOUDINARY
 
-# Проверить конфигурацию через скрипт
-docker compose -f docker-compose.release.yml exec api bash -c "cd /app && ./scripts/check_cloudinary_config.sh"
+# Проверить конфигурацию через скрипт (используется sh для Alpine)
+docker compose -f docker-compose.release.yml exec api sh /app/scripts/check_cloudinary_docker.sh
 
 # Посмотреть, какой файл используется
 docker compose -f docker-compose.release.yml config | grep -A 5 "env_file"
