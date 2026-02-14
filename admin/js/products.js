@@ -852,9 +852,12 @@ async function uploadVariationImages(variationIndex, inputEl) {
     let files = Array.from(inputEl.files || []);
     if (files.length === 0) return;
 
-    // Проверяем текущее количество фото в вариации
+    // DEPRECATED: Эта функция устарела, используйте uploadVariationImagesByColor
+    // Проверяем текущее количество фото в вариации (для обратной совместимости)
     const vars = getVariations();
-    const currentImages = Array.isArray(vars[variationIndex]?.imageUrls) ? vars[variationIndex].imageUrls.length : 0;
+    const imageUrlsByColor = vars[variationIndex]?.imageUrlsByColor || {};
+    const allImages = Object.values(imageUrlsByColor).flat();
+    const currentImages = allImages.length;
     const maxImages = 2; // Максимум 2 фото на вариацию
     
     // Проверяем, не превысит ли загрузка лимит
@@ -945,19 +948,31 @@ async function uploadVariationImages(variationIndex, inputEl) {
                     <img src="${imageUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Uploaded" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22%3E%3Crect fill=%22%23f8f9fa%22 width=%22120%22 height=%22120%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%236c757d%22 text-anchor=%22middle%22 dy=%22.3em%22%3EОшибка%3C/text%3E%3C/svg%3E';">
                 `;
                 
-                // Добавляем в вариацию, но не перерисовываем сразу
+                // DEPRECATED: Эта функция устарела, используйте uploadVariationImagesByColor
+                // Добавляем в вариацию для первого цвета (для обратной совместимости)
                 const vars = getVariations();
-                if (!Array.isArray(vars[variationIndex].imageUrls)) vars[variationIndex].imageUrls = [];
+                if (!vars[variationIndex].imageUrlsByColor) {
+                    vars[variationIndex].imageUrlsByColor = {};
+                }
+                
+                // Используем первый цвет из списка, если есть
+                const firstColor = vars[variationIndex].colors && vars[variationIndex].colors.length > 0 
+                    ? vars[variationIndex].colors[0] 
+                    : 'default';
+                
+                if (!Array.isArray(vars[variationIndex].imageUrlsByColor[firstColor])) {
+                    vars[variationIndex].imageUrlsByColor[firstColor] = [];
+                }
                 
                 // Проверяем лимит перед добавлением
-                if (vars[variationIndex].imageUrls.length >= maxImages) {
+                if (vars[variationIndex].imageUrlsByColor[firstColor].length >= maxImages) {
                     if (window.ui && window.ui.showMessage) {
-                        window.ui.showMessage(`⚠️ Достигнут лимит ${maxImages} фото на вариацию`, 'warning');
+                        window.ui.showMessage(`⚠️ Достигнут лимит ${maxImages} фото для цвета "${firstColor}"`, 'warning');
                     }
                     break; // Прерываем загрузку
                 }
                 
-                vars[variationIndex].imageUrls.push(url);
+                vars[variationIndex].imageUrlsByColor[firstColor].push(url);
                 setVariations(vars);
                 
                 // Освобождаем память от превью
@@ -1006,12 +1021,22 @@ async function uploadVariationImages(variationIndex, inputEl) {
     inputEl.value = '';
 }
 
+// DEPRECATED: Эта функция устарела, используйте removeVariationImageByColor
 function removeVariationImage(variationIndex, imgIndex) {
+    // Для обратной совместимости - удаляем из первого цвета
     const vars = getVariations();
-    if (!vars[variationIndex] || !Array.isArray(vars[variationIndex].imageUrls)) return;
-    vars[variationIndex].imageUrls.splice(imgIndex, 1);
-    setVariations(vars);
-    renderVariations();
+    if (!vars[variationIndex] || !vars[variationIndex].imageUrlsByColor) return;
+    
+    const firstColor = vars[variationIndex].colors && vars[variationIndex].colors.length > 0 
+        ? vars[variationIndex].colors[0] 
+        : 'default';
+    
+    if (vars[variationIndex].imageUrlsByColor[firstColor] && 
+        Array.isArray(vars[variationIndex].imageUrlsByColor[firstColor])) {
+        vars[variationIndex].imageUrlsByColor[firstColor].splice(imgIndex, 1);
+        setVariations(vars);
+        renderVariations();
+    }
 }
 
 // Загрузка изображений для конкретного цвета
