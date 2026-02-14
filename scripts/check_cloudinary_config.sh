@@ -3,18 +3,52 @@
 # Скрипт проверки конфигурации Cloudinary
 # Использование: ./scripts/check_cloudinary_config.sh [путь_к_env_файлу]
 
-ENV_FILE="${1:-env.development}"
+ENV_FILE="${1:-}"
 
 echo "🔍 Проверка конфигурации Cloudinary..."
-echo "📁 Файл конфигурации: $ENV_FILE"
 echo ""
 
-# Проверяем, существует ли файл
-if [ ! -f "$ENV_FILE" ]; then
-    echo "❌ Файл $ENV_FILE не найден!"
-    echo "   Использование: $0 [путь_к_env_файлу]"
-    exit 1
+# Определяем источник конфигурации
+USE_ENV_FILE=false
+ENV_FILE_PATH=""
+
+# Если указан файл, используем его
+if [ -n "$ENV_FILE" ]; then
+    if [ -f "$ENV_FILE" ]; then
+        USE_ENV_FILE=true
+        ENV_FILE_PATH="$ENV_FILE"
+        echo "📁 Используется файл: $ENV_FILE_PATH"
+    else
+        echo "❌ Указанный файл $ENV_FILE не найден!"
+        exit 1
+    fi
+else
+    # Пробуем найти файл конфигурации в разных местах
+    POSSIBLE_FILES=(
+        "env.development"
+        ".env"
+        ".env.production"
+        "../env.development"
+        "../../env.development"
+    )
+    
+    for file in "${POSSIBLE_FILES[@]}"; do
+        if [ -f "$file" ]; then
+            USE_ENV_FILE=true
+            ENV_FILE_PATH="$file"
+            echo "📁 Найден файл конфигурации: $ENV_FILE_PATH"
+            break
+        fi
+    done
+    
+    # Если файл не найден, используем переменные окружения
+    if [ "$USE_ENV_FILE" = false ]; then
+        echo "📁 Файл конфигурации не найден, проверяем переменные окружения..."
+        echo "   (Проверяем переменные окружения системы/Docker)"
+    fi
 fi
+
+echo ""
 
 # Функция для маскировки строк
 mask_string() {
@@ -28,13 +62,24 @@ mask_string() {
     fi
 }
 
-# Читаем переменные из файла (игнорируем комментарии и пустые строки)
-USE_CLOUDINARY=$(grep -E "^USE_CLOUDINARY=" "$ENV_FILE" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
-CLOUDINARY_CLOUD_NAME=$(grep -E "^CLOUDINARY_CLOUD_NAME=" "$ENV_FILE" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
-CLOUDINARY_API_KEY=$(grep -E "^CLOUDINARY_API_KEY=" "$ENV_FILE" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
-CLOUDINARY_API_SECRET=$(grep -E "^CLOUDINARY_API_SECRET=" "$ENV_FILE" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
-CLOUDINARY_UPLOAD_PRESET=$(grep -E "^CLOUDINARY_UPLOAD_PRESET=" "$ENV_FILE" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
-CLOUDINARY_REMOVE_BACKGROUND=$(grep -E "^CLOUDINARY_REMOVE_BACKGROUND=" "$ENV_FILE" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
+# Читаем переменные из файла или окружения
+if [ "$USE_ENV_FILE" = true ]; then
+    # Читаем из файла (игнорируем комментарии и пустые строки)
+    USE_CLOUDINARY=$(grep -E "^USE_CLOUDINARY=" "$ENV_FILE_PATH" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
+    CLOUDINARY_CLOUD_NAME=$(grep -E "^CLOUDINARY_CLOUD_NAME=" "$ENV_FILE_PATH" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
+    CLOUDINARY_API_KEY=$(grep -E "^CLOUDINARY_API_KEY=" "$ENV_FILE_PATH" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
+    CLOUDINARY_API_SECRET=$(grep -E "^CLOUDINARY_API_SECRET=" "$ENV_FILE_PATH" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
+    CLOUDINARY_UPLOAD_PRESET=$(grep -E "^CLOUDINARY_UPLOAD_PRESET=" "$ENV_FILE_PATH" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
+    CLOUDINARY_REMOVE_BACKGROUND=$(grep -E "^CLOUDINARY_REMOVE_BACKGROUND=" "$ENV_FILE_PATH" | cut -d'=' -f2 | sed 's/#.*$//' | tr -d ' ' | head -1)
+else
+    # Читаем из переменных окружения
+    USE_CLOUDINARY="${USE_CLOUDINARY:-}"
+    CLOUDINARY_CLOUD_NAME="${CLOUDINARY_CLOUD_NAME:-}"
+    CLOUDINARY_API_KEY="${CLOUDINARY_API_KEY:-}"
+    CLOUDINARY_API_SECRET="${CLOUDINARY_API_SECRET:-}"
+    CLOUDINARY_UPLOAD_PRESET="${CLOUDINARY_UPLOAD_PRESET:-}"
+    CLOUDINARY_REMOVE_BACKGROUND="${CLOUDINARY_REMOVE_BACKGROUND:-}"
+fi
 
 # Нормализуем булевы значения
 if [ "$USE_CLOUDINARY" = "true" ] || [ "$USE_CLOUDINARY" = "1" ]; then
@@ -114,7 +159,19 @@ fi
 
 echo ""
 echo "📝 Инструкции:"
-echo "   1. Проверьте, что все переменные настроены в $ENV_FILE"
+if [ "$USE_ENV_FILE" = true ]; then
+    echo "   1. Проверьте, что все переменные настроены в $ENV_FILE_PATH"
+else
+    echo "   1. Настройте переменные окружения (через Docker, systemd или .env файл)"
+    echo "      Пример для Docker Compose:"
+    echo "        environment:"
+    echo "          - USE_CLOUDINARY=true"
+    echo "          - CLOUDINARY_CLOUD_NAME=your_cloud_name"
+    echo "          - CLOUDINARY_API_KEY=your_api_key"
+    echo "          - CLOUDINARY_API_SECRET=your_api_secret"
+    echo "          - CLOUDINARY_UPLOAD_PRESET=your_preset"
+    echo "          - CLOUDINARY_REMOVE_BACKGROUND=true"
+fi
 echo "   2. Если удаление фона включено, проверьте настройки Upload Preset:"
 echo "      - Откройте Cloudinary Dashboard"
 echo "      - Settings → Upload → Upload Presets"
