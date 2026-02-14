@@ -157,7 +157,48 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 	// Оптимизировано для фото с телефонов: автоматическая обработка EXIF ориентации,
 	// изменение размера, добавление фона, сжатие
 	if folder == "variations" || folder == "products" {
-		log.Printf("🎨 Обработка изображения товара (оптимизировано для фото с телефонов)...")
+		// Проверяем, используется ли Cloudinary
+		if cfg.UseCloudinary && cfg.CloudinaryCloudName != "" && cfg.CloudinaryUploadPreset != "" {
+			log.Printf("☁️ Обработка изображения товара через Cloudinary...")
+			
+			// Создаем процессор Cloudinary
+			cloudinaryProcessor := utils.NewCloudinaryProcessor(
+				cfg.CloudinaryCloudName,
+				cfg.CloudinaryAPIKey,
+				cfg.CloudinaryAPISecret,
+				cfg.CloudinaryUploadPreset,
+			)
+			
+			// Загружаем в Cloudinary с обработкой
+			result, err := cloudinaryProcessor.ProcessProductImage(
+				file,
+				folder,
+				cfg.CloudinaryRemoveBackground,
+			)
+			if err != nil {
+				log.Printf("❌ Ошибка загрузки в Cloudinary: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":   "Failed to upload to Cloudinary",
+					"details": err.Error(),
+				})
+				return
+			}
+			
+			// Возвращаем URL от Cloudinary
+			c.JSON(http.StatusOK, gin.H{
+				"url":      result.SecureURL,
+				"public_id": result.PublicID,
+				"width":    result.Width,
+				"height":   result.Height,
+				"format":   result.Format,
+				"bytes":    result.Bytes,
+				"provider": "cloudinary",
+			})
+			return
+		}
+		
+		// Локальная обработка (если Cloudinary не используется)
+		log.Printf("🎨 Обработка изображения товара локально (оптимизировано для фото с телефонов)...")
 		
 		// Создаем процессор изображений
 		processor := utils.NewImageProcessor(

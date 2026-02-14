@@ -49,6 +49,29 @@ docker compose -f docker-compose.release.yml up -d
 
 ---
 
+## ☁️ Настройка Cloudinary (опционально, рекомендуется)
+
+Cloudinary автоматически обрабатывает EXIF ориентацию и правильно поворачивает фото с телефонов.
+
+📖 **Подробная инструкция:** [CLOUDINARY_SETUP.md](./CLOUDINARY_SETUP.md)
+
+**Быстрая настройка:**
+
+1. Зарегистрируйтесь на https://cloudinary.com/users/register/free
+2. Получите учетные данные в Dashboard
+3. Создайте Upload Preset (Settings → Upload)
+4. Добавьте переменные в `.env.production`:
+   ```bash
+   USE_CLOUDINARY=true
+   CLOUDINARY_CLOUD_NAME=ваш-cloud-name
+   CLOUDINARY_API_KEY=ваш-api-key
+   CLOUDINARY_API_SECRET=ваш-api-secret
+   CLOUDINARY_UPLOAD_PRESET=mm-shop-products
+   ```
+5. Перезапустите API: `docker compose -f docker-compose.release.yml restart api`
+
+---
+
 ## 💾 Миграция на новый диск
 
 Если нужно перенести данные на новый диск с большим объемом места:

@@ -77,6 +77,14 @@ type Config struct {
 	ProductImageBG      string
 	ProductImageQuality int
 	MaxImagesPerVariation int
+
+	// Cloudinary (для обработки изображений)
+	UseCloudinary          bool
+	CloudinaryCloudName    string
+	CloudinaryAPIKey       string
+	CloudinaryAPISecret    string
+	CloudinaryUploadPreset string
+	CloudinaryRemoveBackground bool // Использовать удаление фона (платная функция)
 }
 
 var AppConfig *Config
@@ -157,6 +165,14 @@ func Load() *Config {
 		ProductImageBG:         getEnv("PRODUCT_IMAGE_BG", "white"),
 		ProductImageQuality:    getIntEnv("PRODUCT_IMAGE_QUALITY", 85),
 		MaxImagesPerVariation:  getIntEnv("MAX_IMAGES_PER_VARIATION", 2),
+
+		// Cloudinary
+		UseCloudinary:          getBoolEnv("USE_CLOUDINARY", false),
+		CloudinaryCloudName:    getEnv("CLOUDINARY_CLOUD_NAME", ""),
+		CloudinaryAPIKey:       getEnv("CLOUDINARY_API_KEY", ""),
+		CloudinaryAPISecret:    getEnv("CLOUDINARY_API_SECRET", ""),
+		CloudinaryUploadPreset: getEnv("CLOUDINARY_UPLOAD_PRESET", ""),
+		CloudinaryRemoveBackground: getBoolEnv("CLOUDINARY_REMOVE_BACKGROUND", false),
 	}
 
 	// Сохраняем глобальную конфигурацию
