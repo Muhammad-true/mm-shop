@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/mm-api/mm-api/config"
+	"github.com/mm-api/mm-api/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"golang.org/x/image/webp"
@@ -68,9 +69,10 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 	}
 
 	// Получаем конфигурацию для максимального размера файла
+	// Лимит увеличен для фото с телефонов (могут быть 5-15MB)
 	cfg := config.GetConfig()
 	maxSizeStr := cfg.UploadMaxSize
-	maxSize := int64(50 * 1024 * 1024) // По умолчанию 50MB
+	maxSize := int64(20 * 1024 * 1024) // По умолчанию 20MB (достаточно для фото с телефонов)
 
 	// Парсим размер из конфигурации
 	if strings.HasSuffix(maxSizeStr, "MB") {
@@ -146,22 +148,60 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 	filePath := filepath.Join(uploadDir, filename)
 	log.Printf("💾 Путь сохранения: %s", filePath)
 
-	// Сжимаем и сохраняем изображение
+	// Используем уже полученную конфигурацию (cfg объявлен выше)
 	originalSize := header.Size
-	finalFilename, bytesWritten, err := uc.compressAndSaveImage(file, filePath, ext, contentType)
-	if err != nil {
-		log.Printf("❌ Ошибка сохранения файла: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to save file",
-			"details": err.Error(),
-		})
-		return
-	}
+	var bytesWritten int64
+	var finalFilename string
 
-	// Обновляем filename, если формат изменился (PNG/WebP -> JPEG)
-	if finalFilename != filename {
-		filename = finalFilename
-		log.Printf("🔄 Формат изменен, новое имя файла: %s", filename)
+	// Если это изображение товара (variations или products), обрабатываем специально
+	// Оптимизировано для фото с телефонов: автоматическая обработка EXIF ориентации,
+	// изменение размера, добавление фона, сжатие
+	if folder == "variations" || folder == "products" {
+		log.Printf("🎨 Обработка изображения товара (оптимизировано для фото с телефонов)...")
+		
+		// Создаем процессор изображений
+		processor := utils.NewImageProcessor(
+			cfg.ProductImageWidth,
+			cfg.ProductImageHeight,
+			cfg.ProductImageBG,
+		)
+		processor.JPEGQuality = cfg.ProductImageQuality
+
+		// Всегда сохраняем как .jpg для товаров
+		finalPath := strings.TrimSuffix(filePath, ext) + ".jpg"
+		
+		// Обрабатываем изображение (изменение размера + фон + сжатие)
+		bytesWritten, err = processor.ProcessProductImage(file, finalPath)
+		if err != nil {
+			log.Printf("❌ Ошибка обработки изображения товара: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to process product image",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		// Обновляем имя файла на .jpg
+		finalFilename = strings.TrimSuffix(filename, ext) + ".jpg"
+		log.Printf("✅ Изображение товара обработано: размер=%dx%d, фон=%s", 
+			cfg.ProductImageWidth, cfg.ProductImageHeight, cfg.ProductImageBG)
+	} else {
+		// Для других изображений используем стандартную обработку
+		finalFilename, bytesWritten, err = uc.compressAndSaveImage(file, filePath, ext, contentType)
+		if err != nil {
+			log.Printf("❌ Ошибка сохранения файла: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to save file",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		// Обновляем filename, если формат изменился (PNG/WebP -> JPEG)
+		if finalFilename != filename {
+			filename = finalFilename
+			log.Printf("🔄 Формат изменен, новое имя файла: %s", filename)
+		}
 	}
 
 	// Вычисляем процент сжатия
@@ -169,6 +209,11 @@ func (uc *UploadController) UploadImage(c *gin.Context) {
 	savedBytes := originalSize - bytesWritten
 	log.Printf("✅ Файл успешно сохранен: %d байт записано (было %d байт, сжато на %.1f%%, сэкономлено %d байт)", 
 		bytesWritten, originalSize, 100-compressionRatio, savedBytes)
+	
+	// Обновляем filename для ответа
+	if finalFilename != "" {
+		filename = finalFilename
+	}
 
 	// Формируем URL для доступа к файлу
 	fileURL := uc.GetImageURL(filename, folder)

@@ -47,6 +47,7 @@ func SetupRoutes() *gin.Engine {
 	updateController := &controllers.UpdateController{}
 	libissPosController := &controllers.LibissPosController{}
 	shopCustomerController := &controllers.ShopCustomerController{}
+	posController := &controllers.PosController{}
 
 	// API группа
 	api := r.Group("/api/v1")
@@ -421,6 +422,34 @@ func SetupRoutes() *gin.Engine {
 		{
 			shopManagement.POST("/:id/logo", shopController.UploadLogo) // Загрузка логотипа магазина
 		}
+
+		// POS эндпоинты для синхронизации со складом и продажами
+		pos := shop.Group("pos")
+		{
+			// Массовая загрузка товаров со склада
+			pos.POST("/products/bulk-upload", posController.BulkUploadProducts)
+			// Синхронизация продаж (уменьшение количества)
+			pos.POST("/sales/sync", posController.SyncSales)
+			// Получение информации о количестве товаров
+			pos.GET("/products/stock", posController.GetStockInfo)
+			// Обновление количества конкретной вариации
+			pos.PUT("/products/:variationId/stock", posController.UpdateStock)
+		}
+	}
+
+	// Альтернативные POS маршруты (для удобства, используют те же контроллеры)
+	posAlt := api.Group("/pos")
+	posAlt.Use(middleware.AuthRequired())
+	posAlt.Use(middleware.AdminOrShopOwnerRequired())
+	{
+		// Массовая загрузка товаров со склада
+		posAlt.POST("/products/bulk-upload", posController.BulkUploadProducts)
+		// Синхронизация продаж (уменьшение количества)
+		posAlt.POST("/sales/sync", posController.SyncSales)
+		// Получение информации о количестве товаров
+		posAlt.GET("/products/stock", posController.GetStockInfo)
+		// Обновление количества конкретной вариации
+		posAlt.PUT("/products/:variationId/stock", posController.UpdateStock)
 	}
 
 	// Загрузка файлов

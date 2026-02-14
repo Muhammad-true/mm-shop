@@ -70,6 +70,13 @@ type Config struct {
 	// Lemon Squeezy
 	LemonSqueezyAPIKey string
 	LemonSqueezyStoreID string
+
+	// Обработка изображений товаров
+	ProductImageWidth   int
+	ProductImageHeight  int
+	ProductImageBG      string
+	ProductImageQuality int
+	MaxImagesPerVariation int
 }
 
 var AppConfig *Config
@@ -110,7 +117,8 @@ func Load() *Config {
 		CORSAllowCredentials: getBoolEnv("CORS_ALLOW_CREDENTIALS", true),
 
 		// Загрузка файлов
-		UploadMaxSize:      getEnv("UPLOAD_MAX_SIZE", "50MB"),
+		// Увеличен лимит для фото с телефонов (могут быть 10-15MB)
+		UploadMaxSize:      getEnv("UPLOAD_MAX_SIZE", "20MB"),
 		UploadAllowedTypes: getEnv("UPLOAD_ALLOWED_TYPES", "image/jpeg,image/png,image/webp"),
 		UploadPath:         getEnv("UPLOAD_PATH", "./images"),
 
@@ -142,6 +150,13 @@ func Load() *Config {
 		// Lemon Squeezy
 		LemonSqueezyAPIKey: getEnv("LEMONSQUEEZY_API_KEY", ""),
 		LemonSqueezyStoreID: getEnv("LEMONSQUEEZY_STORE_ID", ""),
+
+		// Обработка изображений товаров
+		ProductImageWidth:      getIntEnv("PRODUCT_IMAGE_WIDTH", 1200),
+		ProductImageHeight:     getIntEnv("PRODUCT_IMAGE_HEIGHT", 1200),
+		ProductImageBG:         getEnv("PRODUCT_IMAGE_BG", "white"),
+		ProductImageQuality:    getIntEnv("PRODUCT_IMAGE_QUALITY", 85),
+		MaxImagesPerVariation:  getIntEnv("MAX_IMAGES_PER_VARIATION", 2),
 	}
 
 	// Сохраняем глобальную конфигурацию

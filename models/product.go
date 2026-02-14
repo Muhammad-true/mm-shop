@@ -32,20 +32,21 @@ type Product struct {
 
 // ProductVariation представляет вариацию товара (размеры + цвета + цена + фото)
 type ProductVariation struct {
-	ID            uuid.UUID `json:"id" gorm:"type:uuid;primary_key;"`
-	ProductID     uuid.UUID `json:"productId" gorm:"type:uuid;not null"`
-	Sizes         []string  `json:"sizes" gorm:"serializer:json"`  // Множественные размеры
-	Colors        []string  `json:"colors" gorm:"serializer:json"` // Множественные цвета
-	Price         float64   `json:"price" gorm:"not null"`
-	OriginalPrice *float64  `json:"originalPrice"`
-	Discount      int       `json:"discount" gorm:"default:0"`        // Скидка в процентах (0-100%), например: 15 = 15%
-	ImageURLs     []string  `json:"imageUrls" gorm:"serializer:json"` // Множественные фото
-	StockQuantity int       `json:"stockQuantity" gorm:"default:0"`
-	IsAvailable   bool      `json:"isAvailable" gorm:"default:true"`
-	SKU           string    `json:"sku"`
-	Barcode       string    `json:"barcode" gorm:"index"` // Штрих-код (EAN-13, UPC, Code128 и т.д.)
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ID                uuid.UUID          `json:"id" gorm:"type:uuid;primary_key;"`
+	ProductID         uuid.UUID          `json:"productId" gorm:"type:uuid;not null"`
+	Sizes             []string           `json:"sizes" gorm:"serializer:json"`                    // Множественные размеры
+	Colors            []string           `json:"colors" gorm:"serializer:json"`                   // Множественные цвета
+	Price             float64            `json:"price" gorm:"not null"`
+	OriginalPrice     *float64           `json:"originalPrice"`
+	Discount          int                `json:"discount" gorm:"default:0"`                        // Скидка в процентах (0-100%), например: 15 = 15%
+	ImageURLs         []string           `json:"imageUrls" gorm:"serializer:json"`                // Множественные фото (для обратной совместимости)
+	ImageURLsByColor  map[string][]string `json:"imageUrlsByColor" gorm:"serializer:json"`        // Фото по цветам: цвет -> массив фото (максимум 2 фото на цвет)
+	StockQuantity     int                `json:"stockQuantity" gorm:"default:0"`
+	IsAvailable       bool               `json:"isAvailable" gorm:"default:true"`
+	SKU               string             `json:"sku"`
+	Barcode           string             `json:"barcode" gorm:"index"` // Штрих-код (EAN-13, UPC, Code128 и т.д.)
+	CreatedAt         time.Time          `json:"createdAt"`
+	UpdatedAt         time.Time          `json:"updatedAt"`
 
 	// Связи
 	Product Product `json:"product,omitempty" gorm:"foreignKey:ProductID"`
@@ -80,15 +81,16 @@ type ProductRequest struct {
 
 // ProductVariationRequest представляет запрос на создание/обновление вариации
 type ProductVariationRequest struct {
-	Sizes         []string `json:"sizes" binding:"required,min=1"`
-	Colors        []string `json:"colors" binding:"required,min=1"`
-	Price         float64  `json:"price" binding:"required,gt=0"`
-	OriginalPrice *float64 `json:"originalPrice"`
-	Discount      int      `json:"discount" binding:"gte=0,lte=100"` // Скидка в процентах 0-100%, например: 15 = 15%
-	ImageURLs     []string `json:"imageUrls"`                        // Множественные фото
-	StockQuantity int      `json:"stockQuantity" binding:"gte=0"`
-	SKU           string   `json:"sku"`
-	Barcode       string   `json:"barcode"` // Штрих-код (EAN-13, UPC, Code128 и т.д.)
+	Sizes            []string           `json:"sizes" binding:"required,min=1"`
+	Colors           []string           `json:"colors" binding:"required,min=1"`
+	Price            float64            `json:"price" binding:"required,gt=0"`
+	OriginalPrice    *float64           `json:"originalPrice"`
+	Discount         int                `json:"discount" binding:"gte=0,lte=100"` // Скидка в процентах 0-100%, например: 15 = 15%
+	ImageURLs        []string           `json:"imageUrls"`                        // Множественные фото (для обратной совместимости)
+	ImageURLsByColor map[string][]string `json:"imageUrlsByColor"`                // Фото по цветам: цвет -> массив фото (максимум 2 фото на цвет)
+	StockQuantity    int                `json:"stockQuantity" binding:"gte=0"`
+	SKU              string             `json:"sku"`
+	Barcode          string             `json:"barcode"` // Штрих-код (EAN-13, UPC, Code128 и т.д.)
 }
 
 // ShopInfo представляет информацию о магазине
@@ -119,33 +121,41 @@ type ProductResponse struct {
 
 // ProductVariationResponse представляет ответ с информацией о вариации
 type ProductVariationResponse struct {
-	ID            uuid.UUID `json:"id"`
-	Sizes         []string  `json:"sizes"`
-	Colors        []string  `json:"colors"`
-	Price         float64   `json:"price"`
-	OriginalPrice *float64  `json:"originalPrice"`
-	Discount      int       `json:"discount"`  // Скидка в процентах (0-100%), например: 15 = 15%
-	ImageURLs     []string  `json:"imageUrls"` // Множественные фото
-	StockQuantity int       `json:"stockQuantity"`
-	IsAvailable   bool      `json:"isAvailable"`
-	SKU           string    `json:"sku"`
-	Barcode       string    `json:"barcode"` // Штрих-код
+	ID               uuid.UUID          `json:"id"`
+	Sizes            []string           `json:"sizes"`
+	Colors           []string           `json:"colors"`
+	Price            float64            `json:"price"`
+	OriginalPrice    *float64           `json:"originalPrice"`
+	Discount         int                `json:"discount"`  // Скидка в процентах (0-100%), например: 15 = 15%
+	ImageURLs        []string           `json:"imageUrls"` // Множественные фото (для обратной совместимости)
+	ImageURLsByColor map[string][]string `json:"imageUrlsByColor"` // Фото по цветам: цвет -> массив фото
+	StockQuantity    int                `json:"stockQuantity"`
+	IsAvailable      bool               `json:"isAvailable"`
+	SKU              string             `json:"sku"`
+	Barcode          string             `json:"barcode"` // Штрих-код
 }
 
 // ToResponse преобразует ProductVariation в ProductVariationResponse
 func (pv *ProductVariation) ToResponse() ProductVariationResponse {
+	// Инициализируем map, если она nil
+	imageURLsByColor := pv.ImageURLsByColor
+	if imageURLsByColor == nil {
+		imageURLsByColor = make(map[string][]string)
+	}
+	
 	return ProductVariationResponse{
-		ID:            pv.ID,
-		Sizes:         pv.Sizes,
-		Colors:        pv.Colors,
-		Price:         pv.Price,
-		OriginalPrice: pv.OriginalPrice,
-		Discount:      pv.Discount,
-		ImageURLs:     pv.ImageURLs,
-		StockQuantity: pv.StockQuantity,
-		IsAvailable:   pv.IsAvailable,
-		SKU:           pv.SKU,
-		Barcode:       pv.Barcode,
+		ID:               pv.ID,
+		Sizes:            pv.Sizes,
+		Colors:           pv.Colors,
+		Price:            pv.Price,
+		OriginalPrice:    pv.OriginalPrice,
+		Discount:         pv.Discount,
+		ImageURLs:        pv.ImageURLs,
+		ImageURLsByColor: imageURLsByColor,
+		StockQuantity:    pv.StockQuantity,
+		IsAvailable:      pv.IsAvailable,
+		SKU:              pv.SKU,
+		Barcode:          pv.Barcode,
 	}
 }
 
@@ -153,18 +163,25 @@ func (pv *ProductVariation) ToResponse() ProductVariationResponse {
 func (p *Product) ToResponse() ProductResponse {
 	variations := make([]ProductVariationResponse, len(p.Variations))
 	for i, v := range p.Variations {
+		// Инициализируем map, если она nil
+		imageURLsByColor := v.ImageURLsByColor
+		if imageURLsByColor == nil {
+			imageURLsByColor = make(map[string][]string)
+		}
+		
 		variations[i] = ProductVariationResponse{
-			ID:            v.ID,
-			Sizes:         v.Sizes,
-			Colors:        v.Colors,
-			Price:         v.Price,
-			OriginalPrice: v.OriginalPrice,
-			Discount:      v.Discount,
-			ImageURLs:     v.ImageURLs, // Assuming the first image is the main one for response
-			StockQuantity: v.StockQuantity,
-			IsAvailable:   v.IsAvailable,
-			SKU:           v.SKU,
-			Barcode:       v.Barcode,
+			ID:               v.ID,
+			Sizes:            v.Sizes,
+			Colors:           v.Colors,
+			Price:            v.Price,
+			OriginalPrice:    v.OriginalPrice,
+			Discount:         v.Discount,
+			ImageURLs:        v.ImageURLs,
+			ImageURLsByColor: imageURLsByColor,
+			StockQuantity:    v.StockQuantity,
+			IsAvailable:      v.IsAvailable,
+			SKU:              v.SKU,
+			Barcode:          v.Barcode,
 		}
 	}
 

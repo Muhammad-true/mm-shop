@@ -326,10 +326,11 @@ async function loadProductData(id) {
         document.getElementById('product-category').value = product.categoryId;
         document.getElementById('product-brand').value = product.brand;
         
-        // Загружаем вариации (убеждаемся, что barcode есть)
+        // Загружаем вариации (убеждаемся, что barcode и imageUrlsByColor есть)
         const variations = (product.variations || []).map(v => ({
             ...v,
-            barcode: v.barcode || ''
+            barcode: v.barcode || '',
+            imageUrlsByColor: v.imageUrlsByColor || {} // Инициализируем, если нет
         }));
         setVariations(variations);
         renderVariations();
@@ -616,7 +617,8 @@ function addVariation() {
         stockQuantity: 0,
         sku: '',
         barcode: '',
-        imageUrls: []
+        imageUrls: [], // Для обратной совместимости
+        imageUrlsByColor: {} // Фото по цветам: цвет -> массив фото
     };
     
     if (window.storage && window.storage.addVariation) {
@@ -715,19 +717,70 @@ function renderVariations() {
                     <small style="color: #666; font-size: 11px; display: block; margin-top: 4px;">Введите штрих-код (EAN-13, UPC, Code128 и т.д.)</small>
                 </div>
                 <div class="variation-field">
-                    <label>Фото вариации (несколько)</label>
-                    <input type="file" accept="image/*" multiple onchange="window.products.uploadVariationImages(${index}, this)">
-                    ${variation.imageUrls && variation.imageUrls.length ? `
-                    <div class="variation-images-preview">
-                        ${variation.imageUrls.map((url, imgIndex) => {
-                            const imageUrl = window.getImageUrl ? window.getImageUrl(url) : url;
+                    <label>Фото по цветам <small style="color: #666; font-weight: normal;">(максимум 2 фото на цвет)</small></label>
+                    ${(() => {
+                        const colors = variation.colors || [];
+                        const imageUrlsByColor = variation.imageUrlsByColor || {};
+                        const maxImages = 2;
+                        
+                        if (colors.length === 0) {
+                            return '<small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">⚠️ Сначала выберите цвета</small>';
+                        }
+                        
+                        return colors.map(color => {
+                            const colorImages = imageUrlsByColor[color] || [];
+                            const currentImageCount = colorImages.length;
+                            const canUpload = maxImages - currentImageCount;
+                            const isDisabled = canUpload <= 0;
+                            
+                            // Эмодзи для цветов
+                            const colorEmoji = {
+                                'Красный': '🔴',
+                                'Синий': '🔵',
+                                'Зеленый': '🟢',
+                                'Черный': '⚫',
+                                'Белый': '⚪',
+                                'Серый': '⚫',
+                                'Желтый': '🟡',
+                                'Оранжевый': '🟠',
+                                'Розовый': '🌸',
+                                'Фиолетовый': '🟣',
+                                'Коричневый': '🟤',
+                                'Бежевый': '🟫',
+                                'Голубой': '🔵',
+                                'Салатовый': '🟢',
+                                'Бордовый': '🔴',
+                                'Темно-синий': '🔵'
+                            }[color] || '🎨';
+                            
                             return `
-                            <div class="image-preview-item">
-                                <img src="${imageUrl}" alt="Preview" style="max-width: 70px; max-height: 70px; object-fit: cover; border-radius: 6px;">
-                                <button type="button" class="remove-image" onclick="window.products.removeVariationImage(${index}, ${imgIndex})">×</button>
+                            <div style="margin-bottom: 15px; padding: 12px; border: 1px solid #e9ecef; border-radius: 8px; background: #f8f9fa;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <strong style="color: #2c3e50;">${colorEmoji} ${color}</strong>
+                                    <small style="color: ${isDisabled ? '#dc3545' : '#666'};">
+                                        ${currentImageCount}/${maxImages} фото
+                                    </small>
+                                </div>
+                                <input type="file" 
+                                       accept="image/*" 
+                                       ${isDisabled ? 'disabled' : 'multiple'} 
+                                       ${isDisabled ? 'title="Достигнут лимит 2 фото для этого цвета. Удалите существующие фото перед загрузкой новых."' : ''}
+                                       onchange="window.products.uploadVariationImagesByColor(${index}, '${color}', this)"
+                                       style="width: 100%; ${isDisabled ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                                ${colorImages.length > 0 ? `
+                                <div class="variation-images-preview" style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                                    ${colorImages.map((url, imgIndex) => {
+                                        const imageUrl = window.getImageUrl ? window.getImageUrl(url) : url;
+                                        return `
+                                        <div class="image-preview-item" style="position: relative; width: 60px; height: 60px;">
+                                            <img src="${imageUrl}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 2px solid #ddd;">
+                                            <button type="button" class="remove-image" onclick="window.products.removeVariationImageByColor(${index}, '${color}', ${imgIndex})" style="position: absolute; top: -6px; right: -6px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">×</button>
+                                        </div>`;
+                                    }).join('')}
+                                </div>` : ''}
                             </div>`;
-                        }).join('')}
-                    </div>` : ''}
+                        }).join('');
+                    })()}
                 </div>
             </div>
         </div>
@@ -766,14 +819,42 @@ function updateVariationMulti(index, field, value, checked) {
         if (!vars[index][field].includes(value)) vars[index][field].push(value);
     } else {
         vars[index][field] = vars[index][field].filter(v => v !== value);
+        // Если удаляем цвет, удаляем и его фото
+        if (field === 'colors' && vars[index].imageUrlsByColor && vars[index].imageUrlsByColor[value]) {
+            delete vars[index].imageUrlsByColor[value];
+        }
     }
     setVariations(vars);
+    renderVariations(); // Перерисовываем, чтобы обновить интерфейс фото
 }
 
 // Загрузка изображений вариации
 async function uploadVariationImages(variationIndex, inputEl) {
-    const files = Array.from(inputEl.files || []);
+    let files = Array.from(inputEl.files || []);
     if (files.length === 0) return;
+
+    // Проверяем текущее количество фото в вариации
+    const vars = getVariations();
+    const currentImages = Array.isArray(vars[variationIndex]?.imageUrls) ? vars[variationIndex].imageUrls.length : 0;
+    const maxImages = 2; // Максимум 2 фото на вариацию
+    
+    // Проверяем, не превысит ли загрузка лимит
+    if (currentImages + files.length > maxImages) {
+        const canUpload = maxImages - currentImages;
+        if (canUpload <= 0) {
+            if (window.ui && window.ui.showMessage) {
+                window.ui.showMessage(`❌ Максимум ${maxImages} фото на вариацию. Удалите существующие фото перед загрузкой новых.`, 'error');
+            }
+            inputEl.value = '';
+            return;
+        }
+        
+        // Обрезаем массив файлов до допустимого количества
+        files = files.slice(0, canUpload);
+        if (window.ui && window.ui.showMessage) {
+            window.ui.showMessage(`⚠️ Можно загрузить только ${canUpload} фото (максимум ${maxImages} на вариацию). Загружаем ${canUpload} из ${inputEl.files.length}...`, 'warning');
+        }
+    }
 
     const adminToken = window.storage && window.storage.getAdminToken ? window.storage.getAdminToken() : null;
     const folder = 'variations';
@@ -848,6 +929,15 @@ async function uploadVariationImages(variationIndex, inputEl) {
                 // Добавляем в вариацию, но не перерисовываем сразу
                 const vars = getVariations();
                 if (!Array.isArray(vars[variationIndex].imageUrls)) vars[variationIndex].imageUrls = [];
+                
+                // Проверяем лимит перед добавлением
+                if (vars[variationIndex].imageUrls.length >= maxImages) {
+                    if (window.ui && window.ui.showMessage) {
+                        window.ui.showMessage(`⚠️ Достигнут лимит ${maxImages} фото на вариацию`, 'warning');
+                    }
+                    break; // Прерываем загрузку
+                }
+                
                 vars[variationIndex].imageUrls.push(url);
                 setVariations(vars);
                 
@@ -901,6 +991,124 @@ function removeVariationImage(variationIndex, imgIndex) {
     const vars = getVariations();
     if (!vars[variationIndex] || !Array.isArray(vars[variationIndex].imageUrls)) return;
     vars[variationIndex].imageUrls.splice(imgIndex, 1);
+    setVariations(vars);
+    renderVariations();
+}
+
+// Загрузка изображений для конкретного цвета
+async function uploadVariationImagesByColor(variationIndex, color, inputEl) {
+    let files = Array.from(inputEl.files || []);
+    if (files.length === 0) return;
+
+    const vars = getVariations();
+    if (!vars[variationIndex]) return;
+    
+    // Инициализируем imageUrlsByColor, если его нет
+    if (!vars[variationIndex].imageUrlsByColor) {
+        vars[variationIndex].imageUrlsByColor = {};
+    }
+    
+    const colorImages = vars[variationIndex].imageUrlsByColor[color] || [];
+    const currentImageCount = colorImages.length;
+    const maxImages = 2; // Максимум 2 фото на цвет
+    
+    // Проверяем, не превысит ли загрузка лимит
+    if (currentImageCount + files.length > maxImages) {
+        const canUpload = maxImages - currentImageCount;
+        if (canUpload <= 0) {
+            if (window.ui && window.ui.showMessage) {
+                window.ui.showMessage(`❌ Максимум ${maxImages} фото на цвет "${color}". Удалите существующие фото перед загрузкой новых.`, 'error');
+            }
+            inputEl.value = '';
+            return;
+        }
+        
+        files = files.slice(0, canUpload);
+        if (window.ui && window.ui.showMessage) {
+            window.ui.showMessage(`⚠️ Можно загрузить только ${canUpload} фото для цвета "${color}" (максимум ${maxImages} на цвет). Загружаем ${canUpload} из ${inputEl.files.length}...`, 'warning');
+        }
+    }
+
+    const adminToken = window.storage && window.storage.getAdminToken ? window.storage.getAdminToken() : null;
+    const folder = 'variations';
+
+    if (window.ui && window.ui.showMessage) {
+        window.ui.showMessage(`⏳ Загрузка ${files.length} фото для цвета "${color}"...`, 'info');
+    }
+
+    const uploadedUrls = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('folder', folder);
+        
+        try {
+            const resp = await fetch(getApiUrl(CONFIG.API.ENDPOINTS.UPLOAD.IMAGE) + `?folder=${folder}`, {
+                method: 'POST',
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                body: formData
+            });
+            const data = await resp.json();
+            
+            if (resp.ok && (data.url || data.data?.url)) {
+                const url = data.url || data.data.url;
+                uploadedUrls.push(url);
+                successCount++;
+                
+                // Добавляем в вариацию для конкретного цвета
+                const vars = getVariations();
+                if (!vars[variationIndex].imageUrlsByColor) {
+                    vars[variationIndex].imageUrlsByColor = {};
+                }
+                if (!Array.isArray(vars[variationIndex].imageUrlsByColor[color])) {
+                    vars[variationIndex].imageUrlsByColor[color] = [];
+                }
+                
+                // Проверяем лимит перед добавлением
+                if (vars[variationIndex].imageUrlsByColor[color].length >= maxImages) {
+                    if (window.ui && window.ui.showMessage) {
+                        window.ui.showMessage(`⚠️ Достигнут лимит ${maxImages} фото для цвета "${color}"`, 'warning');
+                    }
+                    break;
+                }
+                
+                vars[variationIndex].imageUrlsByColor[color].push(url);
+                setVariations(vars);
+                
+            } else {
+                failCount++;
+            }
+        } catch (e) {
+            console.error('upload error', e);
+            failCount++;
+        }
+    }
+
+    // Перерисовываем вариации
+    renderVariations();
+
+    // Показываем финальное сообщение
+    if (window.ui && window.ui.showMessage) {
+        if (failCount === 0) {
+            window.ui.showMessage(`✅ Загружено ${successCount} фото для цвета "${color}"`, 'success');
+        } else {
+            window.ui.showMessage(`⚠️ Загружено ${successCount}, ошибок ${failCount} для цвета "${color}"`, 'warning');
+        }
+    }
+
+    inputEl.value = '';
+}
+
+// Удаление изображения для конкретного цвета
+function removeVariationImageByColor(variationIndex, color, imgIndex) {
+    const vars = getVariations();
+    if (!vars[variationIndex] || !vars[variationIndex].imageUrlsByColor || !Array.isArray(vars[variationIndex].imageUrlsByColor[color])) return;
+    vars[variationIndex].imageUrlsByColor[color].splice(imgIndex, 1);
     setVariations(vars);
     renderVariations();
 }
@@ -1134,7 +1342,9 @@ window.products = {
     updateVariation,
     updateVariationMulti,
     uploadVariationImages,
+    uploadVariationImagesByColor,
     removeVariationImage,
+    removeVariationImageByColor,
     openProductModal,
     closeProductModal,
     handleProductSubmit,

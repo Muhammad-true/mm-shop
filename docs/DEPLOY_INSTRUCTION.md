@@ -33,7 +33,7 @@ docker-compose -f docker-compose.release.yml up -d --build
 ```bash
 cd /root/mm-shop
 git pull origin main
-docker-compose -f docker-compose.release.yml up -d --build api
+docker compose -f docker-compose.release.yml up -d --build api
 docker-compose -f docker-compose.release.yml up -d --build admin
 ```
 

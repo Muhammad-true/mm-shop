@@ -1,11 +1,13 @@
 package controllers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/mm-api/mm-api/config"
 	"github.com/mm-api/mm-api/database"
 	"github.com/mm-api/mm-api/models"
 
@@ -206,8 +208,49 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 	log.Printf("📋 Данные товара: %+v", req)
 	log.Printf("🎨 Количество вариаций: %d", len(req.Variations))
 
+	// Получаем конфигурацию для проверки лимита фото
+	cfg := config.GetConfig()
+	maxImages := cfg.MaxImagesPerVariation
+	if maxImages <= 0 {
+		maxImages = 2 // По умолчанию 2 фото
+	}
+
+	// Валидация: проверяем количество фото в каждой вариации
 	for i, variation := range req.Variations {
 		log.Printf("🎨 Вариация %d: %+v", i+1, variation)
+		
+		// Проверяем фото по цветам (новый способ)
+		if variation.ImageURLsByColor != nil {
+			for color, imageURLs := range variation.ImageURLsByColor {
+				if len(imageURLs) > maxImages {
+					log.Printf("❌ Вариация %d, цвет '%s' содержит %d фото, максимум разрешено %d", 
+						i+1, color, len(imageURLs), maxImages)
+					c.JSON(http.StatusBadRequest, gin.H{
+						"error": fmt.Sprintf("Вариация %d, цвет '%s' содержит слишком много фото. Максимум разрешено %d фото на цвет", 
+							i+1, color, maxImages),
+						"variationIndex": i,
+						"color":          color,
+						"imageCount":     len(imageURLs),
+						"maxImages":      maxImages,
+					})
+					return
+				}
+			}
+		}
+		
+		// Проверяем общие фото (для обратной совместимости)
+		if len(variation.ImageURLs) > maxImages {
+			log.Printf("❌ Вариация %d содержит %d общих фото, максимум разрешено %d", 
+				i+1, len(variation.ImageURLs), maxImages)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Вариация %d содержит слишком много общих фото. Максимум разрешено %d фото на вариацию", 
+					i+1, maxImages),
+				"variationIndex": i,
+				"imageCount":     len(variation.ImageURLs),
+				"maxImages":      maxImages,
+			})
+			return
+		}
 	}
 
 	// Получаем текущего пользователя из контекста
@@ -272,18 +315,25 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 	for i, variationReq := range req.Variations {
 		log.Printf("🎨 Создаем вариацию %d/%d", i+1, len(req.Variations))
 
+		// Инициализируем map для фото по цветам, если она nil
+		imageURLsByColor := variationReq.ImageURLsByColor
+		if imageURLsByColor == nil {
+			imageURLsByColor = make(map[string][]string)
+		}
+
 		variation := models.ProductVariation{
-			ProductID:     product.ID,
-			Sizes:         variationReq.Sizes,
-			Colors:        variationReq.Colors,
-			Price:         variationReq.Price,
-			OriginalPrice: variationReq.OriginalPrice,
-			Discount:      variationReq.Discount,
-			ImageURLs:     variationReq.ImageURLs,
-			StockQuantity: variationReq.StockQuantity,
-			IsAvailable:   variationReq.StockQuantity > 0,
-			SKU:           variationReq.SKU,
-			Barcode:       variationReq.Barcode,
+			ProductID:        product.ID,
+			Sizes:            variationReq.Sizes,
+			Colors:           variationReq.Colors,
+			Price:            variationReq.Price,
+			OriginalPrice:    variationReq.OriginalPrice,
+			Discount:         variationReq.Discount,
+			ImageURLs:        variationReq.ImageURLs,
+			ImageURLsByColor: imageURLsByColor,
+			StockQuantity:    variationReq.StockQuantity,
+			IsAvailable:      variationReq.StockQuantity > 0,
+			SKU:              variationReq.SKU,
+			Barcode:          variationReq.Barcode,
 		}
 
 		log.Printf("🎨 Вариация %d: %+v", i+1, variation)
@@ -411,20 +461,68 @@ func (pc *ProductController) UpdateProduct(c *gin.Context) {
 		return
 	}
 
+	// Получаем конфигурацию для проверки лимита фото
+	cfg := config.GetConfig()
+	maxImages := cfg.MaxImagesPerVariation
+	if maxImages <= 0 {
+		maxImages = 2 // По умолчанию 2 фото
+	}
+
+	// Валидация: проверяем количество фото в каждой вариации
+	for i, variationReq := range req.Variations {
+		// Проверяем фото по цветам (новый способ)
+		if variationReq.ImageURLsByColor != nil {
+			for color, imageURLs := range variationReq.ImageURLsByColor {
+				if len(imageURLs) > maxImages {
+					tx.Rollback()
+					c.JSON(http.StatusBadRequest, gin.H{
+						"error": fmt.Sprintf("Вариация %d, цвет '%s' содержит слишком много фото. Максимум разрешено %d фото на цвет", 
+							i+1, color, maxImages),
+						"variationIndex": i,
+						"color":          color,
+						"imageCount":     len(imageURLs),
+						"maxImages":      maxImages,
+					})
+					return
+				}
+			}
+		}
+		
+		// Проверяем общие фото (для обратной совместимости)
+		if len(variationReq.ImageURLs) > maxImages {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Вариация %d содержит слишком много общих фото. Максимум разрешено %d фото на вариацию", 
+					i+1, maxImages),
+				"variationIndex": i,
+				"imageCount":     len(variationReq.ImageURLs),
+				"maxImages":      maxImages,
+			})
+			return
+		}
+	}
+
 	// Создаем новые вариации
 	for _, variationReq := range req.Variations {
+		// Инициализируем map для фото по цветам, если она nil
+		imageURLsByColor := variationReq.ImageURLsByColor
+		if imageURLsByColor == nil {
+			imageURLsByColor = make(map[string][]string)
+		}
+		
 		variation := models.ProductVariation{
-			ProductID:     product.ID,
-			Sizes:         variationReq.Sizes,
-			Colors:        variationReq.Colors,
-			Price:         variationReq.Price,
-			OriginalPrice: variationReq.OriginalPrice,
-			Discount:      variationReq.Discount,
-			ImageURLs:     variationReq.ImageURLs,
-			StockQuantity: variationReq.StockQuantity,
-			IsAvailable:   variationReq.StockQuantity > 0,
-			SKU:           variationReq.SKU,
-			Barcode:       variationReq.Barcode,
+			ProductID:        product.ID,
+			Sizes:            variationReq.Sizes,
+			Colors:           variationReq.Colors,
+			Price:            variationReq.Price,
+			OriginalPrice:    variationReq.OriginalPrice,
+			Discount:         variationReq.Discount,
+			ImageURLs:        variationReq.ImageURLs,
+			ImageURLsByColor: imageURLsByColor,
+			StockQuantity:    variationReq.StockQuantity,
+			IsAvailable:      variationReq.StockQuantity > 0,
+			SKU:              variationReq.SKU,
+			Barcode:          variationReq.Barcode,
 		}
 
 		if err := tx.Create(&variation).Error; err != nil {
