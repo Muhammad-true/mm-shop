@@ -83,26 +83,16 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 	w.WriteField("upload_preset", cp.UploadPreset)
 	w.WriteField("folder", folder)
 	
-	// Трансформации изображения
 	// Примечание: если preset уже настроен с трансформациями, они будут применены автоматически
-	// Здесь мы можем переопределить или дополнить трансформации preset
-	transformations := []string{
-		"c_fill",           // Fill - заполняет весь размер (может обрезать)
-		"g_auto",           // Автоматическое определение гравитации (центрирование объекта)
-		"h_1200",           // Высота 1200px
-		"w_1200",           // Ширина 1200px
-		"fl_auto",          // Автоматическая обработка EXIF ориентации (ВАЖНО! Исправляет поворот фото с телефонов)
-		"b_white",          // Белый фон
-		"q_auto:good",      // Автоматическое качество (хороший баланс)
-	}
-
-	// Если нужно удалить фон (платная функция)
-	if removeBackground {
-		transformations = append([]string{"e_background_removal"}, transformations...)
-	}
-
-	transformation := strings.Join(transformations, ",")
-	w.WriteField("transformation", transformation)
+	// Не передаем transformation в коде, чтобы использовать настройки preset
+	// Если нужно переопределить трансформации, можно добавить их здесь:
+	
+	// Если preset не настроен с трансформациями, можно использовать базовые:
+	// Но лучше настроить все в preset, чтобы не дублировать логику
+	// 
+	// Пример сложной цепочки трансформаций (если нужно переопределить preset):
+	// transformation := "c_fill,g_auto,h_1200,w_1200/b_rgb:D5FFD1/c_auto,h_1200,w_1200/f_jpg/e_background_removal:fineedges_y/c_auto_pad,g_auto,h_1200,w_1200"
+	// w.WriteField("transformation", transformation)
 
 	// Дополнительные параметры
 	w.WriteField("format", "jpg")        // Всегда сохраняем как JPG
@@ -114,7 +104,7 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 	// Загружаем в Cloudinary
 	uploadURL := fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/image/upload", cp.CloudName)
 	
-	log.Printf("☁️ Загрузка изображения в Cloudinary (folder: %s, transformation: %s)...", folder, transformation)
+	log.Printf("☁️ Загрузка изображения в Cloudinary (folder: %s, preset: %s)...", folder, cp.UploadPreset)
 	
 	resp, err := http.Post(uploadURL, w.FormDataContentType(), &b)
 	if err != nil {
