@@ -127,7 +127,7 @@ type ProductVariationResponse struct {
 	Price            float64            `json:"price"`
 	OriginalPrice    *float64           `json:"originalPrice"`
 	Discount         int                `json:"discount"`  // Скидка в процентах (0-100%), например: 15 = 15%
-	ImageURLs        []string           `json:"imageUrls"` // Множественные фото (для обратной совместимости)
+	ImageURLs        []string           `json:"imageUrls,omitempty"` // Множественные фото (для обратной совместимости)
 	ImageURLsByColor map[string][]string `json:"imageUrlsByColor"` // Фото по цветам: цвет -> массив фото
 	StockQuantity    int                `json:"stockQuantity"`
 	IsAvailable      bool               `json:"isAvailable"`
@@ -143,6 +143,15 @@ func (pv *ProductVariation) ToResponse() ProductVariationResponse {
 		imageURLsByColor = make(map[string][]string)
 	}
 	
+	// Если есть imageUrlsByColor с данными, не возвращаем пустой imageUrls
+	// Это для обратной совместимости - если используется новая структура, старую не показываем
+	imageURLs := pv.ImageURLs
+	if len(imageURLsByColor) > 0 && len(imageURLs) == 0 {
+		// Если есть данные в imageUrlsByColor, но imageUrls пустой, оставляем nil
+		// JSON omitempty скроет это поле
+		imageURLs = nil
+	}
+	
 	return ProductVariationResponse{
 		ID:               pv.ID,
 		Sizes:            pv.Sizes,
@@ -150,7 +159,7 @@ func (pv *ProductVariation) ToResponse() ProductVariationResponse {
 		Price:            pv.Price,
 		OriginalPrice:    pv.OriginalPrice,
 		Discount:         pv.Discount,
-		ImageURLs:        pv.ImageURLs,
+		ImageURLs:        imageURLs,
 		ImageURLsByColor: imageURLsByColor,
 		StockQuantity:    pv.StockQuantity,
 		IsAvailable:      pv.IsAvailable,
@@ -163,26 +172,8 @@ func (pv *ProductVariation) ToResponse() ProductVariationResponse {
 func (p *Product) ToResponse() ProductResponse {
 	variations := make([]ProductVariationResponse, len(p.Variations))
 	for i, v := range p.Variations {
-		// Инициализируем map, если она nil
-		imageURLsByColor := v.ImageURLsByColor
-		if imageURLsByColor == nil {
-			imageURLsByColor = make(map[string][]string)
-		}
-		
-		variations[i] = ProductVariationResponse{
-			ID:               v.ID,
-			Sizes:            v.Sizes,
-			Colors:           v.Colors,
-			Price:            v.Price,
-			OriginalPrice:    v.OriginalPrice,
-			Discount:         v.Discount,
-			ImageURLs:        v.ImageURLs,
-			ImageURLsByColor: imageURLsByColor,
-			StockQuantity:    v.StockQuantity,
-			IsAvailable:      v.IsAvailable,
-			SKU:              v.SKU,
-			Barcode:          v.Barcode,
-		}
+		// Используем метод ToResponse для консистентности
+		variations[i] = v.ToResponse()
 	}
 
 	response := ProductResponse{
