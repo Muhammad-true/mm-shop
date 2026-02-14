@@ -553,7 +553,7 @@ async function viewProductVariations(id) {
                                     }
                                     
                                     return `
-                                        <div style="margin-bottom: 15px;">
+                                    <div style="margin-bottom: 15px;">
                                             <strong style="color: #495057; font-size: 13px;"><i class="fas fa-images"></i> Фотографии по цветам:</strong>
                                             ${Object.entries(imageUrlsByColor).map(([color, urls]) => {
                                                 if (!urls || urls.length === 0) return '';
@@ -563,36 +563,36 @@ async function viewProductVariations(id) {
                                                         <strong style="color: #6c757d; font-size: 12px;">${color} (${urls.length}):</strong>
                                                         <div class="variation-images-preview" style="display: flex; gap: 10px; margin-top: 5px; flex-wrap: wrap;">
                                                             ${urls.map((url, imgIndex) => {
-                                                                // Получаем полный URL изображения
-                                                                let imageUrl = url;
-                                                                if (typeof window.getImageUrl === 'function') {
-                                                                    imageUrl = window.getImageUrl(url);
-                                                                } else if (typeof getImageUrl === 'function') {
-                                                                    imageUrl = getImageUrl(url);
-                                                                } else {
-                                                                    // Формируем URL вручную
-                                                                    const API_BASE_URL = window.getApiUrl ? window.getApiUrl('') : (CONFIG && CONFIG.API && CONFIG.API.BASE_URL ? CONFIG.API.BASE_URL : '');
-                                                                    imageUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? url : '/' + url}`;
-                                                                }
-                                                                return `
-                                                                    <div class="image-preview-item" style="position: relative; border: 2px solid #e9ecef; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                                                                        <img 
-                                                                            src="${imageUrl}" 
+                                                // Получаем полный URL изображения
+                                                let imageUrl = url;
+                                                if (typeof window.getImageUrl === 'function') {
+                                                    imageUrl = window.getImageUrl(url);
+                                                } else if (typeof getImageUrl === 'function') {
+                                                    imageUrl = getImageUrl(url);
+                                                } else {
+                                                    // Формируем URL вручную
+                                                    const API_BASE_URL = window.getApiUrl ? window.getApiUrl('') : (CONFIG && CONFIG.API && CONFIG.API.BASE_URL ? CONFIG.API.BASE_URL : '');
+                                                    imageUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? url : '/' + url}`;
+                                                }
+                                                return `
+                                                    <div class="image-preview-item" style="position: relative; border: 2px solid #e9ecef; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                                        <img 
+                                                            src="${imageUrl}" 
                                                                             alt="${color} - Photo ${imgIndex + 1}" 
                                                                             onclick="window.openImageModal('${imageUrl}', 'Фото вариации ${index + 1} - ${color}')"
-                                                                            style="width: 120px; height: 120px; object-fit: cover; cursor: pointer; transition: transform 0.2s;"
-                                                                            onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22%3E%3Crect fill=%22%23f8f9fa%22 width=%22120%22 height=%22120%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%236c757d%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2214%22%3EНет фото%3C/text%3E%3C/svg%3E'; console.error('Ошибка загрузки:', '${imageUrl}');"
-                                                                            onmouseover="this.style.transform='scale(1.05)'"
-                                                                            onmouseout="this.style.transform='scale(1)'"
-                                                                        >
-                                                                        <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: white; font-size: 10px; padding: 2px 6px; text-align: center;">
+                                                            style="width: 120px; height: 120px; object-fit: cover; cursor: pointer; transition: transform 0.2s;"
+                                                            onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22%3E%3Crect fill=%22%23f8f9fa%22 width=%22120%22 height=%22120%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%236c757d%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2214%22%3EНет фото%3C/text%3E%3C/svg%3E'; console.error('Ошибка загрузки:', '${imageUrl}');"
+                                                            onmouseover="this.style.transform='scale(1.05)'"
+                                                            onmouseout="this.style.transform='scale(1)'"
+                                                        >
+                                                        <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: white; font-size: 10px; padding: 2px 6px; text-align: center;">
                                                                             ${color} #${imgIndex + 1}
-                                                                        </div>
-                                                                    </div>
-                                                                `;
-                                                            }).join('')}
                                                         </div>
                                                     </div>
+                                                `;
+                                            }).join('')}
+                                        </div>
+                                    </div>
                                                 `;
                                             }).join('')}
                                         </div>
@@ -789,14 +789,14 @@ function renderVariations() {
                                 ${colorImages.length > 0 ? `
                                 <div class="variation-images-preview" style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
                                     ${colorImages.map((url, imgIndex) => {
-                                        const imageUrl = window.getImageUrl ? window.getImageUrl(url) : url;
-                                        return `
+                            const imageUrl = window.getImageUrl ? window.getImageUrl(url) : url;
+                            return `
                                         <div class="image-preview-item" style="position: relative; width: 60px; height: 60px;">
                                             <img src="${imageUrl}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 2px solid #ddd;">
                                             <button type="button" class="remove-image" onclick="window.products.removeVariationImageByColor(${index}, '${color}', ${imgIndex})" style="position: absolute; top: -6px; right: -6px; background: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px; line-height: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">×</button>
-                                        </div>`;
-                                    }).join('')}
-                                </div>` : ''}
+                            </div>`;
+                        }).join('')}
+                    </div>` : ''}
                             </div>`;
                         }).join('');
                     })()}

@@ -83,12 +83,23 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 	w.WriteField("upload_preset", cp.UploadPreset)
 	w.WriteField("folder", folder)
 	
-	// Примечание: если preset уже настроен с трансформациями, они будут применены автоматически
-	// Не передаем transformation в коде, чтобы использовать настройки preset
-	
 	// ВАЖНО: fl_auto нельзя использовать в Upload Preset!
 	// Передаем флаг auto через параметр flags для автоматической обработки EXIF ориентации
 	w.WriteField("flags", "auto")        // Автоматическая обработка EXIF ориентации (исправляет поворот фото с телефонов)
+
+	// Если нужно удаление фона, добавляем transformation через API
+	// Примечание: удаление фона можно настроить в Upload Preset, но если нужно переопределить,
+	// можно передать через transformation. Однако лучше настроить в preset.
+	if removeBackground {
+		log.Printf("🎨 Включено удаление фона через Cloudinary (e_background_removal)")
+		// Если preset не настроен с удалением фона, можно добавить transformation здесь
+		// Но лучше настроить в preset, так как это более надежно
+		// transformation := "c_fill,g_auto,h_1200,w_1200/e_background_removal:fineedges_y/c_auto_pad,g_auto,h_1200,w_1200"
+		// w.WriteField("transformation", transformation)
+		log.Printf("⚠️ Удаление фона должно быть настроено в Upload Preset! Проверьте настройки preset '%s'", cp.UploadPreset)
+	} else {
+		log.Printf("ℹ️ Удаление фона отключено (removeBackground=false)")
+	}
 
 	// Дополнительные параметры
 	w.WriteField("format", "jpg")        // Всегда сохраняем как JPG
@@ -100,7 +111,11 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 	// Загружаем в Cloudinary
 	uploadURL := fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/image/upload", cp.CloudName)
 	
-	log.Printf("☁️ Загрузка изображения в Cloudinary (folder: %s, preset: %s)...", folder, cp.UploadPreset)
+	log.Printf("☁️ Загрузка изображения в Cloudinary:")
+	log.Printf("   📁 Folder: %s", folder)
+	log.Printf("   ⚙️  Preset: %s", cp.UploadPreset)
+	log.Printf("   🎨 Remove Background: %v", removeBackground)
+	log.Printf("   🔗 URL: %s", uploadURL)
 	
 	resp, err := http.Post(uploadURL, w.FormDataContentType(), &b)
 	if err != nil {
