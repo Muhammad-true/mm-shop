@@ -5,41 +5,50 @@
 
 ## Решение на сервере
 
-### Шаг 1: Убрать файл из staging area и индекса Git
+### Шаг 1: Временно сохранить файл и сделать pull
 
 ```bash
 cd ~/mm-shop/release
 
-# Убрать из staging area
-git restore --staged .env.production
+# Сохранить файл во временное место
+cp .env.production .env.production.backup
 
-# Убрать из индекса Git (но оставить на диске)
-git rm --cached .env.production
+# Удалить файл (чтобы Git мог сделать pull)
+rm .env.production
 
-# Проверить статус
-git status
-```
-
-### Шаг 2: Получить обновленный .gitignore
-
-```bash
 # Теперь можно сделать pull
 git pull
+
+# Вернуть файл обратно
+cp .env.production.backup .env.production
+
+# Удалить backup (опционально)
+rm .env.production.backup
 ```
 
-### Шаг 3: Проверить, что файл игнорируется
+### Шаг 2: Проверить, что файл в .gitignore
+
+```bash
+# Проверить, что .env.production в .gitignore
+grep "\.env.production" .gitignore
+
+# Должно показать:
+# .env.production  # Production конфигурация (секреты, не коммитим!)
+```
+
+### Шаг 3: Проверить статус Git
 
 ```bash
 # Проверить статус - .env.production не должен показываться
 git status
 
-# Проверить, что файл в .gitignore
-grep "\.env.production" .gitignore
+# Если файл все еще показывается, удалите его из индекса
+git rm --cached .env.production 2>/dev/null || true
 ```
 
 ## Если файл все еще отслеживается
 
-Если после `git rm --cached` файл все еще показывается:
+Если после всех действий файл все еще показывается в `git status`:
 
 ```bash
 # Полностью удалить из Git истории (но оставить на диске)
@@ -81,3 +90,14 @@ docker compose -f docker-compose.release.yml restart api
 docker compose -f docker-compose.release.yml exec api printenv | grep CLOUDINARY
 ```
 
+## Быстрое решение (одной командой)
+
+```bash
+cd ~/mm-shop/release && \
+cp .env.production .env.production.backup && \
+rm .env.production && \
+git pull && \
+cp .env.production.backup .env.production && \
+rm .env.production.backup && \
+git status
+```
