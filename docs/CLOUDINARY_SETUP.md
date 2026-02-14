@@ -52,6 +52,14 @@ Cloudinary - это облачный сервис для обработки из
      - `q_auto:good` - автоматическое качество
      - `fl_auto` - **автоматическая обработка EXIF ориентации** (важно!)
    - **Формат:** `jpg` (вкладка "Upload Manipulations")
+   
+   - **Раздел "Optimize and Deliver":**
+     - **Delivery type:** `Upload` (по умолчанию) - определяет, как URL может быть доступен
+     - **Access control:** оставьте пустым (или "Select..." без выбора) - для публичного доступа
+     - **Format:** `jpg` (или оставьте пустым для автоматического определения)
+     - **Allowed formats:** оставьте пустым (разрешить все форматы при загрузке)
+     - **Discard original file name when delivering assets as attachments:** оставьте выключенным
+   
    - Нажмите **Save**
 
 3. **Скопируйте имя preset:**

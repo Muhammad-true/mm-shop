@@ -27,7 +27,16 @@
      w_1200,h_1200,c_fit,b_white,q_auto:good,fl_auto
      ```
    - **Формат:** `jpg` (вкладка "Upload Manipulations")
-   - Нажмите **Save**
+   
+4. **Настройте "Optimize and Deliver":**
+   - **Delivery type:** `Upload` (по умолчанию)
+   - **Access control:** оставьте пустым (или "Select..." без выбора)
+   - **Format:** `jpg` (или оставьте пустым для автоматического)
+   - **Allowed formats:** оставьте пустым (разрешить все форматы)
+   - **Discard original file name when delivering assets as attachments:** оставьте выключенным
+   
+5. **Сохраните:**
+   - Нажмите **Save** внизу страницы
 
 ## На сервере (2 минуты)
 
