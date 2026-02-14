@@ -25,11 +25,13 @@ if [ -n "$ENV_FILE" ]; then
 else
     # Пробуем найти файл конфигурации в разных местах
     POSSIBLE_FILES=(
-        "env.development"
-        ".env"
-        ".env.production"
-        "../env.development"
-        "../../env.development"
+        ".env.production"           # Production файл (используется в docker-compose.release.yml)
+        "env.development"           # Development файл
+        ".env"                      # Общий .env файл
+        "../.env.production"        # На уровень выше
+        "../../.env.production"     # На два уровня выше
+        "../env.development"        # На уровень выше
+        "../../env.development"     # На два уровня выше
     )
     
     for file in "${POSSIBLE_FILES[@]}"; do
@@ -161,16 +163,25 @@ echo ""
 echo "📝 Инструкции:"
 if [ "$USE_ENV_FILE" = true ]; then
     echo "   1. Проверьте, что все переменные настроены в $ENV_FILE_PATH"
+    echo "      (Этот файл используется Docker Compose для загрузки переменных)"
 else
-    echo "   1. Настройте переменные окружения (через Docker, systemd или .env файл)"
-    echo "      Пример для Docker Compose:"
-    echo "        environment:"
-    echo "          - USE_CLOUDINARY=true"
-    echo "          - CLOUDINARY_CLOUD_NAME=your_cloud_name"
-    echo "          - CLOUDINARY_API_KEY=your_api_key"
-    echo "          - CLOUDINARY_API_SECRET=your_api_secret"
-    echo "          - CLOUDINARY_UPLOAD_PRESET=your_preset"
-    echo "          - CLOUDINARY_REMOVE_BACKGROUND=true"
+    echo "   1. Создайте файл .env.production в директории release/"
+    echo "      Или настройте переменные окружения через Docker Compose"
+    echo ""
+    echo "      Пример создания .env.production:"
+    echo "        cd ~/mm-shop/release"
+    echo "        nano .env.production"
+    echo ""
+    echo "      Добавьте в файл:"
+    echo "        USE_CLOUDINARY=true"
+    echo "        CLOUDINARY_CLOUD_NAME=your_cloud_name"
+    echo "        CLOUDINARY_API_KEY=your_api_key"
+    echo "        CLOUDINARY_API_SECRET=your_api_secret"
+    echo "        CLOUDINARY_UPLOAD_PRESET=your_preset"
+    echo "        CLOUDINARY_REMOVE_BACKGROUND=true"
+    echo ""
+    echo "   2. Или проверьте переменные внутри Docker контейнера:"
+    echo "        docker compose -f docker-compose.release.yml exec api printenv | grep CLOUDINARY"
 fi
 echo "   2. Если удаление фона включено, проверьте настройки Upload Preset:"
 echo "      - Откройте Cloudinary Dashboard"
