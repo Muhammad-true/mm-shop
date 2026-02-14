@@ -88,3 +88,4 @@ env.development
 .env.local
 .env.*.local
 
+images/avatars/
