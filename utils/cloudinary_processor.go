@@ -85,14 +85,10 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 	
 	// Примечание: если preset уже настроен с трансформациями, они будут применены автоматически
 	// Не передаем transformation в коде, чтобы использовать настройки preset
-	// Если нужно переопределить трансформации, можно добавить их здесь:
 	
-	// Если preset не настроен с трансформациями, можно использовать базовые:
-	// Но лучше настроить все в preset, чтобы не дублировать логику
-	// 
-	// Пример сложной цепочки трансформаций (если нужно переопределить preset):
-	// transformation := "c_fill,g_auto,h_1200,w_1200/b_rgb:D5FFD1/c_auto,h_1200,w_1200/f_jpg/e_background_removal:fineedges_y/c_auto_pad,g_auto,h_1200,w_1200"
-	// w.WriteField("transformation", transformation)
+	// ВАЖНО: fl_auto нельзя использовать в Upload Preset!
+	// Передаем флаг auto через параметр flags для автоматической обработки EXIF ориентации
+	w.WriteField("flags", "auto")        // Автоматическая обработка EXIF ориентации (исправляет поворот фото с телефонов)
 
 	// Дополнительные параметры
 	w.WriteField("format", "jpg")        // Всегда сохраняем как JPG
