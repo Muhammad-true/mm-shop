@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Скрипт проверки конфигурации Cloudinary
 # Использование: ./scripts/check_cloudinary_config.sh [путь_к_env_файлу]
@@ -23,18 +23,8 @@ if [ -n "$ENV_FILE" ]; then
         exit 1
     fi
 else
-    # Пробуем найти файл конфигурации в разных местах
-    POSSIBLE_FILES=(
-        ".env.production"           # Production файл (используется в docker-compose.release.yml)
-        "env.development"           # Development файл
-        ".env"                      # Общий .env файл
-        "../.env.production"        # На уровень выше
-        "../../.env.production"     # На два уровня выше
-        "../env.development"        # На уровень выше
-        "../../env.development"     # На два уровня выше
-    )
-    
-    for file in "${POSSIBLE_FILES[@]}"; do
+    # Пробуем найти файл конфигурации в разных местах (sh-совместимый способ)
+    for file in ".env.production" "env.development" ".env" "../.env.production" "../../.env.production" "../env.development" "../../env.development"; do
         if [ -f "$file" ]; then
             USE_ENV_FILE=true
             ENV_FILE_PATH="$file"
@@ -52,15 +42,18 @@ fi
 
 echo ""
 
-# Функция для маскировки строк
+# Функция для маскировки строк (совместима с sh)
 mask_string() {
-    local str="$1"
+    str="$1"
     if [ -z "$str" ]; then
         echo "(не настроен)"
     elif [ ${#str} -le 4 ]; then
         echo "***"
     else
-        echo "${str:0:4}***${str: -4}"
+        # sh-совместимый способ получения подстроки
+        prefix=$(echo "$str" | cut -c1-4)
+        suffix=$(echo "$str" | rev | cut -c1-4 | rev)
+        echo "${prefix}***${suffix}"
     fi
 }
 
