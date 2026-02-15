@@ -104,6 +104,19 @@ func SetupRoutes() *gin.Engine {
 			categories.GET("/:id/products", categoryController.GetCategoryProducts)
 		}
 
+		// Публичные продукты для deep links (без фильтрации по владельцу)
+		productsPublic := public.Group("products")
+		{
+			productsPublic.GET("/:id/public", productController.GetProductPublic)
+		}
+
+		// Публичные endpoints для deep links магазинов (требуют аутентификации)
+		clientShops := public.Group("client-shops")
+		clientShops.Use(middleware.AuthRequired())
+		{
+			clientShops.GET("/:id/bonus-info", shopCustomerController.GetShopBonusInfoForDeepLink)
+		}
+
 		// Города (публичный доступ)
 		cities := public.Group("cities")
 		{

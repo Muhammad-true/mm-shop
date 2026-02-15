@@ -354,6 +354,14 @@ func (scc *ShopCustomerController) GetShopBonusInfo(c *gin.Context) {
 	))
 }
 
+// GetShopBonusInfoForDeepLink возвращает информацию о бонусах клиента в конкретном магазине
+// GET /api/v1/client-shops/:id/bonus-info
+// Используется для deep links
+func (scc *ShopCustomerController) GetShopBonusInfoForDeepLink(c *gin.Context) {
+	// Используем тот же метод, что и GetShopBonusInfo
+	scc.GetShopBonusInfo(c)
+}
+
 // GetBonusHistory возвращает историю изменений бонусов клиента в магазине
 // GET /api/v1/shops/:id/bonus/history
 func (scc *ShopCustomerController) GetBonusHistory(c *gin.Context) {

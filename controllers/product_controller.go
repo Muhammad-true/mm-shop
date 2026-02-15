@@ -762,6 +762,40 @@ func (pc *ProductController) DeleteProduct(c *gin.Context) {
 	})
 }
 
+// GetProductPublic возвращает один продукт по ID (публичный, без фильтрации по владельцу)
+// Используется для deep links и sharing
+func (pc *ProductController) GetProductPublic(c *gin.Context) {
+	id := c.Param("id")
+	productID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid product ID",
+		})
+		return
+	}
+
+	var product models.Product
+	if err := database.DB.Preload("Variations").Preload("Category").Preload("Shop").Preload("Owner.Role").
+		Where("id = ?", productID).First(&product).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Product not found",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Database error",
+			})
+		}
+		return
+	}
+
+	log.Printf("📦 Получен товар (публичный): ID=%s, Name=%s", product.ID, product.Name)
+
+	c.JSON(http.StatusOK, gin.H{
+		"product": product.ToResponse(),
+	})
+}
+
 // GetProductAdmin возвращает один продукт по ID (для админов, без проверки владельца)
 func (pc *ProductController) GetProductAdmin(c *gin.Context) {
 	id := c.Param("id")
