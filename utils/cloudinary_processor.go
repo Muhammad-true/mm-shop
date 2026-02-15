@@ -35,15 +35,15 @@ func NewCloudinaryProcessor(cloudName, apiKey, apiSecret, uploadPreset string) *
 
 // CloudinaryResponse представляет ответ от Cloudinary API
 type CloudinaryResponse struct {
-	PublicID   string `json:"public_id"`
-	URL        string `json:"url"`
-	SecureURL  string `json:"secure_url"`
-	Width      int    `json:"width"`
-	Height     int    `json:"height"`
-	Format     string `json:"format"`
-	Bytes      int    `json:"bytes"`
+	PublicID     string `json:"public_id"`
+	URL          string `json:"url"`
+	SecureURL    string `json:"secure_url"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	Format       string `json:"format"`
+	Bytes        int    `json:"bytes"`
 	ResourceType string `json:"resource_type"`
-	CreatedAt  string `json:"created_at"`
+	CreatedAt    string `json:"created_at"`
 }
 
 // CloudinaryError представляет ошибку от Cloudinary
@@ -82,10 +82,10 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 	// Параметры загрузки
 	w.WriteField("upload_preset", cp.UploadPreset)
 	w.WriteField("folder", folder)
-	
+
 	// ВАЖНО: fl_auto нельзя использовать в Upload Preset!
 	// Передаем флаг auto через параметр flags для автоматической обработки EXIF ориентации
-	w.WriteField("flags", "auto")        // Автоматическая обработка EXIF ориентации (исправляет поворот фото с телефонов)
+	w.WriteField("flags", "auto") // Автоматическая обработка EXIF ориентации (исправляет поворот фото с телефонов)
 
 	// Если нужно удаление фона, добавляем transformation через API
 	// Примечание: удаление фона можно настроить в Upload Preset, но если нужно переопределить,
@@ -102,7 +102,7 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 	}
 
 	// Дополнительные параметры
-	w.WriteField("format", "jpg")        // Всегда сохраняем как JPG
+	w.WriteField("format", "jpg") // Всегда сохраняем как JPG
 	// Примечание: overwrite и invalidate не разрешены при unsigned upload (с upload_preset)
 	// Они могут быть настроены в самом Upload Preset в Cloudinary Dashboard
 
@@ -110,13 +110,13 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 
 	// Загружаем в Cloudinary
 	uploadURL := fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/image/upload", cp.CloudName)
-	
+
 	log.Printf("☁️ Загрузка изображения в Cloudinary:")
 	log.Printf("   📁 Folder: %s", folder)
 	log.Printf("   ⚙️  Preset: %s", cp.UploadPreset)
 	log.Printf("   🎨 Remove Background: %v", removeBackground)
 	log.Printf("   🔗 URL: %s", uploadURL)
-	
+
 	resp, err := http.Post(uploadURL, w.FormDataContentType(), &b)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка HTTP запроса к Cloudinary: %v", err)
@@ -153,18 +153,18 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 // DeleteImage удаляет изображение из Cloudinary
 func (cp *CloudinaryProcessor) DeleteImage(publicID string) error {
 	timestamp := time.Now().Unix()
-	
+
 	// Создаем подпись для API запроса
 	params := map[string]string{
 		"public_id": publicID,
 		"timestamp": strconv.FormatInt(timestamp, 10),
 	}
-	
+
 	signature := cp.generateSignature(params)
-	
+
 	// Формируем URL для удаления
 	deleteURL := fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/image/destroy", cp.CloudName)
-	
+
 	// Создаем form data
 	formData := map[string]string{
 		"public_id": publicID,
@@ -172,25 +172,25 @@ func (cp *CloudinaryProcessor) DeleteImage(publicID string) error {
 		"signature": signature,
 		"api_key":   cp.APIKey,
 	}
-	
+
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
 	for k, v := range formData {
 		w.WriteField(k, v)
 	}
 	w.Close()
-	
+
 	resp, err := http.Post(deleteURL, w.FormDataContentType(), &b)
 	if err != nil {
 		return fmt.Errorf("ошибка удаления: %v", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("ошибка удаления (status %d): %s", resp.StatusCode, string(body))
 	}
-	
+
 	log.Printf("✅ Изображение удалено из Cloudinary: %s", publicID)
 	return nil
 }
@@ -203,14 +203,14 @@ func (cp *CloudinaryProcessor) generateSignature(params map[string]string) strin
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	
+
 	// Создаем строку для подписи
 	var parts []string
 	for _, k := range keys {
 		parts = append(parts, fmt.Sprintf("%s=%s", k, params[k]))
 	}
 	signString := strings.Join(parts, "&") + cp.APISecret
-	
+
 	// Вычисляем SHA1
 	hash := sha1.Sum([]byte(signString))
 	return fmt.Sprintf("%x", hash)
@@ -225,9 +225,8 @@ func (cp *CloudinaryProcessor) GetOptimizedURL(publicID string, width, height in
 		"q_auto:good",
 		"fl_auto",
 	}
-	
+
 	transformation := strings.Join(transformations, ",")
 	return fmt.Sprintf("https://res.cloudinary.com/%s/image/upload/%s/%s.jpg",
 		cp.CloudName, transformation, publicID)
 }
-
