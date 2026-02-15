@@ -88,5 +88,5 @@ env.development
 .env.development
 .env.local
 .env.*.local
-
+.env.production
 images/avatars/
