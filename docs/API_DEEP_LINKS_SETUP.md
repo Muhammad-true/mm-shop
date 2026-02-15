@@ -112,16 +112,29 @@ location /my-shops/ {
 **Ответ должен содержать:**
 ```json
 {
-  "shopId": "67890",
-  "shop": {
-    "id": "67890",
-    "name": "Название магазина",
-    "avatarUrl": "https://example.com/shop-logo.jpg"
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "shopId": "uuid",
+    "phone": "+998901234567",
+    "qrCode": "USER_SHOP_QR_CODE_STRING",
+    "bonusAmount": 150,
+    "firstBonusDate": "2024-01-01T00:00:00Z",
+    "shop": {
+      "id": "uuid",
+      "name": "Название магазина",
+      "inn": "123456789"
+    },
+    "createdAt": "2024-01-01T00:00:00Z",
+    "updatedAt": "2024-01-01T00:00:00Z"
   },
-  "qrCode": "USER_SHOP_QR_CODE_STRING",
-  "bonusAmount": 150.50
+  "message": "Информация о бонусах получена"
 }
 ```
+
+**Примечание:** 
+- `bonusAmount` - целое число (int), не float
+- `shop.avatarUrl` не включен в ответ, но можно получить через `GET /api/v1/shops/{shopId}`
 
 **Ошибки:**
 - `401 Unauthorized` - если пользователь не авторизован
