@@ -101,10 +101,9 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 		log.Printf("ℹ️ Удаление фона отключено (removeBackground=false)")
 	}
 
-	// Дополнительные параметры
-	w.WriteField("format", "jpg") // Всегда сохраняем как JPG
-	// Примечание: overwrite и invalidate не разрешены при unsigned upload (с upload_preset)
-	// Они могут быть настроены в самом Upload Preset в Cloudinary Dashboard
+	// Примечание: format, overwrite и invalidate не разрешены при unsigned upload (с upload_preset)
+	// Эти параметры должны быть настроены в самом Upload Preset в Cloudinary Dashboard
+	// Формат (jpg) и другие настройки должны быть указаны в preset
 
 	w.Close()
 
