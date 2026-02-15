@@ -331,6 +331,8 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 		if imageURLsByColor == nil {
 			imageURLsByColor = make(map[string][]string)
 			log.Printf("⚠️ Вариация %d: ImageURLsByColor был nil, создан пустой map", i+1)
+		} else if len(imageURLsByColor) == 0 {
+			log.Printf("⚠️ Вариация %d: ImageURLsByColor пустой map (нет изображений)", i+1)
 		} else {
 			log.Printf("✅ Вариация %d: ImageURLsByColor содержит %d цветов: %v", i+1, len(imageURLsByColor), func() []string {
 				keys := make([]string, 0, len(imageURLsByColor))
@@ -356,7 +358,7 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 			Barcode:          variationReq.Barcode,
 		}
 
-		log.Printf("🎨 Вариация %d: %+v", i+1, variation)
+		log.Printf("🎨 Вариация %d перед сохранением: ImageURLsByColor=%v (len=%d)", i+1, imageURLsByColor, len(imageURLsByColor))
 
 		if err := tx.Create(&variation).Error; err != nil {
 			log.Printf("❌ Ошибка создания вариации %d: %v", i+1, err)
@@ -368,7 +370,13 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 			return
 		}
 
-		log.Printf("✅ Вариация %d создана", i+1)
+		// Проверяем, что сохранилось
+		var savedVariation models.ProductVariation
+		if err := tx.First(&savedVariation, variation.ID).Error; err == nil {
+			log.Printf("✅ Вариация %d создана, сохранено ImageURLsByColor: %v (len=%d)", i+1, savedVariation.ImageURLsByColor, len(savedVariation.ImageURLsByColor))
+		} else {
+			log.Printf("⚠️ Вариация %d создана, но не удалось проверить сохраненные данные: %v", i+1, err)
+		}
 	}
 
 	// Подтверждаем транзакцию
