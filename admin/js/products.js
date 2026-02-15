@@ -1210,6 +1210,23 @@ async function handleProductSubmit(e) {
         
         console.log('📦 Данные формы:', formData);
         console.log('📦 Вариации с размерами:', formData.variations.map(v => ({ sizes: v.sizes, colors: v.colors })));
+        console.log('📸 Вариации с изображениями:', formData.variations.map(v => ({ 
+            colors: v.colors, 
+            imageUrlsByColor: v.imageUrlsByColor,
+            imageUrlsByColorKeys: v.imageUrlsByColor ? Object.keys(v.imageUrlsByColor) : [],
+            imageUrlsByColorValues: v.imageUrlsByColor ? Object.values(v.imageUrlsByColor) : [],
+            hasImages: v.imageUrlsByColor && Object.keys(v.imageUrlsByColor).length > 0
+        })));
+        
+        // Проверка: есть ли изображения в вариациях
+        const variationsWithImages = formData.variations.filter(v => 
+            v.imageUrlsByColor && Object.keys(v.imageUrlsByColor).length > 0
+        );
+        if (variationsWithImages.length === 0) {
+            console.warn('⚠️ ВНИМАНИЕ: Нет изображений в вариациях! imageUrlsByColor пустой для всех вариаций.');
+        } else {
+            console.log(`✅ Найдено ${variationsWithImages.length} вариаций с изображениями`);
+        }
         
         // Проверка: обязательно наличие хотя бы одной вариации
         if (!formData.variations || formData.variations.length === 0) {
