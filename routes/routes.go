@@ -72,15 +72,23 @@ func SetupRoutes() *gin.Engine {
 			// auth.POST("/logout", authController.Logout) // TODO: Реализовать
 		}
 
-		// Продукты (требуют аутентификации для изоляции данных)
+		// Продукты - сначала публичные маршруты (более специфичные должны быть раньше)
 		products := public.Group("products")
-		products.Use(middleware.AuthRequired())
 		{
-			products.GET("/", productController.GetProducts)
-			products.GET("/:id", productController.GetProduct)
-			products.GET("/featured", productController.GetProducts)                      // TODO: Добавить логику для рекомендуемых
-			products.GET("/search", productController.GetProducts)                        // Используем тот же метод с параметром search
-			products.GET("/with-variations", productController.GetProductsWithVariations) // Новый endpoint с JOIN запросом
+			// Публичный endpoint для deep links (БЕЗ аутентификации, БЕЗ фильтрации по владельцу)
+			// Должен быть ПЕРЕД /:id, чтобы не перехватывался общим маршрутом
+			products.GET("/:id/public", productController.GetProductPublic)
+		}
+
+		// Продукты (требуют аутентификации для изоляции данных)
+		productsAuth := public.Group("products")
+		productsAuth.Use(middleware.AuthRequired())
+		{
+			productsAuth.GET("/", productController.GetProducts)
+			productsAuth.GET("/:id", productController.GetProduct)
+			productsAuth.GET("/featured", productController.GetProducts)                      // TODO: Добавить логику для рекомендуемых
+			productsAuth.GET("/search", productController.GetProducts)                        // Используем тот же метод с параметром search
+			productsAuth.GET("/with-variations", productController.GetProductsWithVariations) // Новый endpoint с JOIN запросом
 		}
 
 		// Обновления (публичный доступ, но с обязательной платформой)
@@ -102,12 +110,6 @@ func SetupRoutes() *gin.Engine {
 			categories.GET("/", categoryController.GetCategories)
 			categories.GET("/:id", categoryController.GetCategory)
 			categories.GET("/:id/products", categoryController.GetCategoryProducts)
-		}
-
-		// Публичные продукты для deep links (без фильтрации по владельцу)
-		productsPublic := public.Group("products")
-		{
-			productsPublic.GET("/:id/public", productController.GetProductPublic)
 		}
 
 		// Публичные endpoints для deep links магазинов (требуют аутентификации)
