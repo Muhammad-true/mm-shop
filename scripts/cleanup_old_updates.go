@@ -1,3 +1,6 @@
+//go:build cleanup
+// +build cleanup
+
 package main
 
 import (

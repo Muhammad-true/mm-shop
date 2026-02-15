@@ -1,3 +1,6 @@
+//go:build cloudinary
+// +build cloudinary
+
 package main
 
 import (

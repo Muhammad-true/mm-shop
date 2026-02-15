@@ -1,3 +1,6 @@
+//go:build ftpwatcher
+// +build ftpwatcher
+
 package main
 
 import (
