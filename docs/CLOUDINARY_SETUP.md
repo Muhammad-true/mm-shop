@@ -44,8 +44,11 @@ Cloudinary - это облачный сервис для обработки из
    - **Asset folder:** `variations` (папка для ресурсов)
    - **Трансформации:** (вкладка "Incoming Transformation" или "Upload Manipulations")
      
-     ⚠️ **КРИТИЧЕСКИ ВАЖНО:** 
-     - `fl_auto` **НЕЛЬЗЯ** использовать в Upload Preset! Это вызывает ошибку "Недопустимый флаг в преобразовании"
+     ⚠️ **КРИТИЧЕСКИ ВАЖНО для Unsigned Upload:** 
+     - При использовании **Unsigned Upload** (с `upload_preset`) разрешены только следующие параметры:
+       - `upload_preset`, `folder`, `public_id`, `tags`, `context`, `metadata`, и т.д.
+       - **НЕ разрешены:** `format`, `overwrite`, `invalidate`, `transformation` (через API)
+     - Все трансформации (размер, формат, качество) должны быть настроены **в самом Upload Preset** в Cloudinary Dashboard
      - Флаг `auto` для обработки EXIF ориентации передается через API параметр `flags: "auto"` (уже настроено в коде)
      - Cloudinary автоматически обрабатывает EXIF ориентацию при загрузке, если передать `flags: "auto"`
      
@@ -83,12 +86,14 @@ Cloudinary - это облачный сервис для обработки из
      ```
      - `f_auto` - автоматический формат (WebP для поддерживающих браузеров, fallback на оригинал)
      - `q_auto` - автоматическое качество
-   - **Формат:** `jpg` (вкладка "Upload Manipulations")
+   - **Раздел "Upload Manipulations" (Incoming Transformation):**
+     - **Format:** `jpg` ⚠️ **ОБЯЗАТЕЛЬНО** настройте здесь, так как параметр `format` не разрешен при unsigned upload через API
+     - **Transformation:** `c_fill,g_auto,h_1200,w_1200,b_white` (или другая цепочка трансформаций)
    
    - **Раздел "Optimize and Deliver":**
      - **Delivery type:** `Upload` (по умолчанию) - определяет, как URL может быть доступен
      - **Access control:** оставьте пустым (или "Select..." без выбора) - для публичного доступа
-     - **Format:** `jpg` (или оставьте пустым для автоматического определения)
+     - **Format:** `jpg` ⚠️ **ОБЯЗАТЕЛЬНО** настройте здесь для unsigned upload
      - **Allowed formats:** оставьте пустым (разрешить все форматы при загрузке)
      - **Discard original file name when delivering assets as attachments:** оставьте выключенным
    
