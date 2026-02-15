@@ -73,7 +73,6 @@ func main() {
 		// Проверяем, старше ли файл указанного времени
 		if info.ModTime().Before(cutoffTime) {
 			fileSize := info.Size()
-			fileName := filepath.Base(path)
 			relativePath, _ := filepath.Rel(config.UpdatesDir, path)
 
 			log.Printf("   🗑️  Удаление: %s (%s)", relativePath, formatSize(fileSize))
