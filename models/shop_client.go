@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,28 +36,47 @@ func (sc *ShopClient) BeforeCreate(tx *gorm.DB) error {
 
 // ShopClientResponse представляет ответ с информацией о клиенте магазина
 type ShopClientResponse struct {
-	ID            uuid.UUID   `json:"id"`
-	ShopID        uuid.UUID   `json:"shopId"`
-	Phone         string      `json:"phone"`
-	QRCode        string      `json:"qrCode"`
-	BonusAmount   int         `json:"bonusAmount"`
-	FirstBonusDate *time.Time `json:"firstBonusDate"`
-	Shop          *ShopInfo   `json:"shop,omitempty"`
-	CreatedAt     time.Time   `json:"createdAt"`
-	UpdatedAt     time.Time   `json:"updatedAt"`
+	ID              uuid.UUID   `json:"id"`
+	ShopID          uuid.UUID   `json:"shopId"`
+	Phone           string      `json:"phone"`
+	QRCode          string      `json:"qrCode"`
+	BonusAmount     int         `json:"bonusAmount"`     // Количество бонусов в дирамах (для обратной совместимости)
+	BonusSom        int         `json:"bonusSom"`        // Количество сомов (bonusAmount / 100)
+	BonusDiram      int         `json:"bonusDiram"`      // Количество дирамов (bonusAmount % 100)
+	BonusFormatted  string      `json:"bonusFormatted"`  // Форматированная строка: "X с Y д"
+	FirstBonusDate  *time.Time  `json:"firstBonusDate"`
+	Shop            *ShopInfo   `json:"shop,omitempty"`
+	CreatedAt       time.Time   `json:"createdAt"`
+	UpdatedAt       time.Time   `json:"updatedAt"`
 }
 
 // ToResponse преобразует ShopClient в ShopClientResponse
 func (sc *ShopClient) ToResponse() ShopClientResponse {
+	// Вычисляем сомы и дирамы
+	// bonusAmount хранится в дирамах (1 сом = 100 дирамов)
+	bonusSom := sc.BonusAmount / 100
+	bonusDiram := sc.BonusAmount % 100
+	
+	// Форматируем строку для отображения
+	var bonusFormatted string
+	if bonusDiram > 0 {
+		bonusFormatted = fmt.Sprintf("%d с %d д", bonusSom, bonusDiram)
+	} else {
+		bonusFormatted = fmt.Sprintf("%d с", bonusSom)
+	}
+
 	response := ShopClientResponse{
-		ID:            sc.ID,
-		ShopID:        sc.ShopID,
-		Phone:         sc.Phone,
-		QRCode:        sc.QRCode,
-		BonusAmount:   sc.BonusAmount,
+		ID:             sc.ID,
+		ShopID:         sc.ShopID,
+		Phone:          sc.Phone,
+		QRCode:         sc.QRCode,
+		BonusAmount:    sc.BonusAmount,
+		BonusSom:       bonusSom,
+		BonusDiram:     bonusDiram,
+		BonusFormatted: bonusFormatted,
 		FirstBonusDate: sc.FirstBonusDate,
-		CreatedAt:     sc.CreatedAt,
-		UpdatedAt:     sc.UpdatedAt,
+		CreatedAt:      sc.CreatedAt,
+		UpdatedAt:      sc.UpdatedAt,
 	}
 
 	// Добавляем информацию о магазине, если она загружена
