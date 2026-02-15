@@ -1382,11 +1382,6 @@ function updateVariationSize(variationIndex) {
         setVariations(vars);
         console.log(`✅ Размеры обновлены для вариации ${variationIndex}:`, selectedSizes);
     }
-    
-    // Также обновляем в глобальном объекте для совместимости
-    if (currentProduct && currentProduct.variations && currentProduct.variations[variationIndex]) {
-        currentProduct.variations[variationIndex].sizes = selectedSizes;
-    }
 }
 
 window.products = {

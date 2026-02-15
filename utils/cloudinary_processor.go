@@ -103,8 +103,8 @@ func (cp *CloudinaryProcessor) ProcessProductImage(input io.Reader, folder strin
 
 	// Дополнительные параметры
 	w.WriteField("format", "jpg")        // Всегда сохраняем как JPG
-	w.WriteField("overwrite", "false")   // Не перезаписывать существующие
-	w.WriteField("invalidate", "true")   // Инвалидировать кэш CDN
+	// Примечание: overwrite и invalidate не разрешены при unsigned upload (с upload_preset)
+	// Они могут быть настроены в самом Upload Preset в Cloudinary Dashboard
 
 	w.Close()
 
