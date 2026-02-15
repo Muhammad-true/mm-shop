@@ -217,7 +217,18 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 
 	// Валидация: проверяем количество фото в каждой вариации
 	for i, variation := range req.Variations {
-		log.Printf("🎨 Вариация %d: %+v", i+1, variation)
+		log.Printf("🎨 Вариация %d: Colors=%v, Sizes=%v, Price=%v", i+1, variation.Colors, variation.Sizes, variation.Price)
+		log.Printf("🎨 Вариация %d ImageURLsByColor: %+v", i+1, variation.ImageURLsByColor)
+		log.Printf("🎨 Вариация %d ImageURLsByColor keys: %v", i+1, func() []string {
+			if variation.ImageURLsByColor == nil {
+				return []string{"nil"}
+			}
+			keys := make([]string, 0, len(variation.ImageURLsByColor))
+			for k := range variation.ImageURLsByColor {
+				keys = append(keys, k)
+			}
+			return keys
+		}())
 		
 		// Проверяем фото по цветам (новый способ)
 		if variation.ImageURLsByColor != nil {
@@ -319,6 +330,15 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 		imageURLsByColor := variationReq.ImageURLsByColor
 		if imageURLsByColor == nil {
 			imageURLsByColor = make(map[string][]string)
+			log.Printf("⚠️ Вариация %d: ImageURLsByColor был nil, создан пустой map", i+1)
+		} else {
+			log.Printf("✅ Вариация %d: ImageURLsByColor содержит %d цветов: %v", i+1, len(imageURLsByColor), func() []string {
+				keys := make([]string, 0, len(imageURLsByColor))
+				for k, v := range imageURLsByColor {
+					keys = append(keys, fmt.Sprintf("%s(%d фото)", k, len(v)))
+				}
+				return keys
+			}())
 		}
 
 		variation := models.ProductVariation{
