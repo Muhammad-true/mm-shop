@@ -113,9 +113,13 @@ services:
       - mm-network
 
   # MM Web (Flutter Web)
+   # MM Web (Flutter Web)
+    # MM Web (Flutter Web)
   web:
-    image: nginx:alpine
-    container_name: mm_web
+    build:
+      context: ./web-app
+      dockerfile: Dockerfile.webapp.release
+    container_name: mm-web-prod
     restart: unless-stopped
     networks:
       - mm-network
@@ -123,12 +127,17 @@ services:
       - ./web-app:/usr/share/nginx/html:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     ports:
-      - "8081:80"   # можно изменить, чтобы не пересекалось с API или Admin
-    command: >
-      sh -c "
-      apk add --no-cache curl &&
-      nginx -g 'daemon off;'
-      "
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+
 
   # PgAdmin
   pgadmin:
