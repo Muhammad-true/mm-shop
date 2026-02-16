@@ -2,8 +2,6 @@
 # Libiss- Production Release (Optimized for 50GB Storage)
 ############################################
 
-version: "3.9"
-
 services:
   # PostgreSQL Database
   postgres:
@@ -116,9 +114,7 @@ services:
 
   # MM Web (Flutter Web)
   web:
-    build:
-      context: ..
-      dockerfile: Dockerfile.webapp.release
+    image: nginx:alpine
     container_name: mm_web
     restart: unless-stopped
     networks:
@@ -128,6 +124,11 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     ports:
       - "8081:80"   # можно изменить, чтобы не пересекалось с API или Admin
+    command: >
+      sh -c "
+      apk add --no-cache curl &&
+      nginx -g 'daemon off;'
+      "
 
   # PgAdmin
   pgadmin:
