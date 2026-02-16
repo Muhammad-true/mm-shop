@@ -53,7 +53,7 @@ services:
   # MM API
   api:
     build:
-      context: ..
+      context: ./
       dockerfile: Dockerfile.api.release
     container_name: mm-api-prod
     restart: unless-stopped
