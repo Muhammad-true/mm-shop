@@ -1,5 +1,8 @@
-# MM Shop - Production Release (Optimized for 50GB Storage)
-# ========================================================
+############################################
+# Libiss- Production Release (Secure)
+############################################
+
+version: "3.9"
 
 services:
   # PostgreSQL Database
@@ -8,24 +11,18 @@ services:
     container_name: mm-postgres-prod
     restart: unless-stopped
     environment:
-      POSTGRES_DB: mm_shop_prod
-      POSTGRES_USER: mm_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-muhammadjon}
+      POSTGRES_DB: ${POSTGRES_DB:-mm_shop_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-mm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # берём из .env
       PGDATA: /var/lib/postgresql/data
     ports:
       - "5432:5432"
     volumes:
-      # Переносим БД на большой диск
       - /mnt/mm_shop_data/postgres_data:/var/lib/postgresql/data
     networks:
       - mm-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mm_user -d mm_shop_prod"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -36,15 +33,9 @@ services:
     container_name: mm-redis-prod
     restart: unless-stopped
     volumes:
-      # Переносим кэш на большой диск (необязательно, но полезно для экономии места на /)
       - /mnt/mm_shop_data/redis_data:/data
     networks:
       - mm-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -64,13 +55,12 @@ services:
       - .env.production
     environment:
       - GIN_MODE=release
-      - DATABASE_URL=postgres://mm_user:muhammadjon@postgres:5432/mm_shop_prod?sslmode=disable
+      - DATABASE_URL=postgres://$${POSTGRES_USER}:$${POSTGRES_PASSWORD}@postgres:5432/$${POSTGRES_DB}?sslmode=disable
       - REDIS_URL=redis://redis:6379/0
       - CORS_ALLOW_ORIGINS=*
-      - PUBLIC_HOST=159.89.99.252
-      - JWT_SECRET=${JWT_SECRET:-moya-super-secretnaya-fraza-dlya-api-777}
+      - PUBLIC_HOST=${PUBLIC_HOST}
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
-      # ГЛАВНОЕ: Переносим изображения и логи на большой диск
       - /mnt/mm_shop_data/images:/app/images
       - /mnt/mm_shop_data/logs:/app/logs
       - /mnt/mm_shop_data/updates:/app/updates
@@ -82,11 +72,6 @@ services:
         condition: service_healthy
     networks:
       - mm-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
@@ -96,7 +81,7 @@ services:
   # MM Admin Panel
   admin:
     build:
-      context: .
+      context: ./release/admin
       dockerfile: Dockerfile.admin.release
     container_name: mm-admin-prod
     restart: unless-stopped
@@ -111,6 +96,21 @@ services:
     networks:
       - mm-network
 
+  # MM Web (Flutter Web)
+  web:
+    build:
+      context: ./release/web-app
+      dockerfile: Dockerfile
+    container_name: mm_web
+    restart: unless-stopped
+    networks:
+      - mm-network
+    volumes:
+      - ./release/web-app:/usr/share/nginx/html:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    ports:
+      - "8081:80"
+
   # PgAdmin
   pgadmin:
     image: dpage/pgadmin4
@@ -118,10 +118,8 @@ services:
     restart: unless-stopped
     ports:
       - "5050:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@mm.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    env_file:
+      - .env.pgadmin   # email и пароль берём из .env.pgadmin
     depends_on:
       postgres:
         condition: service_healthy
