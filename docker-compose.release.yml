@@ -97,7 +97,7 @@ services:
   # MM Admin Panel
   admin:
     build:
-      context: ..
+      context: ./
       dockerfile: Dockerfile.admin.release
     container_name: mm-admin-prod
     restart: unless-stopped
