@@ -1,0 +1,27 @@
+# MM Web (Flutter Web) - Production Release
+# =========================================
+
+FROM nginx:alpine
+
+# Устанавливаем необходимые пакеты (если нужны)
+RUN apk add --no-cache curl
+
+# Копируем конфигурацию Nginx для Flutter Web
+COPY nginx.production.conf /etc/nginx/nginx.conf
+
+# Копируем файлы Flutter Web
+COPY . /usr/share/nginx/html/
+
+# Создаем директорию для логов
+RUN mkdir -p /var/log/nginx && \
+    chown -R nginx:nginx /var/log/nginx /usr/share/nginx/html
+
+# Открываем порты
+EXPOSE 80 443
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Запускаем Nginx
+CMD ["nginx", "-g", "daemon off;"]
