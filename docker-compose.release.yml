@@ -81,7 +81,7 @@ services:
   # MM Admin Panel
   admin:
     build:
-      context: ./release/admin
+      context: ./admin
       dockerfile: Dockerfile.admin.release
     container_name: mm-admin-prod
     restart: unless-stopped
@@ -99,7 +99,7 @@ services:
   # MM Web (Flutter Web)
   web:
     build:
-      context: ./release/web-app
+      context: ./web-app
       dockerfile: Dockerfile
     container_name: mm_web
     restart: unless-stopped
