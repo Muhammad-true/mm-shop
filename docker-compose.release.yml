@@ -60,7 +60,7 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - ../.env.production
+      - ./.env.production
     environment:
       - GIN_MODE=release
       - POSTGRES_USER=mm_user
