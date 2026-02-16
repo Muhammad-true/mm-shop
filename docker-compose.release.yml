@@ -117,7 +117,7 @@ services:
     # MM Web (Flutter Web)
   web:
     build:
-      context: ./web-app
+      context: ./
       dockerfile: Dockerfile.webapp.release
     container_name: mm-web-prod
     restart: unless-stopped
