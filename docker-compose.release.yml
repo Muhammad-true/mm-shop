@@ -117,26 +117,29 @@ services:
     build:
       context: ./
     dockerfile: Dockerfile.webapp.release
-  container_name: mm-web-prod
-  restart: unless-stopped
-  networks:
-    - mm-network
-  volumes:
-    - ./web-app:/usr/share/nginx/html:ro
-    - /etc/letsencrypt:/etc/letsencrypt:ro
-    - ./nginx/webapp.conf:/etc/nginx/conf.d/default.conf:ro
-  ports:
-    - "80:80"
-    - "443:443"
-  depends_on:
-    - api
-  healthcheck:
-    test: ["CMD", "curl", "-f", "http://localhost/"]
-    interval: 30s
-    timeout: 5s
-    retries: 3
-
-
+    container_name: mm-web-prod
+    restart: unless-stopped
+    networks:
+      - mm-network
+    volumes:
+      - ./web-app:/usr/share/nginx/html:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./nginx/webapp.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   # PgAdmin
   pgadmin:
