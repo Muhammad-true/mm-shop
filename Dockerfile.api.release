@@ -1,62 +1,32 @@
-# MM API - Production Release
-# ===========================
-
 FROM golang:1.24-alpine AS builder
-
-# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Настраиваем временную директорию для Go
 ENV GOTMPDIR=/tmp/go-tmp
-# Включаем кэш Go (требуется для Go 1.12+)
 ENV GOCACHE=/tmp/go-cache
-# Разрешаем автоматическое скачивание toolchain, если нужна более новая версия
 ENV GOTOOLCHAIN=auto
 
-# Копируем go.mod и go.sum
 COPY go.mod go.sum ./
+RUN go mod download
 
-# Загружаем зависимости и сразу очищаем кэш
-RUN go mod download && \
-    go clean -cache -modcache -testcache 2>/dev/null || true
-
-# Копируем исходный код
 COPY . .
 
-# Создаем временные директории для Go
 RUN mkdir -p /tmp/go-tmp /tmp/go-cache
 
-# Собираем бинарник с оптимизацией (с strip символов)
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-w -s" -trimpath -a -installsuffix cgo -o mm_shop . && \
-    ls -la /app/mm_shop && \
-    go clean -cache -modcache -testcache 2>/dev/null || true && \
-    rm -rf /tmp/go-tmp/* /tmp/go-cache/* /var/tmp/* /root/.cache 2>/dev/null || true
+    go build -ldflags="-w -s" -trimpath -o mm_shop . && \
+    rm -rf /tmp/go-tmp/* /tmp/go-cache/* /var/tmp/* /root/.cache
 
-# Финальный образ
 FROM alpine:latest
-
-# Устанавливаем ca-certificates для HTTPS запросов
 RUN apk --no-cache add ca-certificates wget
-
 WORKDIR /app
 
-# Копируем бинарник из builder
 COPY --from=builder /app/mm_shop .
-
-# Копируем админ-панель из builder
 COPY --from=builder /app/admin ./admin
 
-# Создаем директории для изображений и логов
 RUN mkdir -p /app/images /app/logs
-
-# Открываем порт
 EXPOSE 8080
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
-# Запускаем приложение
 CMD ["./mm_shop"]
-
