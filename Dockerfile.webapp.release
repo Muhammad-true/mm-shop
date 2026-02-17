@@ -1,13 +1,10 @@
 FROM nginx:alpine
 
+# Убираем дефолт
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Копируем конфигурацию Nginx для веб-приложения
-COPY nginx/webapp.conf /etc/nginx/conf.d/default.conf
+# Копируем свою конфигурацию
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Копируем Flutter Web сборку
-COPY web-app/ /usr/share/nginx/html/
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Копируем файлы веб-приложения
+COPY . /usr/share/nginx/html/
