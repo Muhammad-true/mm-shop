@@ -98,12 +98,11 @@ services:
   admin:
     build:
       context: ./admin
-      dockerfile: Dockerfile.admin.release
+      dockerfile: Docker.admin.release
     container_name: mm-admin-prod
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "81:80"
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
@@ -116,7 +115,7 @@ services:
   web:
     build:
       context: ./web-app
-    dockerfile: Dockerfile.webapp.release
+      dockerfile: Docker.webapp.release
     container_name: mm-web-prod
     restart: unless-stopped
     networks:
