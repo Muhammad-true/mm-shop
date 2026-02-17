@@ -1,5 +1,5 @@
 ############################################
-# Libiss- Production Release (Optimized for 50GB Storage)
+# Libiss - Production Release (Optimized for 50GB Storage)
 ############################################
 
 services:
@@ -97,7 +97,7 @@ services:
   # MM Admin Panel
   admin:
     build:
-      context: ./
+      context: ./release/admin
       dockerfile: Dockerfile.admin.release
     container_name: mm-admin-prod
     restart: unless-stopped
@@ -113,19 +113,18 @@ services:
       - mm-network
 
   # MM Web (Flutter Web)
-   # MM Web (Flutter Web)
-    # MM Web (Flutter Web)
   web:
     build:
-      context: ./
+      context: ./release/web-app
       dockerfile: Dockerfile.webapp.release
     container_name: mm-web-prod
     restart: unless-stopped
     networks:
       - mm-network
     volumes:
-      - ./web-app:/usr/share/nginx/html:ro
+      - ./release/web-app:/usr/share/nginx/html:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./release/web-app/nginx.webapp.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "80:80"
       - "443:443"
@@ -136,8 +135,6 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-
-
 
   # PgAdmin
   pgadmin:
